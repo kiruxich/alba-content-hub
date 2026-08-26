@@ -1,0 +1,1030 @@
+// --- ВСТРОЕННЫЕ ДАННЫЕ ПРОДУКТОВ (data.js больше не нужен) ---
+const productsData = [
+    { id: 'insights', title: 'InSights', badge: 'Аналитика', badgeBg: 'rgba(10,132,255,0.15)', badgeColor: '#0a84ff', target: 'B2B, Маркетологи', value: 'Поиск блогеров и AI-скоринг', desc: 'SaaS платформа для анализа соцсетей с ИИ', roadmap: [{ step: 'MVP', desc: 'Релиз базового поиска' }] },
+    { id: 'hranitel', title: 'Хранитель', badge: 'Документооборот', badgeBg: 'rgba(48,209,88,0.15)', badgeColor: '#30d158', target: 'Enterprise, Госсектор', value: 'Поиск по сканам в закрытом контуре', desc: 'RAG-система для работы с архивами', roadmap: [{ step: 'Пилот', desc: 'Внедрение в первую корпорацию' }] },
+    { id: 'duet', title: 'ДУЭТ', badge: 'Образование', badgeBg: 'rgba(191,90,242,0.15)', badgeColor: '#bf5af2', target: 'Школы, B2G', value: 'Автоматизация расписаний', desc: 'Управление образовательным процессом', roadmap: [{ step: 'Серт.', desc: 'Получение лицензий' }] },
+    { id: 'crista', title: 'Crista', badge: 'HoReCa', badgeBg: 'rgba(255,159,10,0.15)', badgeColor: '#ff9f0a', target: 'Рестораны, Отели', value: 'Автоматизация бронирований', desc: 'CRM для сегмента гостеприимства', roadmap: [{ step: 'Бета', desc: 'Тест на 3 ресторанах' }] },
+    { id: 'fantaziya', title: 'Фантазия', badge: 'E-commerce', badgeBg: 'rgba(255,55,95,0.15)', badgeColor: '#ff375f', target: 'Ритейл', value: 'Умные витрины', desc: 'AI-рекомендации для интернет-магазинов', roadmap: [{ step: 'Релиз', desc: 'Запуск интеграции с CMS' }] },
+    { id: 'legitagent', title: 'legitAgent', badge: 'Open Source', badgeBg: 'rgba(100,210,255,0.15)', badgeColor: '#64d2ff', target: 'Разработчики', value: 'NPM пакеты и CLI инструменты', desc: 'Инструментарий для фронтенд разработчиков', roadmap: [{ step: 'v1.0', desc: 'Стабильный релиз ядра' }] },
+    { id: 'alba-creation', title: 'Alba Creation', badge: 'Студия', badgeBg: 'rgba(94,92,230,0.15)', badgeColor: '#5e5ce6', target: 'Все клиенты', value: 'Full-stack разработка', desc: 'Цифровая веб-студия полного цикла', roadmap: [{ step: 'Масштаб', desc: 'Выход на международный рынок' }] }
+];
+
+let ideasBank = [];
+let scheduledEvents = [];
+let tgSettings = { token: '', chatId: '' };
+let planSettings = { daily: 1, weekly: 7 };
+let currentSelectedIdea = null;
+let currentOpenProductId = null;
+let selectedPickerDate = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    initStorageEngine();
+    renderProductsGrid();
+    renderMatrixView();
+    renderCalendar();
+    renderKanbanView();
+    renderAnalyticsView();
+    const schedInput = document.getElementById('schedule-date-input');
+    if (schedInput) schedInput.value = new Date().toISOString().split('T')[0];
+});
+
+// ИНИЦИАЛИЗАЦИЯ И ХРАНИЛИЩЕ (Только localStorage)
+function initStorageEngine() {
+    try {
+        const savedIdeas = localStorage.getItem('alba_ideas_bank');
+        ideasBank = savedIdeas ? JSON.parse(savedIdeas) : [];
+
+        const savedEvents = localStorage.getItem('alba_scheduled_events');
+        scheduledEvents = savedEvents ? JSON.parse(savedEvents) : [];
+
+        const savedPlan = localStorage.getItem('alba_plan_settings');
+        if (savedPlan) planSettings = JSON.parse(savedPlan);
+
+        const savedTg = localStorage.getItem('alba_tg_settings');
+        if (savedTg) tgSettings = JSON.parse(savedTg);
+
+        const dailyInput = document.getElementById('plan-daily-input');
+        const weeklyInput = document.getElementById('plan-weekly-input');
+        if (dailyInput) dailyInput.value = planSettings.daily || 1;
+        if (weeklyInput) weeklyInput.value = planSettings.weekly || 7;
+
+        renderBankView();
+        updatePlanProgress();
+    } catch (e) {
+        console.warn("Storage init warning:", e);
+    }
+}
+
+function saveState() {
+    localStorage.setItem('alba_ideas_bank', JSON.stringify(ideasBank));
+    localStorage.setItem('alba_scheduled_events', JSON.stringify(scheduledEvents));
+    localStorage.setItem('alba_plan_settings', JSON.stringify(planSettings));
+    localStorage.setItem('alba_tg_settings', JSON.stringify(tgSettings));
+}
+
+// УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ И НАВИГАЦИЯ
+function switchTab(tabName) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+
+    const targetView = document.getElementById(`view-${tabName}`);
+    if (targetView) targetView.classList.add('active');
+    
+    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5 };
+    if (tabMap[tabName] !== undefined) {
+        const tabs = document.querySelectorAll('.tab-item');
+        if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
+    }
+
+    if (tabName === 'kanban') renderKanbanView();
+    if (tabName === 'analytics') renderAnalyticsView();
+    if (tabName === 'calendar') {
+        renderCalendar();
+        checkFunnelBalance();
+    }
+}
+
+function openOverlay(id) { 
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active'); 
+}
+
+function closeOverlay(id) { 
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active'); 
+}
+
+function showToast(text) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.innerText = text;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// НАСТРОЙКА ПЛАНА ПУБЛИКАЦИЙ И ПРОГРЕСС
+function savePlanSettings() {
+    const dailyInput = document.getElementById('plan-daily-input');
+    const weeklyInput = document.getElementById('plan-weekly-input');
+    
+    const daily = parseInt(dailyInput ? dailyInput.value : 1, 10) || 1;
+    const weekly = parseInt(weeklyInput ? weeklyInput.value : 7, 10) || 7;
+    
+    planSettings = { daily, weekly };
+    saveState();
+    
+    updatePlanProgress();
+    renderCalendar();
+    showToast('План публикаций сохранен и применен!');
+}
+
+function updatePlanProgress() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    const todayCount = scheduledEvents.filter(e => e.rawDate === todayStr).length;
+    const todayPct = Math.min(100, Math.round((todayCount / planSettings.daily) * 100));
+    
+    const tText = document.getElementById('today-progress-text');
+    const tFill = document.getElementById('today-progress-fill');
+    if (tText) tText.innerText = `${todayCount} / ${planSettings.daily} (${todayPct}%)`;
+    if (tFill) tFill.style.width = `${todayPct}%`;
+
+    const now = new Date();
+    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - (dayOfWeek - 1));
+    startOfWeek.setHours(0,0,0,0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23,59,59,999);
+
+    const weekCount = scheduledEvents.filter(e => {
+        const eDate = new Date(e.rawDate);
+        return eDate >= startOfWeek && eDate <= endOfWeek;
+    }).length;
+
+    const weekPct = Math.min(100, Math.round((weekCount / planSettings.weekly) * 100));
+
+    const wText = document.getElementById('week-progress-text');
+    const wFill = document.getElementById('week-progress-fill');
+    if (wText) wText.innerText = `${weekCount} / ${planSettings.weekly} (${weekPct}%)`;
+    if (wFill) wFill.style.width = `${weekPct}%`;
+}
+
+// БАНК ИДЕЙ
+function renderBankView() {
+    const countBadge = document.getElementById('tab-bank-count');
+    if (countBadge) countBadge.innerText = ideasBank.length;
+    
+    const container = document.getElementById('bank-list-content');
+    if (!container) return;
+
+    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase();
+
+    const filtered = ideasBank.filter(i => 
+        i.title.toLowerCase().includes(searchQuery) ||
+        (i.desc && i.desc.toLowerCase().includes(searchQuery)) ||
+        (i.format && i.format.toLowerCase().includes(searchQuery)) ||
+        (i.funnel && i.funnel.toLowerCase().includes(searchQuery))
+    );
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Идеи не найдены или банк пуст</div>`;
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(idea => {
+        const charCount = (idea.desc || '').length;
+        const readTime = Math.max(1, Math.ceil(charCount / 500));
+        const statusMap = { 'idea': '💡 Идея', 'in_progress': '⚙️ В работе', 'ready': '✅ Готово', 'published': '🚀 Опубликовано' };
+        const funnelColor = idea.funnel === 'TOFU' ? '#30d158' : idea.funnel === 'MOFU' ? '#ff9f0a' : '#ff453a';
+
+        html += `
+        <div class="idea-card" draggable="true" ondragstart="handleDragStart(event, '${idea.id}')">
+            <div class="idea-header">
+                <div class="idea-title">${idea.title}</div>
+                <div>
+                    <span class="funnel-badge" style="background:${funnelColor}22; color:${funnelColor};">${idea.funnel || 'TOFU'}</span>
+                    <span class="format-tag">${idea.format || 'TG Пост'}</span>
+                </div>
+            </div>
+            ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
+            <div class="idea-cta">CTA: ${idea.cta || '—'}</div>
+            
+            <div class="meta-stats">
+                <span>📏 ${charCount} симв.</span>
+                <span>⏱ ~${readTime} мин.</span>
+                <span>Статус: <strong>${statusMap[idea.status || 'idea']}</strong></span>
+            </div>
+
+            <div style="margin-top:8px; padding-top:8px; border-top:0.5px solid var(--separator);">
+                <span style="font-size:11px; color:var(--text-secondary); font-weight:600; text-transform:uppercase;">Продукты:</span>
+                <div>`;
+        
+        productsData.forEach(p => {
+            const isFavorited = idea.targetGroups && idea.targetGroups.includes(p.id);
+            html += `
+                <button class="group-chip ${isFavorited ? 'active' : ''}" onclick="toggleGroupForIdea('${idea.id}', '${p.id}')">
+                    ${isFavorited ? '✓ ' : ''}${p.title}
+                </button>`;
+        });
+
+        html += `</div>
+            </div>
+
+            <div class="action-btn-row">
+                <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
+                <button class="edit-btn" onclick="generateAIPrompt('${idea.id}')">🤖 AI Промпт</button>
+                <button class="tg-btn" onclick="copyTelegramFormatted('${idea.id}')">📋 Скопировать</button>
+                <button class="tg-btn" style="background:#0088cc;" onclick="postToTelegram('${idea.id}')">✈️ В TG Bot</button>
+                <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
+                <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
+                <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+// КАНБАН-ДОСКА (DRAG AND DROP)
+function renderKanbanView() {
+    const container = document.getElementById('kanban-board-container');
+    if (!container) return;
+
+    const columns = [
+        { id: 'idea', title: '💡 Идеи' },
+        { id: 'in_progress', title: '⚙️ В работе' },
+        { id: 'ready', title: '✅ Готово' },
+        { id: 'published', title: '🚀 Опубликовано' }
+    ];
+
+    let html = '';
+    columns.forEach(col => {
+        const items = ideasBank.filter(i => (i.status || 'idea') === col.id);
+        html += `
+        <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, '${col.id}')">
+            <div class="kanban-column-header">
+                <span>${col.title}</span>
+                <span class="kanban-count">${items.length}</span>
+            </div>
+            <div class="kanban-cards">`;
+
+        items.forEach(idea => {
+            html += `
+            <div class="kanban-card" draggable="true" ondragstart="handleDragStart(event, '${idea.id}')">
+                <div style="font-weight:600; font-size:14px; margin-bottom:4px;">${idea.title}</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">${idea.format} • ${idea.funnel || 'TOFU'}</div>
+                <button class="edit-btn" style="width:100%; font-size:11px;" onclick="openEditIdeaModal('${idea.id}')">Изменить</button>
+            </div>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function handleDragStart(e, ideaId) {
+    e.dataTransfer.setData("text/plain", ideaId);
+}
+
+function allowDrop(e) { e.preventDefault(); }
+
+function handleDrop(e, targetStatus) {
+    e.preventDefault();
+    const ideaId = e.dataTransfer.getData("text/plain");
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (idea) {
+        idea.status = targetStatus;
+        saveState();
+        renderKanbanView();
+        renderBankView();
+        showToast(`Статус изменен на ${targetStatus}`);
+    }
+}
+
+// AI ПРОМПТ ГЕНЕРАТОР
+function generateAIPrompt(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const targetProduct = productsData.find(p => idea.targetGroups && idea.targetGroups.includes(p.id));
+    const productName = targetProduct ? targetProduct.title : "Alba Creation Studio";
+
+    const promptText = `Напиши готовый контент для ${idea.format} на тему: "${idea.title}".
+Продукт: ${productName}.
+Целевая аудитория и ценность: ${targetProduct ? targetProduct.value : 'B2B/B2C клиенты цифровой студии'}.
+Контекст и тезисы: ${idea.desc || 'Сфокусируйся на преимуществах и решении болей'}.
+Этап воронки: ${idea.funnel || 'TOFU (Охват)'}.
+Обязательный CTA в конце: ${idea.cta || 'Записаться на консультацию'}.
+Стиль: Лаконичный, экспертный, без лишней "воды", с четким форматированием списков и абзацев.`;
+
+    const pTitle = document.getElementById('ai-prompt-title');
+    const pText = document.getElementById('ai-prompt-text');
+    if (pTitle) pTitle.innerText = `Промпт: ${idea.title}`;
+    if (pText) pText.value = promptText;
+    openOverlay('ai-prompt-overlay');
+}
+
+function copyGeneratedPrompt() {
+    const text = document.getElementById('ai-prompt-text')?.value || '';
+    navigator.clipboard.writeText(text);
+    showToast('Промпт скопирован в буфер!');
+    closeOverlay('ai-prompt-overlay');
+}
+
+// ДАШБОРД И АНАЛИТИКА
+function renderAnalyticsView() {
+    const container = document.getElementById('analytics-content');
+    if (!container) return;
+
+    let productStats = productsData.map(p => {
+        const count = ideasBank.filter(i => i.targetGroups && i.targetGroups.includes(p.id)).length;
+        return { title: p.title, count, color: p.badgeColor };
+    });
+
+    const formats = ['TG Пост', 'Threads ветка', 'Insta Reels', 'Insta Публикация', 'Insta История', 'YouTube Shorts', 'VK Клип'];
+    let formatStats = formats.map(f => {
+        const count = ideasBank.filter(i => i.format === f).length;
+        return { format: f, count };
+    });
+
+    let topROI = [...ideasBank].sort((a,b) => ((b.metrics?.leads || 0) - (a.metrics?.leads || 0))).slice(0, 3);
+
+    let html = `
+    <div class="analytics-card">
+        <h3>📊 Дашборд баланса продуктов</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Распределение контент-гипотез по направлениям студии</p>`;
+
+    productStats.forEach(p => {
+        const pct = ideasBank.length ? Math.round((p.count / ideasBank.length) * 100) : 0;
+        html += `
+        <div style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-bottom:4px;">
+                <span>${p.title}</span>
+                <span>${p.count} идей (${pct}%)</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width:${pct}%; background:${p.color}"></div>
+            </div>
+        </div>`;
+    });
+
+    html += `</div>
+
+    <div class="analytics-card">
+        <h3>🎯 Сплит форматов</h3>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-top:12px;">`;
+
+    formatStats.forEach(fs => {
+        html += `
+        <div class="stat-box">
+            <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">${fs.count}</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${fs.format}</div>
+        </div>`;
+    });
+
+    html += `</div></div>
+
+    <div class="analytics-card">
+        <h3>🏆 Рейтинг конверсий & ROI (Топ по B2B лидам)</h3>
+        <div style="margin-top:10px;">`;
+
+    topROI.forEach((item, idx) => {
+        const leads = item.metrics?.leads || 0;
+        const clicks = item.metrics?.clicks || 0;
+        html += `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:0.5px solid var(--separator);">
+            <div>
+                <strong>#${idx+1} ${item.title}</strong>
+                <div style="font-size:12px; color:var(--text-secondary);">${item.format} • ${item.funnel || 'TOFU'}</div>
+            </div>
+            <div style="text-align:right;">
+                <span class="funnel-badge" style="background:rgba(48,209,88,0.2); color:var(--accent-green); font-size:13px;">🎯 ${leads} лидов</span>
+                <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${clicks} кликов</div>
+            </div>
+        </div>`;
+    });
+
+    html += `</div></div>`;
+    container.innerHTML = html;
+}
+
+// ЭКСПОРТ И TELEGRAM
+function copyTelegramFormatted(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const formattedText = `*${idea.title}*\n\n${idea.desc || ''}\n\n👉 _${idea.cta || ''}_\n\n#${(idea.funnel || 'TOFU')} #AlbaCreation`;
+    navigator.clipboard.writeText(formattedText);
+    showToast('Скопировано с разметкой!');
+}
+
+function checkFunnelBalance() {
+    const warningBox = document.getElementById('funnel-warning-box');
+    if (!warningBox) return;
+
+    const tofuCount = scheduledEvents.filter(e => e.desc && e.desc.includes('TOFU')).length;
+    const bofuCount = scheduledEvents.filter(e => e.desc && e.desc.includes('BOFU')).length;
+
+    if (bofuCount > 0 && tofuCount === 0) {
+        warningBox.innerHTML = `
+        <div class="warning-banner">
+            ⚠️ <strong>Дисбаланс воронки:</strong> В календаре есть продающие посты (BOFU), но отсутствует охватный контент (TOFU). Добавьте привлекающие публикации!
+        </div>`;
+    } else {
+        warningBox.innerHTML = '';
+    }
+}
+
+function validateLimits() {
+    const formatEl = document.getElementById('edit-idea-format-input');
+    const descEl = document.getElementById('edit-idea-desc-input');
+    const badge = document.getElementById('limit-validator-badge');
+
+    if (!formatEl || !descEl || !badge) return;
+
+    const format = formatEl.value;
+    const desc = descEl.value;
+
+    let limit = 4096;
+    if (format.includes('Reels') || format.includes('Shorts') || format.includes('Клип')) limit = 1000;
+    if (format.includes('Threads')) limit = 500;
+    if (format.includes('История')) limit = 200;
+
+    const current = desc.length;
+    badge.innerText = `${current} / ${limit} симв.`;
+
+    if (current > limit) {
+        badge.style.color = "var(--accent-red)";
+        badge.style.borderColor = "var(--accent-red)";
+    } else {
+        badge.style.color = "var(--accent-green)";
+        badge.style.borderColor = "var(--accent-green)";
+    }
+}
+
+// МЕТРИКИ И РЕДАКТИРОВАНИЕ
+function openMetricsModal(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    document.getElementById('metrics-idea-id').value = idea.id;
+    document.getElementById('metrics-idea-title').innerText = idea.title;
+    document.getElementById('m-views').value = idea.metrics?.views || 0;
+    document.getElementById('m-saves').value = idea.metrics?.saves || 0;
+    document.getElementById('m-clicks').value = idea.metrics?.clicks || 0;
+    document.getElementById('m-leads').value = idea.metrics?.leads || 0;
+
+    openOverlay('metrics-overlay');
+}
+
+function saveMetrics() {
+    const id = document.getElementById('metrics-idea-id').value;
+    const idea = ideasBank.find(i => i.id === id);
+    if (idea) {
+        idea.metrics = {
+            views: parseInt(document.getElementById('m-views').value, 10) || 0,
+            saves: parseInt(document.getElementById('m-saves').value, 10) || 0,
+            clicks: parseInt(document.getElementById('m-clicks').value, 10) || 0,
+            leads: parseInt(document.getElementById('m-leads').value, 10) || 0
+        };
+        saveState();
+        showToast('Метрики сохранены!');
+        closeOverlay('metrics-overlay');
+        renderBankView();
+        renderAnalyticsView();
+    }
+}
+
+function toggleGroupForIdea(ideaId, groupId) {
+    ideasBank = ideasBank.map(idea => {
+        if (idea.id !== ideaId) return idea;
+        const targetGroups = idea.targetGroups || [];
+        const exists = targetGroups.includes(groupId);
+        return { ...idea, targetGroups: exists ? targetGroups.filter(g => g !== groupId) : [...targetGroups, groupId] };
+    });
+
+    saveState();
+    renderBankView();
+    if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
+}
+
+function openEditIdeaModal(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    document.getElementById('edit-modal-title').innerText = "Редактировать идею";
+    document.getElementById('edit-idea-id').value = idea.id;
+    document.getElementById('edit-idea-title-input').value = idea.title;
+    document.getElementById('edit-idea-desc-input').value = idea.desc || '';
+    document.getElementById('edit-idea-format-input').value = idea.format || 'TG Пост';
+    document.getElementById('edit-idea-funnel-input').value = idea.funnel || 'TOFU';
+    document.getElementById('edit-idea-status-input').value = idea.status || 'idea';
+    document.getElementById('edit-idea-cta-input').value = idea.cta || '';
+
+    validateLimits();
+    openOverlay('edit-idea-overlay');
+}
+
+function openNewIdeaModal() {
+    document.getElementById('edit-modal-title').innerText = "Создать новую идею";
+    document.getElementById('edit-idea-id').value = "";
+    document.getElementById('edit-idea-title-input').value = "";
+    document.getElementById('edit-idea-desc-input').value = "";
+    document.getElementById('edit-idea-format-input').value = "TG Пост";
+    document.getElementById('edit-idea-funnel-input').value = "TOFU";
+    document.getElementById('edit-idea-status-input').value = "idea";
+    document.getElementById('edit-idea-cta-input').value = "Консультация Alba Creation";
+
+    validateLimits();
+    openOverlay('edit-idea-overlay');
+}
+
+function saveIdeaChanges() {
+    const id = document.getElementById('edit-idea-id').value;
+    const title = document.getElementById('edit-idea-title-input').value.trim();
+    const desc = document.getElementById('edit-idea-desc-input').value.trim();
+    const format = document.getElementById('edit-idea-format-input').value;
+    const funnel = document.getElementById('edit-idea-funnel-input').value;
+    const status = document.getElementById('edit-idea-status-input').value;
+    const cta = document.getElementById('edit-idea-cta-input').value.trim();
+
+    if (!title) return alert('Укажите название идеи');
+
+    if (id) {
+        ideasBank = ideasBank.map(item => item.id === id ? { ...item, title, desc, format, funnel, status, cta } : item);
+        showToast('Идея обновлена!');
+    } else {
+        ideasBank.unshift({ 
+            id: String(Date.now()), 
+            title, desc, format, funnel, status, cta, 
+            targetGroups: [], 
+            metrics: { views: 0, saves: 0, clicks: 0, leads: 0 } 
+        });
+        showToast('Новая идея создана!');
+    }
+
+    saveState();
+    renderBankView();
+    renderKanbanView();
+    renderAnalyticsView();
+    if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
+    closeOverlay('edit-idea-overlay');
+}
+
+function deleteIdea(ideaId) {
+    if (!confirm('Удалить эту идею?')) return;
+    
+    // Удаляем из банка
+    ideasBank = ideasBank.filter(i => i.id !== ideaId);
+    
+    // Также можно удалить связанные события из календаря
+    scheduledEvents = scheduledEvents.filter(e => e.ideaId !== ideaId);
+
+    saveState();
+    renderBankView();
+    renderKanbanView();
+    renderAnalyticsView();
+    renderCalendar();
+    showToast('Идея удалена');
+}
+
+function exportIdeasJSON() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ideasBank, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", "ideas.json");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast('Экспортировано!');
+}
+
+function processImportJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (Array.isArray(data)) {
+                ideasBank = data;
+                saveState();
+                renderBankView();
+                renderKanbanView();
+                renderAnalyticsView();
+                showToast('Импортировано успешно!');
+            }
+        } catch (err) { alert('Ошибка чтения JSON файла'); }
+    };
+    reader.readAsText(file);
+}
+
+// TELEGRAM BOT API
+function openTgSettings() {
+    document.getElementById('tg-token-input').value = tgSettings.token || '';
+    document.getElementById('tg-chat-input').value = tgSettings.chatId || '';
+    openOverlay('tg-config-overlay');
+}
+
+function saveTgSettings() {
+    tgSettings.token = document.getElementById('tg-token-input').value.trim();
+    tgSettings.chatId = document.getElementById('tg-chat-input').value.trim();
+    saveState();
+    closeOverlay('tg-config-overlay');
+    showToast('Настройки Telegram сохранены');
+}
+
+async function postToTelegram(ideaId) {
+    if (!tgSettings.token || !tgSettings.chatId) {
+        alert('Укажите Bot Token и Chat ID в настройках Telegram!');
+        openTgSettings();
+        return;
+    }
+
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const messageText = `*${idea.title}*\n\n${idea.desc || ''}\n\n👉 _${idea.cta || ''}_\n\n#${(idea.funnel || 'TOFU')} #AlbaCreation`;
+
+    try {
+        const res = await fetch(`https://api.telegram.org/bot${tgSettings.token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: tgSettings.chatId, text: messageText, parse_mode: 'Markdown' })
+        });
+        const data = await res.json();
+        if (data.ok) showToast('Опубликовано в Telegram!');
+        else alert('Ошибка отправки: ' + data.description);
+    } catch (e) {
+        alert('Не удалось отправить запрос в Telegram API.');
+    }
+}
+
+// МАТРИЦА СИНЕРГИИ И СТРУКТУРА ПРОДУКТОВ
+function renderMatrixView() {
+    const container = document.getElementById('matrix-grid');
+    if (!container) return;
+    let html = '';
+
+    productsData.forEach(p => {
+        html += `
+        <div class="matrix-card">
+            <div class="card-header">
+                <span class="card-title" style="font-size:18px;">${p.title}</span>
+                <span class="card-badge" style="background:${p.badgeBg}; color:${p.badgeColor}">${p.badge}</span>
+            </div>
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">${p.desc}</p>
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-top:14px;">Синергия и лиды:</div>`;
+
+        if (p.synergies && p.synergies.length > 0) {
+            p.synergies.forEach(syn => {
+                html += `
+                <div class="matrix-flow-item">
+                    <span class="matrix-flow-arrow">→</span>
+                    <div>
+                        <strong>${syn.target}</strong> <span style="font-size:10px; color:${p.badgeColor}; border:1px solid ${p.badgeColor}; border-radius:4px; padding:1px 4px; margin-left:4px;">${syn.type}</span>
+                        <div style="color:var(--text-secondary); font-size:12px; margin-top:2px;">${syn.text}</div>
+                    </div>
+                </div>`;
+            });
+        } else {
+            html += `<div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Конечный хаб студии.</div>`;
+        }
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function renderProductsGrid() {
+    const container = document.getElementById('products-grid');
+    if (!container) return;
+    let html = '';
+
+    productsData.forEach(p => {
+        html += `
+        <div class="product-card" onclick="openProductDetail('${p.id}')">
+            <div>
+                <div class="card-header">
+                    <div class="card-title">${p.title}</div>
+                    <span class="card-badge" style="background:${p.badgeBg}; color:${p.badgeColor}">${p.badge}</span>
+                </div>
+                <div class="card-desc">${p.desc}</div>
+            </div>
+            <div class="card-footer">
+                <span>Роадмап и идеи</span>
+                <span>→</span>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function openProductDetail(productId) {
+    currentOpenProductId = productId;
+    renderProductDetailContent(productId);
+    openOverlay('product-detail-overlay');
+}
+
+function renderProductDetailContent(productId) {
+    const product = productsData.find(p => p.id === productId);
+    if (!product) return;
+
+    const navTitle = document.getElementById('p-overlay-nav-title');
+    if (navTitle) navTitle.innerText = product.title;
+    
+    const favoritedIdeas = ideasBank.filter(i => i.targetGroups && i.targetGroups.includes(productId));
+
+    let html = `
+        <h2 style="font-size:26px; font-weight:700; margin:0 0 6px 0;">${product.title}</h2>
+        <div style="font-size:14px; color:var(--text-secondary); margin-bottom:20px;">${product.desc}</div>
+
+        <div class="p-section-title">ЦЕЛЕВАЯ АУДИТОРИЯ & ЦЕННОСТЬ</div>
+        <div class="info-box">
+            <strong>ЦА:</strong> ${product.target}<br><br>
+            <strong>Главный посыл:</strong> ${product.value}
+        </div>
+
+        <div class="p-section-title">ROADMAP ПРОДВИЖЕНИЯ</div>
+        <div class="roadmap-list">`;
+    
+    product.roadmap.forEach(r => {
+        html += `
+            <div class="roadmap-step" style="border-left-color:${product.badgeColor}">
+                <div class="step-title">${r.step}</div>
+                <div class="step-desc">${r.desc}</div>
+            </div>`;
+    });
+
+    html += `</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:24px 0 10px 4px;">
+            <span class="p-section-title" style="margin:0;">ИЗБРАННЫЕ ИДЕИ (${favoritedIdeas.length})</span>
+            <button onclick="closeOverlay('product-detail-overlay'); switchTab('bank');" style="background:none; border:none; color:var(--accent-blue); font-size:12px; font-weight:600; cursor:pointer;">+ Из Банка</button>
+        </div>
+        <div>`;
+
+    if (favoritedIdeas.length === 0) {
+        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Нет идей для этого проекта.</div>`;
+    } else {
+        favoritedIdeas.forEach((idea) => {
+            html += `
+                <div class="idea-card">
+                    <div class="idea-header">
+                        <div class="idea-title">${idea.title}</div>
+                        <span class="format-tag">${idea.format}</span>
+                    </div>
+                    ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
+                    <div class="idea-cta">CTA: ${idea.cta}</div>
+                    <div class="action-btn-row">
+                        <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
+                        <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">Запланировать</button>
+                    </div>
+                </div>`;
+        });
+    }
+
+    html += `</div>`;
+    const body = document.getElementById('product-detail-body');
+    if (body) body.innerHTML = html;
+}
+
+// ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ И ПИKЕР ИДЕЙ
+function openScheduleForIdea(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const targetProduct = productsData.find(p => idea.targetGroups && idea.targetGroups.includes(p.id));
+    const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
+    const pColor = targetProduct ? targetProduct.badgeColor : "#0a84ff";
+
+    currentSelectedIdea = idea; 
+    
+    const sTitle = document.getElementById('schedule-title');
+    const sCat = document.getElementById('schedule-category');
+    if (sTitle) sTitle.innerText = idea.title;
+    if (sCat) sCat.innerText = `Продукт: ${pTitle}`;
+    openOverlay('schedule-overlay');
+}
+
+function confirmSchedule() {
+    const chosenDate = document.getElementById('schedule-date-input').value;
+    if (!chosenDate || !currentSelectedIdea) return;
+
+    const targetProduct = productsData.find(p => currentSelectedIdea.targetGroups && currentSelectedIdea.targetGroups.includes(p.id));
+    const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
+    const pColor = targetProduct ? targetProduct.badgeColor : "#0a84ff";
+
+    const d = new Date(chosenDate);
+    const dayNames = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
+    const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+    const dateStr = `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
+
+    scheduledEvents.push({
+        id: Date.now(),
+        ideaId: currentSelectedIdea.id,
+        title: `${pTitle}: ${currentSelectedIdea.title}`,
+        dateStr: dateStr,
+        rawDate: chosenDate,
+        color: pColor,
+        format: currentSelectedIdea.format || 'TG Пост',
+        cta: currentSelectedIdea.cta || 'Консультация Alba Creation',
+        desc: currentSelectedIdea.desc || `Запланировано (${pTitle})`
+    });
+
+    scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
+    saveState();
+    renderCalendar();
+    updatePlanProgress();
+    checkFunnelBalance();
+
+    closeOverlay('schedule-overlay');
+    closeOverlay('product-detail-overlay');
+    showToast(`Запланировано на ${d.getDate()} ${monthNames[d.getMonth()]}`);
+    switchTab('calendar');
+}
+
+function renderCalendar() {
+    const gridContainer = document.getElementById('calendar-month-grid');
+    const listContainer = document.getElementById('calendar-list-content');
+    if (!gridContainer || !listContainer) return;
+
+    let gridHtml = '';
+    const daysInMonth = 31;
+    const weekDays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+    
+    weekDays.forEach(wd => gridHtml += `<div class="cal-day-header">${wd}</div>`);
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateFormatted = `2026-08-${day < 10 ? '0' + day : day}`;
+        const eventsOnDay = scheduledEvents.filter(e => e.rawDate === dateFormatted);
+        const hasEvent = eventsOnDay.length > 0;
+
+        const reelsCount = eventsOnDay.filter(e => (e.format || '').includes('Reels') || (e.format || '').includes('Shorts') || (e.format || '').includes('Клип')).length;
+        const postsCount = eventsOnDay.filter(e => (e.format || '').includes('TG') || (e.format || '').includes('Пост') || (e.format || '').includes('Публикация')).length;
+        const totalCount = eventsOnDay.length;
+
+        gridHtml += `
+            <div class="cal-day-cell ${hasEvent ? 'has-event' : ''}">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600;" onclick="openDayDetail('${dateFormatted}')">${day}</span>
+                    <span style="font-size:10px; color:var(--text-secondary);">${totalCount}/${planSettings.daily}</span>
+                </div>
+                
+                <div class="cal-slot-picker" onclick="openIdeaPickerForDay('${dateFormatted}')" title="Нажмите, чтобы добавить идею из Банка">
+                    ${totalCount > 0 ? `
+                        <div class="slot-badges">
+                            ${reelsCount > 0 ? `<span class="slot-badge reels">🎬 ${reelsCount}</span>` : ''}
+                            ${postsCount > 0 ? `<span class="slot-badge posts">📝 ${postsCount}</span>` : ''}
+                            ${(totalCount - reelsCount - postsCount) > 0 ? `<span class="slot-badge other">📌 ${totalCount - reelsCount - postsCount}</span>` : ''}
+                        </div>
+                    ` : `
+                        <span class="slot-add-text">+ Добавить</span>
+                    `}
+                </div>
+            </div>`;
+    }
+    gridContainer.innerHTML = gridHtml;
+
+    updatePlanProgress();
+
+    if (scheduledEvents.length === 0) {
+        listContainer.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-secondary);">Нет запланированных постов</div>`;
+        return;
+    }
+
+    let listHtml = `<div class="list-container">`;
+    scheduledEvents.forEach(item => {
+        const dateParts = item.rawDate.split('-');
+        const dayNum = parseInt(dateParts[2], 10);
+        const dayName = item.dateStr.split(',')[0];
+
+        listHtml += `
+        <div class="list-item" onclick="openDayDetail('${item.rawDate}')">
+            <div class="date-block">
+                <div class="date-day" style="color:${item.color}">${dayName}</div>
+                <div class="date-num">${dayNum}</div>
+            </div>
+            <div class="content-block">
+                <div class="item-title">
+                    <span class="dot" style="background-color: ${item.color}"></span>
+                    <span>${item.title}</span>
+                </div>
+                <div class="item-desc">${item.desc}</div>
+            </div>
+        </div>`;
+    });
+    listHtml += `</div>`;
+    listContainer.innerHTML = listHtml;
+}
+
+function openIdeaPickerForDay(dateFormatted) {
+    selectedPickerDate = dateFormatted;
+    const d = new Date(dateFormatted);
+    const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+    
+    const titleEl = document.getElementById('picker-date-title');
+    if (titleEl) titleEl.innerText = `Добавить публикацию на ${d.getDate()} ${monthNames[d.getMonth()]}`;
+
+    const body = document.getElementById('idea-picker-body');
+    if (!body) return;
+
+    // Исключаем идеи, которые УЖЕ есть в календаре
+    const scheduledIdeaIds = scheduledEvents.map(e => e.ideaId);
+    const availableIdeas = ideasBank.filter(idea => !scheduledIdeaIds.includes(idea.id));
+
+    if (availableIdeas.length === 0) {
+        body.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Все идеи из банка уже запланированы или банк пуст</div>`;
+    } else {
+        let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;
+        availableIdeas.forEach(idea => {
+            html += `
+            <div class="idea-card" style="margin-bottom:0;">
+                <div class="idea-header">
+                    <div class="idea-title">${idea.title}</div>
+                    <span class="format-tag">${idea.format || 'TG Пост'}</span>
+                </div>
+                ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
+                <button class="schedule-btn" style="width:100%; margin-top:8px;" onclick="attachIdeaToDay('${idea.id}', '${dateFormatted}')">+ Запланировать публикацию</button>
+            </div>`;
+        });
+        html += `</div>`;
+        body.innerHTML = html;
+    }
+    openOverlay('idea-picker-overlay');
+}
+
+function attachIdeaToDay(ideaId, dateStr) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const d = new Date(dateStr);
+    const dayNames = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
+    const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+    const dateDisplayStr = `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
+
+    const targetProduct = productsData.find(p => idea.targetGroups && idea.targetGroups.includes(p.id));
+    const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
+    const pColor = targetProduct ? targetProduct.badgeColor : "#0a84ff";
+
+    scheduledEvents.push({
+        id: Date.now(),
+        ideaId: idea.id, // Сохраняем ID идеи для фильтрации
+        title: `${pTitle}: ${idea.title}`,
+        dateStr: dateDisplayStr,
+        rawDate: dateStr,
+        color: pColor,
+        format: idea.format || 'TG Пост',
+        cta: idea.cta || 'Ссылка на Alba Creation',
+        desc: idea.desc || `Запланировано из банка (${pTitle})`
+    });
+
+    scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
+    saveState();
+    renderCalendar();
+    updatePlanProgress();
+    checkFunnelBalance();
+
+    closeOverlay('idea-picker-overlay');
+    showToast(`Публикация добавлена на ${d.getDate()} ${monthNames[d.getMonth()]}`);
+}
+
+// ОТДЕЛЬНАЯ СТРАНИЦА ДНЯ (КРУПНЫЕ КАРТОЧКИ ПУБЛИКАЦИЙ)
+function openDayDetail(dateStr) {
+    const events = scheduledEvents.filter(e => e.rawDate === dateStr);
+    const dateParts = dateStr.split('-');
+    const dayNum = parseInt(dateParts[2], 10);
+    const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+    const monthNum = parseInt(dateParts[1], 10) - 1;
+    
+    let html = `<div>
+        <h2 style="font-size:22px; font-weight:700; margin-bottom:16px;">Публикации на ${dayNum} ${monthNames[monthNum]} (${events.length})</h2>`;
+
+    if (events.length === 0) {
+        html += `<div class="info-box" style="text-align:center;">На этот день публикаций пока нет.</div>`;
+    } else {
+        events.forEach(item => {
+            html += `
+            <div class="day-large-card" style="border-left: 4px solid ${item.color}; background: var(--bg-grouped); border-radius: 14px; padding: 16px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-weight:700; font-size:15px; color:var(--text-primary);">Публикация</span>
+                    <span class="slot-badge" style="background:${item.color}22; color:${item.color}; font-size:11px; padding:3px 8px; border-radius:6px; font-weight:600;">${item.format || 'Пост'}</span>
+                </div>
+                <div style="font-size:16px; font-weight:600; margin-bottom:6px;">${item.title}</div>
+                <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">${item.desc}</div>
+                <div class="info-box" style="font-size:12px; margin-bottom:10px; padding:8px;"><strong>CTA:</strong> ${item.cta}</div>
+                <button class="delete-btn" style="width:100%; justify-content:center; padding:8px;" onclick="deleteEvent(${item.id}, '${dateStr}')">🗑 Удалить публикацию</button>
+            </div>`;
+        });
+    }
+
+    html += `
+        <button class="schedule-btn" style="width:100%; margin-top:8px;" onclick="closeOverlay('event-detail-overlay'); openIdeaPickerForDay('${dateStr}');">+ Добавить публикацию из банка</button>
+    </div>`;
+
+    const body = document.getElementById('event-detail-body');
+    if (body) body.innerHTML = html;
+    openOverlay('event-detail-overlay');
+}
+
+// УДАЛЕНИЕ ЗАПЛАНИРОВАННОЙ ПУБЛИКАЦИИ
+function deleteEvent(eventId, dateStr) {
+    scheduledEvents = scheduledEvents.filter(e => e.id !== eventId);
+    saveState();
+    renderCalendar();
+    updatePlanProgress();
+    checkFunnelBalance();
+
+    if (dateStr) {
+        openDayDetail(dateStr); // Перерисовываем модалку дня
+    } else {
+        closeOverlay('event-detail-overlay');
+    }
+    showToast('Публикация удалена из календаря');
+}
