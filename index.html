@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Alba Creation - Content & Product Hub</title>
+    <style>
+        :root {
+            --bg-base: #000000;
+            --bg-grouped: #1c1c1e;
+            --bg-grouped-active: #2c2c2e;
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e93;
+            --accent-blue: #0a84ff;
+            --accent-green: #30d158;
+            --accent-purple: #bf5af2;
+            --accent-orange: #ff9f0a;
+            --accent-red: #ff453a;
+            --separator: rgba(84, 84, 88, 0.4);
+            --sidebar-width: 260px;
+            --tab-bar-height: 65px;
+        }
+
+        *, *:before, *:after {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .app-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .navigation-bar {
+            background: rgba(28, 28, 30, 0.92);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-top: 0.5px solid var(--separator);
+            z-index: 100;
+            display: flex;
+        }
+
+        @media (max-width: 767px) {
+            .app-container { flex-direction: column; }
+            .navigation-bar {
+                position: absolute;
+                bottom: 0; left: 0; right: 0;
+                height: var(--tab-bar-height);
+                justify-content: space-around;
+                align-items: center;
+                padding-bottom: 8px;
+            }
+            .sidebar-brand { display: none; }
+            .view-container {
+                position: absolute;
+                top: 0; left: 0; right: 0;
+                bottom: var(--tab-bar-height);
+            }
+        }
+
+        @media (min-width: 768px) {
+            .app-container { flex-direction: row; }
+            .navigation-bar {
+                width: var(--sidebar-width);
+                height: 100%;
+                flex-direction: column;
+                justify-content: flex-start;
+                border-top: none;
+                border-right: 0.5px solid var(--separator);
+                padding: 24px 16px;
+                gap: 8px;
+            }
+            .sidebar-brand {
+                display: block;
+                padding: 0 12px 20px 12px;
+                border-bottom: 0.5px solid var(--separator);
+                margin-bottom: 12px;
+            }
+            .sidebar-brand p { margin: 0; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+            .sidebar-brand h2 { margin: 4px 0 0 0; font-size: 18px; font-weight: 700; }
+            .view-container { flex: 1; height: 100%; position: relative; }
+        }
+
+        .tab-item {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 10px 14px;
+            border-radius: 10px;
+            gap: 12px;
+            transition: all 0.2s ease;
+            width: 100%;
+            text-align: left;
+        }
+
+        @media (max-width: 767px) {
+            .tab-item {
+                flex-direction: column;
+                justify-content: center;
+                font-size: 10px;
+                padding: 6px 0;
+                gap: 3px;
+                border-radius: 0;
+                width: auto;
+            }
+        }
+
+        .tab-item svg { width: 22px; height: 22px; fill: currentColor; flex-shrink: 0; }
+        .tab-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-primary); }
+        .tab-item.active { color: var(--accent-blue); background: rgba(10, 132, 255, 0.15); font-weight: 600; }
+
+        .view {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background-color: var(--bg-base);
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            padding-bottom: 40px;
+        }
+        .view.active { display: block; opacity: 1; }
+
+        .large-header {
+            padding: 28px 24px 16px 24px;
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 10;
+            border-bottom: 0.5px solid var(--separator);
+        }
+        .large-header p { margin: 0 0 2px 0; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        .large-header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+
+        .products-grid {
+            padding: 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .product-card {
+            background: var(--bg-grouped);
+            border-radius: 16px;
+            padding: 20px;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.2s, border-color 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .product-card:hover { border-color: rgba(255, 255, 255, 0.2); background: var(--bg-grouped-active); transform: translateY(-2px); }
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .card-title { font-size: 20px; font-weight: 700; }
+        .card-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; text-transform: uppercase; }
+        .card-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.45; margin-bottom: 20px; }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--accent-blue); font-weight: 600; border-top: 0.5px solid var(--separator); padding-top: 12px; }
+
+        .bank-container { padding: 24px; max-width: 850px; margin: 0 auto; }
+        .group-chip {
+            background: #09090b;
+            border: 1px solid var(--separator);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-right: 6px;
+            margin-top: 6px;
+            transition: all 0.2s;
+        }
+        .group-chip.active { background: rgba(10, 132, 255, 0.15); border-color: var(--accent-blue); color: var(--accent-blue); font-weight: 600; }
+
+        .matrix-container {
+            padding: 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .matrix-card {
+            background: var(--bg-grouped);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+        }
+        .matrix-card:hover, .matrix-card.selected {
+            border-color: var(--accent-blue);
+            background: var(--bg-grouped-active);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        .matrix-flow-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+        .matrix-flow-arrow { color: var(--accent-blue); font-weight: bold; }
+
+        .calendar-container { padding: 24px; max-width: 900px; margin: 0 auto; }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 24px;
+            background: var(--bg-grouped);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .cal-day-header { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-secondary); padding-bottom: 8px; }
+        .cal-day-cell {
+            aspect-ratio: 1;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .cal-day-cell:hover { border-color: var(--accent-blue); background: rgba(255,255,255,0.08); }
+        .cal-day-cell.has-event { background: rgba(10, 132, 255, 0.1); border-color: rgba(10, 132, 255, 0.3); }
+        .cal-event-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+        .list-container { background: var(--bg-grouped); border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
+        .list-item { display: flex; align-items: center; padding: 16px; position: relative; cursor: pointer; }
+        .list-item:hover { background: var(--bg-grouped-active); }
+        .list-item:not(:last-child)::after { content: ''; position: absolute; bottom: 0; left: 70px; right: 0; height: 0.5px; background: var(--separator); }
+
+        .date-block { width: 44px; text-align: center; flex-shrink: 0; }
+        .date-day { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--accent-red); margin-bottom: 2px; }
+        .date-num { font-size: 20px; font-weight: 600; }
+
+        .content-block { flex: 1; min-width: 0; margin-left: 16px; }
+        .item-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; margin-bottom: 4px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+        .item-desc { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(10px);
+            z-index: 200;
+            display: flex;
+            justify-content: flex-end;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+
+        .drawer-content {
+            width: 100%;
+            max-width: 540px;
+            height: 100%;
+            background: var(--bg-base);
+            border-left: 0.5px solid var(--separator);
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .overlay.active .drawer-content { transform: translateX(0); }
+
+        .nav-bar {
+            position: sticky; top: 0;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 20px;
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 0.5px solid var(--separator);
+            z-index: 10;
+        }
+        .back-btn { color: var(--accent-blue); font-size: 15px; background: none; border: none; cursor: pointer; padding: 0; font-weight: 600; }
+
+        .modal-body { padding: 24px; flex: 1; }
+        .p-section-title { font-size: 11px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; letter-spacing: 0.5px; margin: 24px 0 10px 4px; }
+        .info-box { background: var(--bg-grouped); border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.5; border: 1px solid rgba(255,255,255,0.05); }
+
+        .roadmap-list { display: flex; flex-direction: column; gap: 10px; }
+        .roadmap-step { background: var(--bg-grouped); border-radius: 12px; padding: 14px; border-left: 3px solid var(--accent-blue); }
+        .step-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .step-desc { font-size: 13px; color: var(--text-secondary); }
+
+        .idea-card { background: var(--bg-grouped); border-radius: 14px; padding: 16px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.05); }
+        .idea-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+        .idea-title { font-size: 15px; font-weight: 600; flex: 1; padding-right: 8px; }
+        .format-tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600; background: rgba(255,255,255,0.08); color: var(--accent-orange); }
+        .idea-desc-text { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4; }
+        .idea-cta { font-size: 13px; color: var(--accent-blue); font-style: italic; margin-bottom: 12px; }
+
+        .action-btn-row { display: flex; gap: 8px; margin-top: 10px; }
+        .schedule-btn { background: var(--accent-blue); color: white; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .edit-btn { background: rgba(255,255,255,0.1); color: var(--text-primary); border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .edit-btn:hover { background: rgba(255,255,255,0.2); }
+
+        .form-input, .form-textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-size: 15px; margin-top: 6px; margin-bottom: 16px; }
+        .form-textarea { min-height: 80px; resize: vertical; }
+
+        .date-picker-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-size: 16px; margin-top: 10px; color-scheme: dark; }
+        .submit-btn { width: 100%; padding: 14px; background: var(--accent-blue); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; margin-top: 12px; cursor: pointer; }
+
+        .toast {
+            position: fixed; bottom: 30px; right: 30px; background: var(--accent-green); color: white; padding: 12px 24px; border-radius: 14px; font-size: 14px; font-weight: 600; z-index: 300; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="toast" class="toast">Сохранено!</div>
+
+    <nav class="navigation-bar">
+        <div class="sidebar-brand">
+            <p>Alba Creation</p>
+            <h2>Content Hub</h2>
+        </div>
+        <button class="tab-item active" onclick="switchTab('products')">
+            <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+            <span>Продукты</span>
+        </button>
+        <button class="tab-item" onclick="switchTab('bank')">
+            <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+            <span>Банк идей (<span id="tab-bank-count">0</span>)</span>
+        </button>
+        <button class="tab-item" onclick="switchTab('graph')">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            <span>Матрица лидогенерации</span>
+        </button>
+        <button class="tab-item" onclick="switchTab('calendar')">
+            <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+            <span>Календарь</span>
+        </button>
+    </nav>
+
+    <div class="view-container">
+        <!-- TAB 1: PRODUCTS -->
+        <div id="view-products" class="view active">
+            <div class="large-header">
+                <p>Стратегия Alba Creation</p>
+                <h1>Каталог продуктов и спецпроектов</h1>
+            </div>
+            <div class="products-grid" id="products-grid"></div>
+        </div>
+
+        <!-- TAB 2: BANK OF IDEAS -->
+        <div id="view-bank" class="view">
+            <div class="large-header">
+                <p>Архив гипотез & контента</p>
+                <h1>Банк идей</h1>
+            </div>
+            <div class="bank-container">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+                    <p style="color:var(--text-secondary); font-size:14px; margin:0;">
+                        Управление гипотезами, редактирование и привязка к продуктам.
+                    </p>
+                    <div style="display:flex; gap:8px;">
+                        <button class="edit-btn" onclick="exportIdeasJSON()">💾 Экспорт ideas.json</button>
+                        <button class="schedule-btn" onclick="openNewIdeaModal()">+ Новая идея</button>
+                    </div>
+                </div>
+                <div id="bank-list-content"></div>
+            </div>
+        </div>
+
+        <!-- TAB 3: MATRIX GRAPH VIEW -->
+        <div id="view-graph" class="view">
+            <div class="large-header">
+                <p>Архитектура синергии</p>
+                <h1>Матрица перенаправления трафика</h1>
+            </div>
+            <div class="matrix-container" id="matrix-grid"></div>
+        </div>
+
+        <!-- TAB 4: CALENDAR -->
+        <div id="view-calendar" class="view">
+            <div class="large-header">
+                <p>Сетка публикаций</p>
+                <h1>Интерактивный календарь</h1>
+            </div>
+            <div class="calendar-container">
+                <h3 style="margin: 0 0 12px 4px; font-size:16px;">Август 2026</h3>
+                <div class="calendar-grid" id="calendar-month-grid"></div>
+
+                <h3 style="margin: 24px 0 12px 4px; font-size:16px;">Запланированные публикации</h3>
+                <div id="calendar-list-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRODUCT DETAIL DRAWER -->
+    <div id="product-detail-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;" id="p-overlay-nav-title">Продукт</span>
+                <button class="back-btn" onclick="closeOverlay('product-detail-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body" id="product-detail-body"></div>
+        </div>
+    </div>
+
+    <!-- EDIT / NEW IDEA MODAL -->
+    <div id="edit-idea-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;" id="edit-modal-title">Редактировать идею</span>
+                <button class="back-btn" onclick="closeOverlay('edit-idea-overlay')">Отмена</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-idea-id">
+                
+                <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Название идеи:</label>
+                <input type="text" id="edit-idea-title-input" class="form-input" placeholder="Введите название...">
+
+                <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Суть / Описание:</label>
+                <textarea id="edit-idea-desc-input" class="form-textarea" placeholder="Подробности контента или тезисы..."></textarea>
+
+                <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Формат:</label>
+                <input type="text" id="edit-idea-format-input" class="form-input" placeholder="Reels, Shorts, TG Пост...">
+
+                <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Призыв к действию (CTA):</label>
+                <input type="text" id="edit-idea-cta-input" class="form-input" placeholder="Укажите оффер или ссылку...">
+
+                <button class="submit-btn" onclick="saveIdeaChanges()">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EVENT DETAIL MODAL -->
+    <div id="event-detail-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Детали публикации</span>
+                <button class="back-btn" onclick="closeOverlay('event-detail-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body" id="event-detail-body"></div>
+        </div>
+    </div>
+
+    <!-- SCHEDULE MODAL -->
+    <div id="schedule-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Запланировать пост</span>
+                <button class="back-btn" onclick="closeOverlay('schedule-overlay')">Отмена</button>
+            </div>
+            <div class="modal-body">
+                <h3 id="schedule-title" style="margin-top:0;">Название идеи</h3>
+                <p style="color:var(--text-secondary); font-size:14px;" id="schedule-category">Категория</p>
+                
+                <div style="margin-top:20px;">
+                    <label style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600;">Дата публикации:</label>
+                    <input type="date" id="schedule-date-input" class="date-picker-input">
+                </div>
+
+                <button class="submit-btn" onclick="confirmSchedule()">Подтвердить и добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const productsData = [
+        {
+            id: 'insights',
+            title: 'InSights',
+            badge: 'AI Скоринг',
+            badgeBg: 'rgba(191, 90, 242, 0.2)',
+            badgeColor: '#bf5af2',
+            desc: 'Автоматизация подбора релевантных блогеров за 2 минуты + умная фильтрация ботов.',
+            target: 'Маркетинговые и инфлюенс-агентства, бренды.',
+            value: 'Сокращение 2 недель ручного поиска в Excel до пары кликов через семантический нейро-поиск.',
+            synergies: [
+                { target: 'Alba Studio', text: 'Продажа разработки кастомных AI-панелей для агентств.', type: 'B2B Lead' },
+                { target: 'Crista PWA', text: 'Интеграция базы инфлюенсеров для локального промо квестов.', type: 'B2C Traffic' }
+            ],
+            roadmap: [
+                { step: 'Этап 1: Семантический поиск', desc: 'Поиск блогеров по смыслу контента, а не сухим тегам.' },
+                { step: 'Этап 2: Демонстрация рутины', desc: 'Контент-сравнение: Excel таблички vs Мгновенная выборка InSights.' },
+                { step: 'Этап 3: B2B лидогенерация', desc: 'Продажа разработки кастомных нейро-панелей и парсеров под заказ.' }
+            ]
+        },
+        {
+            id: 'keeper',
+            title: 'Хранитель',
+            badge: 'B2B Enterprise',
+            badgeBg: 'rgba(10, 132, 255, 0.2)',
+            badgeColor: '#0a84ff',
+            desc: 'Умная оцифровка сканов и PDF-документов с мгновенным закрытым поиском.',
+            target: 'CTO, юристы, операционные директора компаний.',
+            value: 'Безопасный поиск по 10 000 архивных документов за 1 секунду без риска утечки NDA (On-Premise).',
+            synergies: [
+                { target: 'Alba Studio', text: 'Показывает опыт студии в создании On-Premise Enterprise систем.', type: 'B2B Showcase' }
+            ],
+            roadmap: [
+                { step: 'Этап 1: Демонстрация болей', desc: 'Показ потерь времени юристов при поиске правки в куче PDF.' },
+                { step: 'Этап 2: Безопасность NDA', desc: 'Акцент на On-Premise установке (все нейросети на серверах клиента).' },
+                { step: 'Этап 3: Enterprise-кейсы', desc: 'Упаковка решений под оцифровку тяжелых архивов.' }
+            ]
+        },
+        {
+            id: 'duet',
+            title: 'ДУЭТ',
+            badge: 'Event SaaS',
+            badgeBg: 'rgba(50, 215, 75, 0.2)',
+            badgeColor: '#32d74b',
+            desc: 'B2C-сервис стильных свадебных сайтов в 3 клика с RSVP-дашбордом.',
+            target: 'Молодожены, ивент-агентства, свадебные организаторы.',
+            value: 'Полное устранение предсвадебного хаоса в мессенджерах и сбор ответов гостей в интерактивный профиль.',
+            synergies: [
+                { target: 'Crista PWA', text: 'Общие механики UX/UI для массового B2C использования.', type: 'UX Pattern' }
+            ],
+            roadmap: [
+                { step: 'Этап 1: Эстетика и скорость', desc: 'Спидраны сборки сайтов и показ стильных шрифтов/палитр.' },
+                { step: 'Этап 2: Проблема 10 общих чатов', desc: 'Показ удобства сбора RSVP и дресс-кода в одном месте.' },
+                { step: 'Этап 3: B2B Упаковка', desc: 'Предложение готовых веб-решений для свадебных организаторов.' }
+            ]
+        },
+        {
+            id: 'crista',
+            title: 'Crista',
+            badge: 'PWA / Gamedev',
+            badgeBg: 'rgba(255, 159, 10, 0.2)',
+            badgeColor: '#ff9f0a',
+            desc: '«Duolingo для путешествий» — изучению мира за 2 минуты в день с Енотом Крисом.',
+            target: 'Путешественники, геймеры, B2B-клиенты (демо сложности PWA).',
+            value: 'Дофаминовая геймификация путешествий, 4 ключевые вкладки (Изучение мира, Wiki, AI-Маршруты, Паспорт).',
+            synergies: [
+                { target: 'Фантазия FPS', text: 'Кросс-промо геймдев механик и 3D элементов.', type: 'Tech Synergy' }
+            ],
+            roadmap: [
+                { step: 'Этап 1: Открытый Девлог', desc: 'Показ сборки интерфейса, 4 главных вкладок и анимации Енота Криса.' },
+                { step: 'Этап 2: Закрытая Бета РФ', desc: 'Запуск квестов по Москве, СПб и Золотому Кольцу для 1000 тестеров.' },
+                { step: 'Этап 3: Публичный Релиз', desc: 'Лидерборды, стрик-система и открытие заблокированных карт мира.' }
+            ]
+        },
+        {
+            id: 'fantasia',
+            title: 'Фантазия',
+            badge: 'Godot 4.7 FPS',
+            badgeBg: 'rgba(255, 69, 58, 0.2)',
+            badgeColor: '#ff453a',
+            desc: 'Narrative FPS на Godot 4.7 — демонстрация графической и инженерной мощи студии.',
+            target: 'Gamedev-сообщество, B2B-клиенты (оценка навыков Alba Creation).',
+            value: 'Доказательство того, что студия способна реализовать самые сложные 3D/WebGL проекции и UX.',
+            synergies: [
+                { target: 'Alba Studio', text: 'Драйвер продаж сложных 3D/WebGL промо-сайтов.', type: 'High-Tech Showcase' }
+            ],
+            roadmap: [
+                { step: 'Этап 1: Визуальный шоукейс', desc: 'Атмосферные тизеры локаций, работы со светом и шейдерами.' },
+                { step: 'Этап 2: UX в 3D играх', desc: 'Разборы построения понятных 3D-интерфейсов без перегруза.' },
+                { step: 'Этап 3: Релиз тизера', desc: 'Привлечение геймдев-сообщества и B2B заказчиков интерактивного веба.' }
+            ]
+        },
+        {
+            id: 'other',
+            title: 'Alba Studio & Brand',
+            badge: 'Бренд & Open Source',
+            badgeBg: 'rgba(100, 210, 255, 0.2)',
+            badgeColor: '#64d2ff',
+            desc: 'legitAgent (152-ФЗ), ретроспективы (Murla, BrickFrame) и жизнь фаундера в Obsidian.',
+            target: 'Предприниматели, фаундеры, IT-сообщество.',
+            value: 'Формирование доверия к бренду Alba Creation через Build in Public и экспертный юридический софт.',
+            synergies: [
+                { target: 'Все продукты', text: 'Главное связующее звено студии и фаундера.', type: 'Brand Core' }
+            ],
+            roadmap: [
+                { step: 'Этап 1: Релиз legitAgent', desc: 'Пост про проверку соответствия 152-ФЗ + анонсы только крупных апдейтов.' },
+                { step: 'Этап 2: Ретроспектива готового', desc: 'Разборы кейсов Murla, BrickFrame, Big Day и Blisski (1-2 поста).' },
+                { step: 'Этап 3: Founder Second Brain', desc: 'Показ процессов управления студией в Obsidian.' }
+            ]
+        }
+    ];
+
+    let ideasBank = [];
+    let scheduledEvents = [
+        { id: 101, title: 'InSights: Excel vs AI', dateStr: 'ПН, 24 августа', rawDate: '2026-08-24', color: '#bf5af2', desc: 'Reels / Shorts: Сравнение скорости поиска блогеров.', format: 'Reels', cta: 'Закажите разработку AI-панели в Alba Creation' },
+        { id: 102, title: 'Хранитель: Поиск по 10 000 сканам', dateStr: 'СР, 26 августа', rawDate: '2026-08-26', color: '#0a84ff', desc: 'Reels: Демонстрация поиска в закрытом контуре.', format: 'Shorts', cta: 'Аудит процессов оцифровки' }
+    ];
+
+    let currentSelectedIdea = null;
+    let currentOpenProductId = null;
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        await loadIdeasFromJSON();
+        renderProductsGrid();
+        renderMatrixView();
+        renderCalendar();
+        document.getElementById('schedule-date-input').value = new Date().toISOString().split('T')[0];
+    });
+
+    async function loadIdeasFromJSON() {
+        try {
+            const response = await fetch('ideas.json');
+            if (!response.ok) throw new Error('Не удалось загрузить ideas.json');
+            ideasBank = await response.json();
+        } catch (error) {
+            console.error(error);
+            showToast('Ошибка загрузки ideas.json (запустите локальный сервер)');
+        } finally {
+            renderBankView();
+        }
+    }
+
+    function exportIdeasJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ideasBank, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", "ideas.json");
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        showToast('ideas.json экспортирован!');
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+
+        const targetView = document.getElementById(`view-${tabName}`);
+        targetView.classList.add('active');
+
+        const tabIndex = tabName === 'products' ? 0 : tabName === 'bank' ? 1 : tabName === 'graph' ? 2 : 3;
+        document.querySelectorAll('.tab-item')[tabIndex].classList.add('active');
+    }
+
+    function openOverlay(id) { document.getElementById(id).classList.add('active'); }
+    function closeOverlay(id) { document.getElementById(id).classList.remove('active'); }
+
+    function showToast(text) {
+        const toast = document.getElementById('toast');
+        toast.innerText = text;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // BANK OF IDEAS EDITING & MANAGEMENT
+    function renderBankView() {
+        document.getElementById('tab-bank-count').innerText = ideasBank.length;
+        const container = document.getElementById('bank-list-content');
+        
+        let html = '';
+        ideasBank.forEach(idea => {
+            html += `
+            <div class="idea-card">
+                <div class="idea-header">
+                    <div class="idea-title">${idea.title}</div>
+                    <span class="format-tag">${idea.format}</span>
+                </div>
+                ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
+                <div class="idea-cta">CTA: ${idea.cta}</div>
+                
+                <div style="margin-top:10px; padding-top:10px; border-top:0.5px solid var(--separator);">
+                    <span style="font-size:11px; color:var(--text-secondary); font-weight:600; text-transform:uppercase;">Привязано к продуктам:</span>
+                    <div>`;
+            
+            productsData.forEach(p => {
+                const isFavorited = idea.targetGroups && idea.targetGroups.includes(p.id);
+                html += `
+                    <button class="group-chip ${isFavorited ? 'active' : ''}" onclick="toggleGroupForIdea('${idea.id}', '${p.id}')">
+                        ${isFavorited ? '✓ ' : ''}${p.title}
+                    </button>`;
+            });
+
+            html += `</div>
+                </div>
+
+                <div class="action-btn-row">
+                    <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Редактировать</button>
+                    <button class="schedule-btn" onclick="openScheduleForIdea('Банк Идей', '${idea.title}', '#0a84ff', '${idea.format}', '${idea.cta}')">Запланировать</button>
+                </div>
+            </div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function toggleGroupForIdea(ideaId, groupId) {
+        ideasBank = ideasBank.map(idea => {
+            if (idea.id !== ideaId) return idea;
+            const targetGroups = idea.targetGroups || [];
+            const exists = targetGroups.includes(groupId);
+            return {
+                ...idea,
+                targetGroups: exists ? targetGroups.filter(g => g !== groupId) : [...targetGroups, groupId]
+            };
+        });
+
+        renderBankView();
+        if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
+    }
+
+    function openEditIdeaModal(ideaId) {
+        const idea = ideasBank.find(i => i.id === ideaId);
+        if (!idea) return;
+
+        document.getElementById('edit-modal-title').innerText = "Редактировать идею";
+        document.getElementById('edit-idea-id').value = idea.id;
+        document.getElementById('edit-idea-title-input').value = idea.title;
+        document.getElementById('edit-idea-desc-input').value = idea.desc || '';
+        document.getElementById('edit-idea-format-input').value = idea.format;
+        document.getElementById('edit-idea-cta-input').value = idea.cta;
+
+        openOverlay('edit-idea-overlay');
+    }
+
+    function openNewIdeaModal() {
+        document.getElementById('edit-modal-title').innerText = "Создать новую идею";
+        document.getElementById('edit-idea-id').value = "";
+        document.getElementById('edit-idea-title-input').value = "";
+        document.getElementById('edit-idea-desc-input').value = "";
+        document.getElementById('edit-idea-format-input').value = "TG Пост";
+        document.getElementById('edit-idea-cta-input').value = "Консультация Alba Creation";
+
+        openOverlay('edit-idea-overlay');
+    }
+
+    function saveIdeaChanges() {
+        const id = document.getElementById('edit-idea-id').value;
+        const title = document.getElementById('edit-idea-title-input').value.trim();
+        const desc = document.getElementById('edit-idea-desc-input').value.trim();
+        const format = document.getElementById('edit-idea-format-input').value.trim();
+        const cta = document.getElementById('edit-idea-cta-input').value.trim();
+
+        if (!title) {
+            alert('Укажите название идеи');
+            return;
+        }
+
+        if (id) {
+            ideasBank = ideasBank.map(item => item.id === id ? { ...item, title, desc, format, cta } : item);
+            showToast('Идея обновлена!');
+        } else {
+            const newIdea = {
+                id: String(Date.now()),
+                title, desc, format, cta,
+                targetGroups: []
+            };
+            ideasBank.unshift(newIdea);
+            showToast('Новая идея создана!');
+        }
+
+        renderBankView();
+        if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
+        closeOverlay('edit-idea-overlay');
+    }
+
+    // MATRIX VIEW
+    function renderMatrixView() {
+        const container = document.getElementById('matrix-grid');
+        let html = '';
+
+        productsData.forEach(p => {
+            html += `
+            <div class="matrix-card">
+                <div class="card-header">
+                    <span class="card-title" style="font-size:18px;">${p.title}</span>
+                    <span class="card-badge" style="background:${p.badgeBg}; color:${p.badgeColor}">${p.badge}</span>
+                </div>
+                <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">${p.desc}</p>
+                
+                <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-top:14px;">Перенаправление лидов и синергия:</div>`;
+
+            if (p.synergies && p.synergies.length > 0) {
+                p.synergies.forEach(syn => {
+                    html += `
+                    <div class="matrix-flow-item">
+                        <span class="matrix-flow-arrow">→</span>
+                        <div>
+                            <strong>${syn.target}</strong> <span style="font-size:10px; color:${p.badgeColor}; border:1px solid ${p.badgeColor}; border-radius:4px; padding:1px 4px; margin-left:4px;">${syn.type}</span>
+                            <div style="color:var(--text-secondary); font-size:12px; margin-top:2px;">${syn.text}</div>
+                        </div>
+                    </div>`;
+                });
+            } else {
+                html += `<div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Является конечным хабом студии.</div>`;
+            }
+
+            html += `</div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // PRODUCTS GRID
+    function renderProductsGrid() {
+        const container = document.getElementById('products-grid');
+        let html = '';
+
+        productsData.forEach(p => {
+            html += `
+            <div class="product-card" onclick="openProductDetail('${p.id}')">
+                <div>
+                    <div class="card-header">
+                        <div class="card-title">${p.title}</div>
+                        <span class="card-badge" style="background:${p.badgeBg}; color:${p.badgeColor}">${p.badge}</span>
+                    </div>
+                    <div class="card-desc">${p.desc}</div>
+                </div>
+                <div class="card-footer">
+                    <span>Роадмап и избранные идеи</span>
+                    <span>→</span>
+                </div>
+            </div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // PRODUCT DETAIL DRAWER
+    function openProductDetail(productId) {
+        currentOpenProductId = productId;
+        renderProductDetailContent(productId);
+        openOverlay('product-detail-overlay');
+    }
+
+    function renderProductDetailContent(productId) {
+        const product = productsData.find(p => p.id === productId);
+        if (!product) return;
+
+        document.getElementById('p-overlay-nav-title').innerText = product.title;
+
+        const favoritedIdeas = ideasBank.filter(i => i.targetGroups && i.targetGroups.includes(productId));
+
+        let html = `
+            <h2 style="font-size:26px; font-weight:700; margin:0 0 6px 0;">${product.title}</h2>
+            <div style="font-size:14px; color:var(--text-secondary); margin-bottom:20px;">${product.desc}</div>
+
+            <div class="p-section-title">ЦЕЛЕВАЯ АУДИТОРИЯ & ЦЕННОСТЬ</div>
+            <div class="info-box">
+                <strong>ЦА:</strong> ${product.target}<br><br>
+                <strong>Главный посыл:</strong> ${product.value}
+            </div>
+
+            <div class="p-section-title">ROADMAP ПРОДВИЖЕНИЯ</div>
+            <div class="roadmap-list">`;
+        
+        product.roadmap.forEach(r => {
+            html += `
+                <div class="roadmap-step" style="border-left-color:${product.badgeColor}">
+                    <div class="step-title">${r.step}</div>
+                    <div class="step-desc">${r.desc}</div>
+                </div>`;
+        });
+
+        html += `</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin:24px 0 10px 4px;">
+                <span class="p-section-title" style="margin:0;">ИЗБРАННЫЕ ИДЕИ (${favoritedIdeas.length})</span>
+                <button onclick="closeOverlay('product-detail-overlay'); switchTab('bank');" style="background:none; border:none; color:var(--accent-blue); font-size:12px; font-weight:600; cursor:pointer;">+ Добавить из Банка</button>
+            </div>
+            <div>`;
+
+        if (favoritedIdeas.length === 0) {
+            html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Нет избранных идей для этого проекта. Выберите их во вкладке «Банк идей».</div>`;
+        } else {
+            favoritedIdeas.forEach((idea) => {
+                html += `
+                    <div class="idea-card">
+                        <div class="idea-header">
+                            <div class="idea-title">${idea.title}</div>
+                            <span class="format-tag">${idea.format}</span>
+                        </div>
+                        ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
+                        <div class="idea-cta">CTA: ${idea.cta}</div>
+                        <div class="action-btn-row">
+                            <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Редактировать</button>
+                            <button class="schedule-btn" onclick="openScheduleForIdea('${product.title}', '${idea.title}', '${product.badgeColor}', '${idea.format}', '${idea.cta}')">Запланировать</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        html += `</div>`;
+        document.getElementById('product-detail-body').innerHTML = html;
+    }
+
+    // SCHEDULE LOGIC
+    function openScheduleForIdea(productTitle, ideaTitle, color, format, cta) {
+        currentSelectedIdea = { productTitle, ideaTitle, color, format, cta };
+        document.getElementById('schedule-title').innerText = ideaTitle;
+        document.getElementById('schedule-category').innerText = `Продукт: ${productTitle}`;
+        openOverlay('schedule-overlay');
+    }
+
+    function confirmSchedule() {
+        const chosenDate = document.getElementById('schedule-date-input').value;
+        if (!chosenDate || !currentSelectedIdea) return;
+
+        const d = new Date(chosenDate);
+        const dayNames = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
+        const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+        
+        const dateStr = `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
+
+        scheduledEvents.push({
+            id: Date.now(),
+            title: `${currentSelectedIdea.productTitle}: ${currentSelectedIdea.ideaTitle}`,
+            dateStr: dateStr,
+            rawDate: chosenDate,
+            color: currentSelectedIdea.color,
+            format: currentSelectedIdea.format || 'TG Пост',
+            cta: currentSelectedIdea.cta || 'Консультация Alba Creation',
+            desc: `Запланировано из хаба продуктов (${currentSelectedIdea.productTitle})`
+        });
+
+        scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
+
+        renderCalendar();
+        closeOverlay('schedule-overlay');
+        closeOverlay('product-detail-overlay');
+        showToast(`Запланировано на ${d.getDate()} ${monthNames[d.getMonth()]}`);
+        switchTab('calendar');
+    }
+
+    // CALENDAR
+    function renderCalendar() {
+        const gridContainer = document.getElementById('calendar-month-grid');
+        const listContainer = document.getElementById('calendar-list-content');
+
+        let gridHtml = '';
+        const daysInMonth = 31;
+        const weekDays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+        
+        weekDays.forEach(wd => gridHtml += `<div class="cal-day-header">${wd}</div>`);
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateFormatted = `2026-08-${day < 10 ? '0' + day : day}`;
+            const eventsOnDay = scheduledEvents.filter(e => e.rawDate === dateFormatted);
+            const hasEvent = eventsOnDay.length > 0;
+
+            gridHtml += `
+                <div class="cal-day-cell ${hasEvent ? 'has-event' : ''}" onclick="openDayDetail('${dateFormatted}')">
+                    <span style="font-weight:600;">${day}</span>
+                    <div>
+                        ${eventsOnDay.map(e => `<span class="cal-event-dot" style="background:${e.color}"></span>`).join(' ')}
+                    </div>
+                </div>`;
+        }
+        gridContainer.innerHTML = gridHtml;
+
+        if (scheduledEvents.length === 0) {
+            listContainer.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-secondary);">Нет запланированных постов</div>`;
+            return;
+        }
+
+        let listHtml = `<div class="list-container">`;
+        scheduledEvents.forEach(item => {
+            const dateParts = item.rawDate.split('-');
+            const dayNum = parseInt(dateParts[2], 10);
+            const dayName = item.dateStr.split(',')[0];
+
+            listHtml += `
+            <div class="list-item" onclick="openEventDetail(${item.id})">
+                <div class="date-block">
+                    <div class="date-day" style="color:${item.color}">${dayName}</div>
+                    <div class="date-num">${dayNum}</div>
+                </div>
+                <div class="content-block">
+                    <div class="item-title">
+                        <span class="dot" style="background-color: ${item.color}"></span>
+                        <span>${item.title}</span>
+                    </div>
+                    <div class="item-desc">${item.desc}</div>
+                </div>
+            </div>`;
+        });
+        listHtml += `</div>`;
+        listContainer.innerHTML = listHtml;
+    }
+
+    function openEventDetail(eventId) {
+        const item = scheduledEvents.find(e => e.id === eventId);
+        if (!item) return;
+
+        let html = `
+            <span class="format-tag" style="background:${item.color}22; color:${item.color};">${item.format || 'Пост'}</span>
+            <h2 style="font-size:22px; font-weight:700; margin:12px 0 6px 0;">${item.title}</h2>
+            <div style="font-size:14px; color:var(--text-secondary); margin-bottom:20px;">Дата публикации: <strong>${item.dateStr} (${item.rawDate})</strong></div>
+
+            <div class="p-section-title">ОПИСАНИЕ И КОНЦЕПТ</div>
+            <div class="info-box">${item.desc}</div>
+
+            <div class="p-section-title">ЦЕЛЕВОЙ ПРИЗЫВ К ДЕЙСТВИЮ (CTA)</div>
+            <div class="info-box" style="border-left:3px solid ${item.color}">${item.cta || 'Ссылка на Alba Creation'}</div>
+
+            <button class="submit-btn" style="background:var(--accent-red); margin-top:30px;" onclick="deleteEvent(${item.id})">Удалить из календаря</button>
+        `;
+
+        document.getElementById('event-detail-body').innerHTML = html;
+        openOverlay('event-detail-overlay');
+    }
+
+    function openDayDetail(dateStr) {
+        const events = scheduledEvents.filter(e => e.rawDate === dateStr);
+        if (events.length === 0) {
+            showToast(`На ${dateStr} постов не запланировано`);
+            return;
+        }
+        openEventDetail(events[0].id);
+    }
+
+    function deleteEvent(eventId) {
+        scheduledEvents = scheduledEvents.filter(e => e.id !== eventId);
+        renderCalendar();
+        closeOverlay('event-detail-overlay');
+        showToast('Публикация удалена');
+    }
+</script>
+</body>
+</html>
