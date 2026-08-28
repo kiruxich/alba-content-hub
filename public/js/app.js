@@ -1117,6 +1117,21 @@ const PLAN_PALETTE = ['#0a84ff', '#30d158', '#bf5af2', '#ff9f0a', '#ff453a', '#6
 function renderContentPlan() {
     renderPlanNotes();
     renderPlanTimeline();
+    growTextareasIn(document.getElementById('plan-notes-row'));
+    growTextareasIn(document.getElementById('plan-timeline'));
+}
+
+// Textareas auto-grow to fit their content instead of showing an internal
+// scrollbar - the fixed-height boxes with a scroll-and-resize-handle look
+// were the main "ugly form" complaint about this board.
+function autoGrowTextarea(el) {
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+}
+
+function growTextareasIn(container) {
+    if (!container) return;
+    container.querySelectorAll('textarea').forEach(autoGrowTextarea);
 }
 
 function planSwatchesHtml(block) {
@@ -1136,16 +1151,16 @@ function renderPlanNotes() {
     }
 
     container.innerHTML = notes.map(block => `
-        <div class="plan-card" style="border-top-color:${block.color || '#0a84ff'}">
+        <div class="plan-card" style="--card-accent:${block.color || '#0a84ff'}">
             <div class="plan-card-head">
-                <input type="text" class="plan-card-title" value="${escapeHtml(block.title)}" placeholder="Заголовок заметки" oninput="setPlanBlockField('${block.id}','title',this.value)">
+                <input type="text" class="plan-card-title" value="${escapeHtml(block.title)}" title="${escapeHtml(block.title)}" placeholder="Заголовок заметки" oninput="setPlanBlockField('${block.id}','title',this.value)">
                 <div class="plan-card-actions">
                     <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
                     <button class="icon-btn" title="Удалить" onclick="removePlanBlock('${block.id}')">🗑</button>
                 </div>
             </div>
             ${planSwatchesHtml(block)}
-            <textarea class="plan-card-text" placeholder="Текст заметки..." oninput="setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
+            <textarea class="plan-card-text" placeholder="Текст заметки..." oninput="autoGrowTextarea(this); setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
         </div>`).join('');
 }
 
@@ -1160,20 +1175,28 @@ function renderPlanTimeline() {
     }
 
     container.innerHTML = quarters.map((block, idx) => {
-        const card = `
-        <div class="timeline-card" style="border-top-color:${block.color || '#0a84ff'}">
-            <div class="plan-card-head">
-                <input type="text" class="timeline-card-title" value="${escapeHtml(block.title)}" placeholder="Продукт квартала" oninput="setPlanBlockField('${block.id}','title',this.value)">
-                <div class="plan-card-actions">
-                    <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
-                    <button class="icon-btn" title="Удалить" onclick="removePlanBlock('${block.id}')">🗑</button>
-                </div>
+        const qLabel = `Q${idx + 1}`;
+        const isLast = idx === quarters.length - 1;
+        const accent = block.color || '#0a84ff';
+        return `
+        <div class="timeline-row">
+            <div class="timeline-marker">
+                <span class="timeline-marker-dot" style="--card-accent:${accent}">${qLabel}</span>
+                ${isLast ? '' : `<span class="timeline-marker-line" style="--card-accent:${accent}"></span>`}
             </div>
-            <input type="text" class="timeline-card-period" value="${escapeHtml(block.period || '')}" placeholder="Например: Январь — Март" oninput="setPlanBlockField('${block.id}','period',this.value)">
-            ${planSwatchesHtml(block)}
-            <textarea class="timeline-card-text" placeholder="Смысловой вектор и B2B-оффер..." oninput="setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
+            <div class="timeline-card" style="--card-accent:${accent}">
+                <div class="timeline-card-head">
+                    <input type="text" class="timeline-card-title" value="${escapeHtml(block.title)}" title="${escapeHtml(block.title)}" placeholder="Продукт квартала" oninput="setPlanBlockField('${block.id}','title',this.value)">
+                    <input type="text" class="timeline-card-period" value="${escapeHtml(block.period || '')}" placeholder="Например: Январь — Март" oninput="setPlanBlockField('${block.id}','period',this.value)">
+                    <div class="plan-card-actions">
+                        <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
+                        <button class="icon-btn" title="Удалить" onclick="removePlanBlock('${block.id}')">🗑</button>
+                    </div>
+                </div>
+                ${planSwatchesHtml(block)}
+                <textarea class="timeline-card-text" placeholder="Смысловой вектор и B2B-оффер..." oninput="autoGrowTextarea(this); setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
+            </div>
         </div>`;
-        return idx < quarters.length - 1 ? card + `<div class="timeline-arrow">→</div>` : card;
     }).join('');
 }
 
