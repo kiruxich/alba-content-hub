@@ -19,36 +19,60 @@ function serialize(row) {
             clicks: row.metrics_clicks,
             leads: row.metrics_leads,
         },
+        source: row.source || 'manual',
+        agentMeta: row.agent_meta ? JSON.parse(row.agent_meta) : null,
+        draftText: row.draft_text ? JSON.parse(row.draft_text) : null,
+        contentType: row.content_type || 'evergreen',
+        expiresAt: row.expires_at || null,
+        rubricId: row.rubric_id || null,
+        qualityFlags: JSON.parse(row.quality_flags || '[]'),
+        coverAssetId: row.cover_asset_id || null,
     };
 }
 
 const upsertSql = `
-    INSERT INTO ideas (id, title, desc, format, funnel, status, cta, target_groups, metrics_views, metrics_saves, metrics_clicks, metrics_leads)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO ideas (id, title, desc, format, funnel, status, cta, target_groups, metrics_views, metrics_saves, metrics_clicks, metrics_leads, source, agent_meta, draft_text, content_type, expires_at, rubric_id, quality_flags, cover_asset_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         title = excluded.title, desc = excluded.desc, format = excluded.format,
         funnel = excluded.funnel, status = excluded.status, cta = excluded.cta,
         target_groups = excluded.target_groups,
         metrics_views = excluded.metrics_views, metrics_saves = excluded.metrics_saves,
-        metrics_clicks = excluded.metrics_clicks, metrics_leads = excluded.metrics_leads
+        metrics_clicks = excluded.metrics_clicks, metrics_leads = excluded.metrics_leads,
+        source = excluded.source, agent_meta = excluded.agent_meta, draft_text = excluded.draft_text,
+        content_type = excluded.content_type, expires_at = excluded.expires_at,
+        rubric_id = excluded.rubric_id, quality_flags = excluded.quality_flags,
+        cover_asset_id = excluded.cover_asset_id
 `;
 
 function upsertArgs(row) {
     return [row.id, row.title, row.desc, row.format, row.funnel, row.status, row.cta,
-        row.target_groups, row.metrics_views, row.metrics_saves, row.metrics_clicks, row.metrics_leads];
+        row.target_groups, row.metrics_views, row.metrics_saves, row.metrics_clicks, row.metrics_leads,
+        row.source, row.agent_meta, row.draft_text,
+        row.content_type, row.expires_at, row.rubric_id, row.quality_flags, row.cover_asset_id];
 }
 
 // GET /api/ideas?q=search+term  -- indexed LIKE scan over title/desc
+// GET /api/ideas?source=agent   -- filter to AI-generated drafts (AI Agent Center)
 router.get('/', async (req, res) => {
     const q = (req.query.q || '').trim();
-    if (!q) {
-        const result = await db.execute('SELECT * FROM ideas ORDER BY created_at DESC');
-        return res.json(result.rows.map(serialize));
+    const source = (req.query.source || '').trim();
+
+    const clauses = [];
+    const args = [];
+    if (q) {
+        clauses.push('(title LIKE ? OR desc LIKE ? OR format LIKE ? OR funnel LIKE ? OR agent_meta LIKE ?)');
+        const like = `%${q}%`;
+        args.push(like, like, like, like, like);
     }
-    const like = `%${q}%`;
+    if (source) {
+        clauses.push('source = ?');
+        args.push(source);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await db.execute({
-        sql: 'SELECT * FROM ideas WHERE title LIKE ? OR desc LIKE ? OR format LIKE ? OR funnel LIKE ? ORDER BY created_at DESC',
-        args: [like, like, like, like],
+        sql: `SELECT * FROM ideas ${where} ORDER BY created_at DESC`,
+        args,
     });
     res.json(result.rows.map(serialize));
 });
@@ -71,6 +95,14 @@ router.post('/', async (req, res) => {
             cta: b.cta || '',
             target_groups: JSON.stringify(b.targetGroups || []),
             metrics_views: 0, metrics_saves: 0, metrics_clicks: 0, metrics_leads: 0,
+            source: b.source || 'manual',
+            agent_meta: b.agentMeta ? JSON.stringify(b.agentMeta) : null,
+            draft_text: b.draftText ? JSON.stringify(b.draftText) : null,
+            content_type: b.contentType || 'evergreen',
+            expires_at: b.expiresAt || null,
+            rubric_id: b.rubricId || null,
+            quality_flags: JSON.stringify(b.qualityFlags || []),
+            cover_asset_id: b.coverAssetId || null,
         }),
     });
     const result = await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [id] });
@@ -96,6 +128,14 @@ router.put('/:id', async (req, res) => {
         metrics_saves: b.metrics?.saves !== undefined ? b.metrics.saves : existing.metrics_saves,
         metrics_clicks: b.metrics?.clicks !== undefined ? b.metrics.clicks : existing.metrics_clicks,
         metrics_leads: b.metrics?.leads !== undefined ? b.metrics.leads : existing.metrics_leads,
+        source: b.source !== undefined ? b.source : existing.source,
+        agent_meta: b.agentMeta !== undefined ? (b.agentMeta ? JSON.stringify(b.agentMeta) : null) : existing.agent_meta,
+        draft_text: b.draftText !== undefined ? (b.draftText ? JSON.stringify(b.draftText) : null) : existing.draft_text,
+        content_type: b.contentType !== undefined ? b.contentType : existing.content_type,
+        expires_at: b.expiresAt !== undefined ? b.expiresAt : existing.expires_at,
+        rubric_id: b.rubricId !== undefined ? b.rubricId : existing.rubric_id,
+        quality_flags: b.qualityFlags !== undefined ? JSON.stringify(b.qualityFlags) : existing.quality_flags,
+        cover_asset_id: b.coverAssetId !== undefined ? b.coverAssetId : existing.cover_asset_id,
     };
     await db.execute({ sql: upsertSql, args: upsertArgs(merged) });
     const result = await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [existing.id] });
@@ -103,8 +143,12 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-    const del = await db.execute({ sql: 'DELETE FROM ideas WHERE id = ?', args: [req.params.id] });
+    // Must run before the idea delete: once the idea row is gone, the FK's
+    // ON DELETE SET NULL fires immediately and sets idea_id to NULL on these
+    // rows, so a delete-by-idea_id issued afterwards would match nothing and
+    // silently leave the events behind.
     await db.execute({ sql: 'DELETE FROM scheduled_events WHERE idea_id = ?', args: [req.params.id] });
+    const del = await db.execute({ sql: 'DELETE FROM ideas WHERE id = ?', args: [req.params.id] });
     if (Number(del.rowsAffected) === 0) return res.status(404).json({ error: 'idea not found' });
     res.status(204).end();
 });
@@ -137,6 +181,10 @@ router.post('/import', async (req, res) => {
                     metrics_saves: item.metrics?.saves || 0,
                     metrics_clicks: item.metrics?.clicks || 0,
                     metrics_leads: item.metrics?.leads || 0,
+                    // Imported JSON files are always human-curated exports, never agent drafts.
+                    source: 'manual', agent_meta: null, draft_text: null,
+                    content_type: item.contentType || 'evergreen', expires_at: null,
+                    rubric_id: null, quality_flags: '[]', cover_asset_id: null,
                 }),
             });
         }

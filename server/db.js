@@ -21,6 +21,17 @@ function makeClient() {
 
 export const db = makeClient();
 
+// SQLite errors on ALTER TABLE ADD COLUMN if the column already exists, so
+// this checks PRAGMA table_info first - safe to run on every startup, unlike
+// a bare ALTER TABLE which would only be safe to run once.
+async function ensureColumn(table, column, definition) {
+    const info = await db.execute(`PRAGMA table_info(${table})`);
+    const exists = info.rows.some(r => r.name === column);
+    if (!exists) {
+        await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+}
+
 await db.executeMultiple(`
 CREATE TABLE IF NOT EXISTS ideas (
     id TEXT PRIMARY KEY,
@@ -84,7 +95,138 @@ CREATE TABLE IF NOT EXISTS project_info (
     product_id TEXT PRIMARY KEY,
     about TEXT DEFAULT ''
 );
+
+-- AI Agent pipeline (Phase 1 schema - see planning discussion). Ideas and
+-- scheduled_events (conceptually "publications", one row per idea per
+-- platform) gain columns below via ensureColumn() rather than being
+-- redefined here, since they already exist with live data.
+
+CREATE TABLE IF NOT EXISTS agent_expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER DEFAULT (strftime('%s','now')),
+    agent_name TEXT NOT NULL,
+    model_used TEXT,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    cached_tokens INTEGER DEFAULT 0,
+    kie_credits_spent NUMERIC DEFAULT 0,
+    total_usd NUMERIC DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_agent_expenses_timestamp ON agent_expenses(timestamp);
+
+CREATE TABLE IF NOT EXISTS agent_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    sources TEXT DEFAULT '[]',
+    keywords TEXT DEFAULT '[]',
+    tone_of_voice TEXT DEFAULT '',
+    budget_daily_cap_usd NUMERIC DEFAULT 1.0,
+    video_generation_enabled INTEGER DEFAULT 0,
+    platform_auto_publish TEXT DEFAULT '{}',
+    product_of_week_override TEXT
+);
+INSERT OR IGNORE INTO agent_settings (id) VALUES (1);
+
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_date TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    log TEXT DEFAULT '',
+    cost_usd NUMERIC DEFAULT 0,
+    trends_found INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_created_at ON agent_runs(created_at);
+
+CREATE TABLE IF NOT EXISTS product_embeddings (
+    product_id TEXT PRIMARY KEY,
+    vector TEXT NOT NULL,
+    source_text_hash TEXT,
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
+CREATE TABLE IF NOT EXISTS platform_connections (
+    platform TEXT PRIMARY KEY,
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at INTEGER,
+    status TEXT DEFAULT 'disconnected',
+    account_name TEXT,
+    connected_at INTEGER
+);
+
+-- Reusable production templates ("рубрики"): the Generator fills a proven
+-- structure instead of inventing post shape from scratch every time.
+CREATE TABLE IF NOT EXISTS content_rubrics (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    structure_template TEXT DEFAULT '[]',
+    target_funnel TEXT DEFAULT 'TOFU',
+    is_active INTEGER DEFAULT 1,
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
+-- Reusable generated (or manually uploaded) images/video, so the same cover
+-- isn't regenerated for every derivative, and so Instagram/YouTube (which
+-- fetch media by public URL, not raw bytes) have something to point at.
+CREATE TABLE IF NOT EXISTS media_assets (
+    id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    type TEXT NOT NULL,
+    product_id TEXT,
+    rubric_id TEXT,
+    tags TEXT DEFAULT '[]',
+    source TEXT DEFAULT 'manual',
+    used_count INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
+-- Session tokens for whatever admin-login mechanism gets picked (password or
+-- Telegram Login Widget both converge on "issue a session token") - the
+-- mechanism-specific part is deferred, but the storage shape doesn't change.
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    token TEXT PRIMARY KEY,
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    expires_at INTEGER
+);
 `);
+
+// Additive columns on existing tables - safe to run on every startup.
+// ideas: distinguish agent-authored drafts from manual ones, and keep the
+// raw agent draft alongside the human-edited text (needed later so the
+// feedback loop learns from what actually got published, not the draft).
+await ensureColumn('ideas', 'source', "TEXT DEFAULT 'manual'");
+await ensureColumn('ideas', 'agent_meta', 'TEXT');
+await ensureColumn('ideas', 'draft_text', 'TEXT');
+// Content lifecycle: 'news' expires and gets auto-archived, 'evergreen' is a
+// repurposing candidate once it has enough age + performance, 'case' /
+// 'educational' don't expire but aren't repurposing candidates either.
+await ensureColumn('ideas', 'content_type', "TEXT DEFAULT 'evergreen'");
+await ensureColumn('ideas', 'expires_at', 'INTEGER');
+// Which reusable rubric ("Кейс недели", "Разбор ошибки клиента" etc) this
+// idea was generated from, if any - lets the Generator fill a proven
+// structure instead of inventing post shape every time.
+await ensureColumn('ideas', 'rubric_id', 'TEXT');
+// Automated pre-publish checks (char limits, missing CTA, dedup) recorded as
+// a JSON array of issue codes; empty array = passed the quality gate.
+await ensureColumn('ideas', 'quality_flags', "TEXT DEFAULT '[]'");
+await ensureColumn('ideas', 'cover_asset_id', 'TEXT');
+
+// scheduled_events: one row already represents one idea's post on one day;
+// adding `platform` turns it into one row per idea per platform (an idea can
+// now have several publications, one per target platform), plus the per-
+// platform metrics a future sync job will fill in.
+await ensureColumn('scheduled_events', 'platform', "TEXT DEFAULT 'telegram'");
+await ensureColumn('scheduled_events', 'external_post_id', 'TEXT');
+await ensureColumn('scheduled_events', 'metrics_views', 'INTEGER DEFAULT 0');
+await ensureColumn('scheduled_events', 'metrics_saves', 'INTEGER DEFAULT 0');
+await ensureColumn('scheduled_events', 'metrics_clicks', 'INTEGER DEFAULT 0');
+await ensureColumn('scheduled_events', 'metrics_synced_at', 'INTEGER');
+// Per-publication UTM code (e.g. "idea_123_telegram") so the landing
+// page/lead-bot can report back which specific post a lead came from -
+// this is what makes the ROI numbers real instead of manually guessed.
+await ensureColumn('scheduled_events', 'utm_code', 'TEXT');
 
 // Seed content_plan once with the studio's actual annual plan, shaped for the
 // quarterly-timeline UI: 'note' blocks are global strategy cards, 'quarter'
@@ -132,7 +274,7 @@ await db.execute({
 // starter derived from their existing productsData fields for the user to
 // expand on later.
 const defaultProjectInfo = {
-    'alba-creation': 'Alba Creation — цифровая студия, работающая в формате remote-first и создающая IT-решения для бизнеса в России и за рубежом: боты, сайты, приложения и целые цифровые экосистемы.\n\nПодход студии — превращать бизнес-задачу в тот формат, который решает её быстрее всего: иногда это Telegram-бот, иногда полноценный сайт или личный кабинет, иногда мини-игра.\n\nОсновные направления:\n— Экосистемы: платформы, боты, личные кабинеты и автоматизация\n— Решения для бизнеса: внутренние инструменты под специфику конкретной компании\n— Сайты: разработка с нуля и редизайн устаревших проектов\n— Игры: от полноценных шутеров до мини-игр в Telegram\n— Партнёрские проекты: реальные кейсы с визуальной презентацией\n\nВсе проекты в портфолио — это реальные продакшен-запуски, а не пилоты. Студия работает с клиентом до результата.\n\nКонтакты: @albacreation в Telegram, +7 (915) 495-42-93.',
+    'alba-creation': 'Alba Creation — цифровая студия полного цикла: «IT-решения любого масштаба — от идеи до экосистемы». Бизнес приходит с задачей, студия превращает её в бота, сайт, приложение или целую экосистему — смотря что решает задачу быстрее. Формат работы — remote-first, клиенты в России и за рубежом.\n\nПЯТЬ НАПРАВЛЕНИЙ\n— Экосистемы — платформа, боты, кабинеты, автоматизация: один организм вместо разрозненных сервисов\n— Решения для бизнеса — инструменты под конкретную задачу компании, от подбора блогеров до оцифровки архива\n— Сайты — создание с нуля и превращение устаревших проектов в современные\n— Игры — от полноценного шутера до мини-игры в Telegram\n— Партнёры — рабочие решения, а не скриншоты на слайде\n\nУСЛУГИ\n— Telegram-боты и мини-приложения — продажи, поддержка, уведомления, внутренние процессы, админка и интеграции с CRM/оплатой\n— Сайты и лендинги — корпоративные сайты и продуктовые страницы с упором на скорость и SEO\n— Веб-приложения и дашборды — платформы, админ-панели, личные кабинеты с авторизацией, ролями и масштабируемой архитектурой\n— Автоматизация и интеграции — связка API, парсинг, отчётность, фоновые процессы с мониторингом\n— MVP и запуск продуктов — быстрый вывод ключевой ценности для фаундеров и новых направлений\n— Экосистемы и масштабирование — несколько связанных продуктов с единой архитектурой для зрелого бизнеса\n— Игры и интерактив — веб-игры, мини-игры в Telegram, брендированная геймификация с аналитикой и монетизацией\n\nПОРТФОЛИО (реальные продакшен-проекты, часть под NDA)\n— Веб-приложения: Дуэт (SaaS-конструктор свадебных сайтов-приглашений), Insight (поиск блогеров через граф связей), Хранитель (AI-система управления документами)\n— Экосистемы: Crista (геймифицированное приложение для планирования путешествий), Merfy (SaaS для онлайн-магазинов)\n— Dev-инструменты: legit Agent (проверка кода на соответствие российским законам)\n— Сайты: VYSOTA FITNESS (премиальный фитнес-клуб), КАЛИБР (школа стрелковой подготовки с 3D-сценой), EfrNet (интернет-провайдер с интерактивными инструментами), Murla (лендинг фулфилмент-компании), BrickFrame (витрина LED-дисплеев для LEGO), BIG DAY (лендинг денежных картин с конфигуратором)\n— Telegram-боты: Blisski Loyalty (бот и Mini App для кальянной), КИС КИС Bot (учёт финансов и калькулятор), Murla Client Bot (управление заказами фулфилмента)\n— Игры: Pyrokinesis (narrative FPS/Action-RPG на Godot)\n\nПРОЦЕСС РАБОТЫ\n1. Заявка — контакт через Telegram или email, без форм\n2. Бриф и созвон — цели, аудитория, бюджет, приоритеты\n3. Оценка — предложение с объёмом работ, этапами и стоимостью\n4. Договор — условия, доступы, способ коммуникации\n5. Разработка — итерации с демо и обратной связью\n6. Сдача — передача результата, документация, обучение\n7. Поддержка — опциональное сопровождение и доработки\n\nПочему с нами: прямой контакт с разработчиками без посредников, работающие версии вместо отчётов, быстрое выполнение без затягивания, прозрачность объёма работ и правок, полная передача проекта с документацией, поддержка после запуска.\n\nКонтакты: @albacreation в Telegram, +7 (915) 495-42-93, sklemin0408@gmail.com.',
     'insights': 'InSights — SaaS-платформа для анализа социальных сетей с использованием ИИ. Помогает маркетологам и B2B-клиентам находить релевантных блогеров и оценивать их аудиторию через AI-скоринг, экономя часы ручного подбора инфлюенсеров.',
     'hranitel': 'Хранитель — RAG-система для работы с корпоративными архивами в закрытом контуре, без выхода в интернет. Позволяет находить нужный документ по смыслу за секунды вместо ручного перебора сканов, что особенно критично для Enterprise и госсектора.',
     'duet': 'ДУЭТ — система автоматизации расписаний для образовательных учреждений. Убирает рутину и конфликты в сетке занятий, которые обычно ложатся на завучей и администрацию школ.',
