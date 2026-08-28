@@ -322,6 +322,30 @@ html, body {
     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
     border-radius: 12px; padding: 14px; margin-bottom: 12px;
 }
-.script-section-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.script-section-head { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.script-section-head.expanded { margin-bottom: 8px; }
 .script-section-heading { flex: 1; margin: 0 !important; font-weight: 600; }
-.script-section-text { min-height: 100px; }
+.script-section-text { min-height: 140px; }
+.section-chevron {
+    color: var(--text-secondary); font-size: 11px; width: 16px; text-align: center;
+    flex-shrink: 0; transition: transform 0.15s ease;
+}
+
+/* CALL MODE - clean, large-type read view for use during a live call */
+.call-mode-nav {
+    position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 12px 0; margin-bottom: 12px; background: var(--bg-base);
+    border-bottom: 0.5px solid var(--separator);
+}
+.call-nav-pill {
+    background: rgba(255,255,255,0.06); border: none; color: var(--text-secondary);
+    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.call-nav-pill:hover { background: rgba(10,132,255,0.18); color: var(--accent-blue); }
+.call-section { padding: 28px 0; border-bottom: 0.5px solid var(--separator); scroll-margin-top: 60px; }
+.call-section:last-child { border-bottom: none; }
+.call-section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-blue); margin: 0 0 12px 0; font-weight: 700; }
+.call-section p { font-size: 18px; line-height: 1.8; color: var(--text-primary); margin: 0; white-space: pre-wrap; }
+.call-mode-header { text-align: center; margin-bottom: 8px; }
+.call-mode-header .call-niche-name { font-size: 26px; font-weight: 700; }
+.call-mode-header .call-niche-subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }

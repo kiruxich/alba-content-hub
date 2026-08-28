@@ -1203,8 +1203,16 @@ function renderClientsView() {
     container.innerHTML = html;
 }
 
+let nicheSectionCollapse = {}; // sectionId -> true (collapsed) - accordion state, edit mode only
+let callMode = false; // false = edit (accordion), true = read-only "call mode"
+
 function openNicheDetail(id) {
     currentOpenNicheId = id;
+    callMode = false;
+    const niche = niches.find(n => n.id === id);
+    (niche?.sections || []).forEach(s => {
+        if (!(s.id in nicheSectionCollapse)) nicheSectionCollapse[s.id] = true; // accordion starts collapsed
+    });
     renderNicheDetailContent(id);
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-niche-detail').classList.add('active');
@@ -1217,6 +1225,11 @@ function closeNicheDetailPage() {
     renderClientsView();
 }
 
+function toggleCallMode() {
+    callMode = !callMode;
+    renderNicheDetailContent(currentOpenNicheId);
+}
+
 function renderNicheDetailContent(id) {
     const niche = niches.find(n => n.id === id);
     if (!niche) return;
@@ -1224,6 +1237,47 @@ function renderNicheDetailContent(id) {
     const titleEl = document.getElementById('niche-detail-title');
     if (titleEl) titleEl.innerText = niche.name;
 
+    const toggleBtn = document.getElementById('niche-mode-toggle-btn');
+    if (toggleBtn) toggleBtn.innerText = callMode ? '✏️ Редактировать' : '🎙 Режим звонка';
+
+    const body = document.getElementById('niche-detail-body');
+    if (!body) return;
+
+    body.innerHTML = callMode ? renderCallModeHtml(niche) : renderEditModeHtml(niche);
+}
+
+// РЕЖИМ ЗВОНКА: крупный шрифт, только чтение, быстрые якоря по разделам
+function renderCallModeHtml(niche) {
+    const sections = niche.sections || [];
+    let html = `
+        <div class="call-mode-header">
+            <div class="call-niche-name">${escapeHtml(niche.name)}</div>
+            ${niche.subtitle ? `<div class="call-niche-subtitle">${escapeHtml(niche.subtitle)}</div>` : ''}
+        </div>
+        <div class="call-mode-nav">
+            ${sections.map(s => `<button class="call-nav-pill" onclick="scrollToCallSection('${s.id}')">${escapeHtml(s.heading)}</button>`).join('')}
+        </div>`;
+
+    sections.forEach(s => {
+        html += `
+        <div class="call-section" id="call-section-${s.id}">
+            <h2>${escapeHtml(s.heading)}</h2>
+            <p>${escapeHtml(s.text)}</p>
+        </div>`;
+    });
+
+    if (sections.length === 0) {
+        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">В скрипте пока нет разделов.</div>`;
+    }
+    return html;
+}
+
+function scrollToCallSection(id) {
+    document.getElementById(`call-section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// РЕЖИМ РЕДАКТИРОВАНИЯ: аккордеон, чтобы длинные разделы не превращали страницу в стену textarea
+function renderEditModeHtml(niche) {
     let html = `
         <label class="form-label" style="margin-top:0;">Название ниши:</label>
         <input type="text" id="niche-name-input" class="form-input" value="${escapeHtml(niche.name)}">
@@ -1231,17 +1285,25 @@ function renderNicheDetailContent(id) {
         <label class="form-label">Описание / когда использовать:</label>
         <input type="text" id="niche-subtitle-input" class="form-input" value="${escapeHtml(niche.subtitle || '')}" placeholder="Например: холодные звонки владельцам кальянных">
 
-        <div class="p-section-title" style="margin-top:24px;">СКРИПТ ЖИВОГО ЗВОНКА</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px;">
+            <div class="p-section-title" style="margin:0;">СКРИПТ ЖИВОГО ЗВОНКА</div>
+            <div style="display:flex; gap:6px;">
+                <button class="edit-btn" style="font-size:11px; padding:6px 10px;" onclick="expandAllNicheSections(true)">Развернуть все</button>
+                <button class="edit-btn" style="font-size:11px; padding:6px 10px;" onclick="expandAllNicheSections(false)">Свернуть все</button>
+            </div>
+        </div>
         <div id="niche-sections-list">`;
 
     (niche.sections || []).forEach((s, idx) => {
+        const collapsed = Boolean(nicheSectionCollapse[s.id]);
         html += `
         <div class="script-section-card">
-            <div class="script-section-head">
-                <input type="text" class="form-input script-section-heading" value="${escapeHtml(s.heading)}" placeholder="Название раздела" oninput="setNicheSectionField(${idx}, 'heading', this.value)">
-                <button class="delete-btn" onclick="removeNicheSection(${idx})">🗑</button>
+            <div class="script-section-head ${collapsed ? '' : 'expanded'}" onclick="toggleNicheSection('${s.id}')">
+                <span class="section-chevron">${collapsed ? '▶' : '▼'}</span>
+                <input type="text" class="form-input script-section-heading" value="${escapeHtml(s.heading)}" placeholder="Название раздела" onclick="event.stopPropagation()" oninput="setNicheSectionField(${idx}, 'heading', this.value)">
+                <button class="delete-btn" onclick="event.stopPropagation(); removeNicheSection(${idx})">🗑</button>
             </div>
-            <textarea class="form-textarea script-section-text" placeholder="Текст раздела скрипта..." oninput="setNicheSectionField(${idx}, 'text', this.value)">${escapeHtml(s.text)}</textarea>
+            ${collapsed ? '' : `<textarea class="form-textarea script-section-text" placeholder="Текст раздела скрипта..." onclick="event.stopPropagation()" oninput="setNicheSectionField(${idx}, 'text', this.value)">${escapeHtml(s.text)}</textarea>`}
         </div>`;
     });
 
@@ -1250,8 +1312,19 @@ function renderNicheDetailContent(id) {
         <button class="submit-btn" style="margin-top:16px;" onclick="saveNicheDetail()">Сохранить скрипт</button>
         <button class="delete-btn" style="width:100%; margin-top:8px; justify-content:center;" onclick="deleteNiche('${niche.id}')">🗑 Удалить нишу</button>`;
 
-    const body = document.getElementById('niche-detail-body');
-    if (body) body.innerHTML = html;
+    return html;
+}
+
+function toggleNicheSection(id) {
+    nicheSectionCollapse[id] = !nicheSectionCollapse[id];
+    renderNicheDetailContent(currentOpenNicheId);
+}
+
+function expandAllNicheSections(expand) {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (!niche) return;
+    (niche.sections || []).forEach(s => { nicheSectionCollapse[s.id] = !expand; });
+    renderNicheDetailContent(currentOpenNicheId);
 }
 
 function setNicheSectionField(idx, field, value) {
@@ -1263,7 +1336,9 @@ function addNicheSection() {
     const niche = niches.find(n => n.id === currentOpenNicheId);
     if (!niche) return;
     niche.sections = niche.sections || [];
-    niche.sections.push({ id: String(Date.now()), heading: 'Новый раздел', text: '' });
+    const newSection = { id: String(Date.now()), heading: 'Новый раздел', text: '' };
+    niche.sections.push(newSection);
+    nicheSectionCollapse[newSection.id] = false; // open the freshly added section
     renderNicheDetailContent(currentOpenNicheId);
 }
 

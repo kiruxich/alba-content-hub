@@ -203,7 +203,10 @@
                     <p>Продажи & Скрипты</p>
                     <h1 id="niche-detail-title">Ниша</h1>
                 </div>
-                <button class="edit-btn" onclick="closeNicheDetailPage()">← Назад к нишам</button>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="schedule-btn" id="niche-mode-toggle-btn" onclick="toggleCallMode()">🎙 Режим звонка</button>
+                    <button class="edit-btn" onclick="closeNicheDetailPage()">← Назад к нишам</button>
+                </div>
             </div>
             <div class="clients-container" style="max-width:800px;">
                 <div id="niche-detail-body"></div>
