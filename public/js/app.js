@@ -16,6 +16,13 @@ let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
 let selectedPickerDate = null;
+let contentPlanBlocks = [];
+let niches = [];
+let currentOpenNicheId = null;
+
+function escapeHtml(str) {
+    return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     initApp();
@@ -41,16 +48,20 @@ async function api(path, options = {}) {
 // ИНИЦИАЛИЗАЦИЯ: подтягиваем состояние с бэкенда вместо localStorage
 async function initApp() {
     try {
-        const [ideas, events, plan, telegram] = await Promise.all([
+        const [ideas, events, plan, telegram, contentPlan, nichesList] = await Promise.all([
             api('/api/ideas'),
             api('/api/events'),
             api('/api/settings/plan'),
             api('/api/settings/telegram'),
+            api('/api/content-plan'),
+            api('/api/niches'),
         ]);
         ideasBank = ideas;
         scheduledEvents = events;
         planSettings = plan;
         tgMeta = telegram;
+        contentPlanBlocks = contentPlan.blocks;
+        niches = nichesList;
 
         const dailyInput = document.getElementById('plan-daily-input');
         const weeklyInput = document.getElementById('plan-weekly-input');
@@ -62,6 +73,8 @@ async function initApp() {
         renderCalendar();
         renderKanbanView();
         renderAnalyticsView();
+        renderContentPlan();
+        renderClientsView();
         await renderBankView();
         updatePlanProgress();
     } catch (e) {
@@ -78,7 +91,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5 };
+    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -90,6 +103,8 @@ function switchTab(tabName) {
         renderCalendar();
         checkFunnelBalance();
     }
+    if (tabName === 'contentplan') renderContentPlan();
+    if (tabName === 'clients') renderClientsView();
 }
 
 function openOverlay(id) {
@@ -1076,5 +1091,242 @@ async function deleteEvent(eventId, dateStr) {
         showToast('Публикация удалена из календаря');
     } catch (e) {
         showToast('Не удалось удалить публикацию: ' + e.message);
+    }
+}
+
+// КОНТЕНТ ПЛАН (редактируемая доска стратегии)
+const PLAN_PALETTE = ['#0a84ff', '#30d158', '#bf5af2', '#ff9f0a', '#ff453a', '#64d2ff', '#ff375f', '#5e5ce6'];
+
+function renderContentPlan() {
+    const container = document.getElementById('content-plan-grid');
+    if (!container) return;
+
+    if (contentPlanBlocks.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">План пуст — добавьте первый блок.</div>`;
+        return;
+    }
+
+    let html = '';
+    contentPlanBlocks.forEach(block => {
+        html += `
+        <div class="plan-card" style="border-top-color:${block.color || '#0a84ff'}">
+            <div class="plan-card-head">
+                <input type="text" class="plan-card-title" value="${escapeHtml(block.title)}" placeholder="Заголовок блока" oninput="setPlanBlockField('${block.id}','title',this.value)">
+                <div class="plan-card-actions">
+                    <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
+                    <button class="icon-btn" title="Удалить" onclick="removePlanBlock('${block.id}')">🗑</button>
+                </div>
+            </div>
+            <div class="plan-card-swatches">
+                ${PLAN_PALETTE.map(c => `<button class="swatch ${c === block.color ? 'active' : ''}" style="background:${c}" title="${c}" onclick="setPlanBlockField('${block.id}','color','${c}')"></button>`).join('')}
+            </div>
+            <textarea class="plan-card-text" placeholder="Текст блока..." oninput="setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function setPlanBlockField(id, field, value) {
+    const block = contentPlanBlocks.find(b => b.id === id);
+    if (!block) return;
+    block[field] = value;
+    if (field === 'color') renderContentPlan();
+}
+
+function addPlanBlock() {
+    contentPlanBlocks.push({ id: String(Date.now()), title: 'Новый блок', color: '#0a84ff', text: '' });
+    renderContentPlan();
+}
+
+function removePlanBlock(id) {
+    contentPlanBlocks = contentPlanBlocks.filter(b => b.id !== id);
+    renderContentPlan();
+}
+
+function copyPlanBlock(id) {
+    const block = contentPlanBlocks.find(b => b.id === id);
+    if (!block) return;
+    navigator.clipboard.writeText(`${block.title}\n\n${block.text}`);
+    showToast('Блок скопирован в буфер!');
+}
+
+async function saveContentPlan() {
+    try {
+        const result = await api('/api/content-plan', { method: 'PUT', body: JSON.stringify({ blocks: contentPlanBlocks }) });
+        contentPlanBlocks = result.blocks;
+        renderContentPlan();
+        showToast('Контент-план сохранён!');
+    } catch (e) {
+        showToast('Не удалось сохранить план: ' + e.message);
+    }
+}
+
+// ЗАКАЗЧИКИ (скрипты живых звонков по нишам)
+const NEW_NICHE_SECTIONS_TEMPLATE = [
+    { id: 's1', heading: 'Приветствие', text: '' },
+    { id: 's2', heading: 'Квалификация', text: '' },
+    { id: 's3', heading: 'Боль', text: '' },
+    { id: 's4', heading: 'Оффер / Питч', text: '' },
+    { id: 's5', heading: 'Обработка возражений', text: '' },
+    { id: 's6', heading: 'Закрытие', text: '' },
+];
+
+function renderClientsView() {
+    const container = document.getElementById('niches-grid');
+    if (!container) return;
+
+    if (niches.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую.</div>`;
+        return;
+    }
+
+    let html = '';
+    niches.forEach(n => {
+        const sectionsCount = (n.sections || []).length;
+        html += `
+        <div class="product-card" onclick="openNicheDetail('${n.id}')">
+            <div>
+                <div class="card-header">
+                    <div class="card-title">${n.name}</div>
+                    <span class="card-badge" style="background:rgba(10,132,255,0.15); color:var(--accent-blue)">${sectionsCount} раздел.</span>
+                </div>
+                <div class="card-desc">${n.subtitle || 'Без описания'}</div>
+            </div>
+            <div class="card-footer">
+                <span>Открыть скрипт звонка</span>
+                <span>→</span>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function openNicheDetail(id) {
+    currentOpenNicheId = id;
+    renderNicheDetailContent(id);
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-niche-detail').classList.add('active');
+}
+
+function closeNicheDetailPage() {
+    currentOpenNicheId = null;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-clients').classList.add('active');
+    renderClientsView();
+}
+
+function renderNicheDetailContent(id) {
+    const niche = niches.find(n => n.id === id);
+    if (!niche) return;
+
+    const titleEl = document.getElementById('niche-detail-title');
+    if (titleEl) titleEl.innerText = niche.name;
+
+    let html = `
+        <label class="form-label" style="margin-top:0;">Название ниши:</label>
+        <input type="text" id="niche-name-input" class="form-input" value="${escapeHtml(niche.name)}">
+
+        <label class="form-label">Описание / когда использовать:</label>
+        <input type="text" id="niche-subtitle-input" class="form-input" value="${escapeHtml(niche.subtitle || '')}" placeholder="Например: холодные звонки владельцам кальянных">
+
+        <div class="p-section-title" style="margin-top:24px;">СКРИПТ ЖИВОГО ЗВОНКА</div>
+        <div id="niche-sections-list">`;
+
+    (niche.sections || []).forEach((s, idx) => {
+        html += `
+        <div class="script-section-card">
+            <div class="script-section-head">
+                <input type="text" class="form-input script-section-heading" value="${escapeHtml(s.heading)}" placeholder="Название раздела" oninput="setNicheSectionField(${idx}, 'heading', this.value)">
+                <button class="delete-btn" onclick="removeNicheSection(${idx})">🗑</button>
+            </div>
+            <textarea class="form-textarea script-section-text" placeholder="Текст раздела скрипта..." oninput="setNicheSectionField(${idx}, 'text', this.value)">${escapeHtml(s.text)}</textarea>
+        </div>`;
+    });
+
+    html += `</div>
+        <button class="edit-btn" style="width:100%; margin-top:8px;" onclick="addNicheSection()">+ Добавить раздел</button>
+        <button class="submit-btn" style="margin-top:16px;" onclick="saveNicheDetail()">Сохранить скрипт</button>
+        <button class="delete-btn" style="width:100%; margin-top:8px; justify-content:center;" onclick="deleteNiche('${niche.id}')">🗑 Удалить нишу</button>`;
+
+    const body = document.getElementById('niche-detail-body');
+    if (body) body.innerHTML = html;
+}
+
+function setNicheSectionField(idx, field, value) {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (niche && niche.sections[idx]) niche.sections[idx][field] = value;
+}
+
+function addNicheSection() {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (!niche) return;
+    niche.sections = niche.sections || [];
+    niche.sections.push({ id: String(Date.now()), heading: 'Новый раздел', text: '' });
+    renderNicheDetailContent(currentOpenNicheId);
+}
+
+function removeNicheSection(idx) {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (!niche) return;
+    niche.sections.splice(idx, 1);
+    renderNicheDetailContent(currentOpenNicheId);
+}
+
+async function saveNicheDetail() {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (!niche) return;
+
+    const name = document.getElementById('niche-name-input').value.trim();
+    const subtitle = document.getElementById('niche-subtitle-input').value.trim();
+    if (!name) return alert('Укажите название ниши');
+
+    try {
+        const updated = await api(`/api/niches/${niche.id}`, { method: 'PUT', body: JSON.stringify({ name, subtitle, sections: niche.sections }) });
+        niches = niches.map(n => n.id === niche.id ? updated : n);
+        const titleEl = document.getElementById('niche-detail-title');
+        if (titleEl) titleEl.innerText = updated.name;
+        showToast('Скрипт сохранён!');
+    } catch (e) {
+        showToast('Не удалось сохранить: ' + e.message);
+    }
+}
+
+async function deleteNiche(id) {
+    if (!confirm('Удалить эту нишу вместе со скриптом?')) return;
+    try {
+        await api(`/api/niches/${id}`, { method: 'DELETE' });
+        niches = niches.filter(n => n.id !== id);
+        closeNicheDetailPage();
+        showToast('Ниша удалена');
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+function openNewNicheModal() {
+    document.getElementById('new-niche-name-input').value = '';
+    document.getElementById('new-niche-subtitle-input').value = '';
+    openOverlay('new-niche-overlay');
+}
+
+async function createNiche() {
+    const name = document.getElementById('new-niche-name-input').value.trim();
+    const subtitle = document.getElementById('new-niche-subtitle-input').value.trim();
+    if (!name) return alert('Укажите название ниши');
+
+    try {
+        const created = await api('/api/niches', {
+            method: 'POST',
+            body: JSON.stringify({ name, subtitle, sections: NEW_NICHE_SECTIONS_TEMPLATE }),
+        });
+        niches.push(created);
+        closeOverlay('new-niche-overlay');
+        renderClientsView();
+        showToast('Ниша создана!');
+        openNicheDetail(created.id);
+    } catch (e) {
+        showToast('Не удалось создать нишу: ' + e.message);
     }
 }

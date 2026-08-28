@@ -41,6 +41,14 @@
             <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
             <span>Календарь</span>
         </button>
+        <button class="tab-item" onclick="switchTab('contentplan')">
+            <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>
+            <span>Контент план</span>
+        </button>
+        <button class="tab-item" onclick="switchTab('clients')">
+            <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            <span>Заказчики</span>
+        </button>
     </nav>
 
     <div class="view-container">
@@ -152,6 +160,53 @@
 
                 <h3 style="margin: 24px 0 12px 4px; font-size:16px;">Запланированные публикации</h3>
                 <div id="calendar-list-content"></div>
+            </div>
+        </div>
+
+        <!-- TAB 7: CONTENT PLAN -->
+        <div id="view-contentplan" class="view">
+            <div class="large-header">
+                <p>Годовая стратегия</p>
+                <h1>Контент план</h1>
+            </div>
+            <div class="content-plan-container">
+                <div class="controls-row">
+                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Редактируемая доска стратегии — правьте прямо здесь и сохраняйте</p>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button class="edit-btn" onclick="addPlanBlock()">+ Добавить блок</button>
+                        <button class="schedule-btn" onclick="saveContentPlan()">💾 Сохранить план</button>
+                    </div>
+                </div>
+                <div class="plan-grid" id="content-plan-grid"></div>
+            </div>
+        </div>
+
+        <!-- TAB 8: CLIENTS / SALES NICHES -->
+        <div id="view-clients" class="view">
+            <div class="large-header">
+                <p>Продажи & Скрипты</p>
+                <h1>Заказчики</h1>
+            </div>
+            <div class="clients-container">
+                <div class="controls-row">
+                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Скрипты живых звонков по нишам — открой карточку, чтобы редактировать</p>
+                    <button class="schedule-btn" onclick="openNewNicheModal()">+ Новая ниша</button>
+                </div>
+                <div class="products-grid" id="niches-grid"></div>
+            </div>
+        </div>
+
+        <!-- NICHE DETAIL PAGE (opened from a niche card - a real page, not a modal) -->
+        <div id="view-niche-detail" class="view">
+            <div class="large-header" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                <div>
+                    <p>Продажи & Скрипты</p>
+                    <h1 id="niche-detail-title">Ниша</h1>
+                </div>
+                <button class="edit-btn" onclick="closeNicheDetailPage()">← Назад к нишам</button>
+            </div>
+            <div class="clients-container" style="max-width:800px;">
+                <div id="niche-detail-body"></div>
             </div>
         </div>
 
@@ -299,6 +354,25 @@
                 </div>
 
                 <button class="submit-btn" onclick="confirmSchedule()">Подтвердить и добавить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW NICHE MODAL -->
+    <div id="new-niche-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Новая ниша</span>
+                <button class="back-btn" onclick="closeOverlay('new-niche-overlay')">Отмена</button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label" style="margin-top:0;">Название ниши:</label>
+                <input type="text" id="new-niche-name-input" class="form-input" placeholder="Например: Кальянные">
+
+                <label class="form-label">Описание:</label>
+                <input type="text" id="new-niche-subtitle-input" class="form-input" placeholder="Когда и для чего использовать скрипт">
+
+                <button class="submit-btn" onclick="createNiche()">Создать нишу</button>
             </div>
         </div>
     </div>
