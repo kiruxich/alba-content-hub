@@ -10,6 +10,7 @@ import settingsRouter from './routes/settings.js';
 import telegramRouter from './routes/telegram.js';
 import contentPlanRouter from './routes/contentPlan.js';
 import nichesRouter from './routes/niches.js';
+import projectInfoRouter from './routes/projectInfo.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -23,6 +24,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/telegram', telegramRouter);
 app.use('/api/content-plan', contentPlanRouter);
 app.use('/api/niches', nichesRouter);
+app.use('/api/project-info', projectInfoRouter);
 
 // Traditional Node hosting (pnpm start): serve the Vite-built frontend from the
 // same process. On Vercel this branch is never hit - static files are served

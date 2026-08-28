@@ -61,6 +61,20 @@
             <div class="products-grid" id="products-grid"></div>
         </div>
 
+        <!-- PRODUCT DETAIL PAGE (opened from a product card - a real page, not a modal) -->
+        <div id="view-product-detail" class="view">
+            <div class="large-header" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                <div>
+                    <p>Каталог продуктов</p>
+                    <h1 id="product-detail-title">Продукт</h1>
+                </div>
+                <button class="edit-btn" onclick="closeProductDetailPage()">← Назад к продуктам</button>
+            </div>
+            <div class="clients-container" style="max-width:900px;">
+                <div id="product-detail-body"></div>
+            </div>
+        </div>
+
         <!-- TAB 2: BANK OF IDEAS -->
         <div id="view-bank" class="view">
             <div class="large-header">
@@ -171,13 +185,21 @@
             </div>
             <div class="content-plan-container">
                 <div class="controls-row">
-                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Редактируемая доска стратегии — правьте прямо здесь и сохраняйте</p>
+                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Квартальная дорожная карта — правьте прямо здесь и сохраняйте</p>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="edit-btn" onclick="addPlanBlock()">+ Добавить блок</button>
+                        <button class="edit-btn" onclick="addPlanNote()">+ Заметка</button>
+                        <button class="edit-btn" onclick="addPlanQuarter()">+ Квартал</button>
                         <button class="schedule-btn" onclick="saveContentPlan()">💾 Сохранить план</button>
                     </div>
                 </div>
-                <div class="plan-grid" id="content-plan-grid"></div>
+
+                <div class="p-section-title" style="margin-top:8px;">СТРАТЕГИЯ</div>
+                <div class="plan-notes-row" id="plan-notes-row"></div>
+
+                <div class="p-section-title" style="margin-top:28px;">ДОРОЖНАЯ КАРТА ПО КВАРТАЛАМ</div>
+                <div class="plan-timeline-wrap">
+                    <div class="plan-timeline" id="plan-timeline"></div>
+                </div>
             </div>
         </div>
 
@@ -213,30 +235,21 @@
             </div>
         </div>
 
-        <!-- IDEA PICKER OVERLAY -->
-        <div id="idea-picker-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;" id="picker-date-title">Добавить идею из Банка</span>
-                <button class="back-btn" onclick="closeOverlay('idea-picker-overlay')">Закрыть ✕</button>
+        <!-- DAY DETAIL PAGE (opened from a calendar day - scheduled posts + pick from bank, one page) -->
+        <div id="view-day-detail" class="view">
+            <div class="large-header" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                <div>
+                    <p>Сетка публикаций</p>
+                    <h1 id="day-detail-title">День</h1>
+                </div>
+                <button class="edit-btn" onclick="closeDayDetailPage()">← Назад к календарю</button>
             </div>
-            <div class="modal-body" id="idea-picker-body">
-                <!-- Заполняется динамически -->
+            <div class="clients-container" style="max-width:800px;">
+                <div id="day-detail-body"></div>
             </div>
-        </div>
         </div>
     </div>
 
-    <!-- PRODUCT DETAIL DRAWER -->
-    <div id="product-detail-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;" id="p-overlay-nav-title">Продукт</span>
-                <button class="back-btn" onclick="closeOverlay('product-detail-overlay')">Закрыть ✕</button>
-            </div>
-            <div class="modal-body" id="product-detail-body"></div>
-        </div>
-    </div>
 
     <!-- EDIT / NEW IDEA MODAL -->
     <div id="edit-idea-overlay" class="overlay">
@@ -326,17 +339,6 @@
                 <textarea id="ai-prompt-text" class="form-textarea" style="height:220px;" readonly></textarea>
                 <button class="submit-btn" onclick="copyGeneratedPrompt()">📋 Скопировать промпт</button>
             </div>
-        </div>
-    </div>
-
-    <!-- EVENT DETAIL MODAL -->
-    <div id="event-detail-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Детали публикации</span>
-                <button class="back-btn" onclick="closeOverlay('event-detail-overlay')">Закрыть ✕</button>
-            </div>
-            <div class="modal-body" id="event-detail-body"></div>
         </div>
     </div>
 

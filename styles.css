@@ -271,11 +271,11 @@ html, body {
 
 /* CONTENT PLAN BOARD */
 .content-plan-container { padding: 24px; max-width: 1300px; margin: 0 auto; }
-.plan-grid {
+.plan-notes-row {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 16px;
-    margin-top: 16px;
+    margin-top: 12px;
     align-items: start;
 }
 .plan-card {
@@ -315,6 +315,35 @@ html, body {
     font-size: 13px; line-height: 1.55; padding: 10px; resize: vertical; font-family: inherit;
 }
 .plan-card-text:focus { outline: none; border-color: var(--accent-blue); }
+
+/* CONTENT PLAN - QUARTERLY TIMELINE */
+.plan-timeline-wrap { overflow-x: auto; margin-top: 12px; padding-bottom: 12px; }
+.plan-timeline { display: flex; align-items: stretch; min-width: max-content; }
+.timeline-card {
+    width: 300px; flex-shrink: 0; background: var(--bg-grouped); border-radius: 16px;
+    padding: 18px; border: 1px solid rgba(255,255,255,0.08); border-top: 4px solid var(--accent-blue);
+    display: flex; flex-direction: column; gap: 10px;
+}
+.timeline-arrow {
+    display: flex; align-items: center; justify-content: center; width: 44px;
+    flex-shrink: 0; color: var(--text-secondary); font-size: 22px; font-weight: 700;
+}
+.timeline-card-title {
+    flex: 1; min-width: 0; background: none; border: none; color: var(--text-primary);
+    font-size: 17px; font-weight: 700; padding: 4px 0; border-bottom: 1px solid transparent;
+}
+.timeline-card-title:focus { outline: none; border-bottom-color: var(--accent-blue); }
+.timeline-card-period {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--text-secondary);
+}
+.timeline-card-period:focus { outline: none; border-color: var(--accent-blue); }
+.timeline-card-text {
+    width: 100%; min-height: 180px; background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; color: var(--text-primary);
+    font-size: 13px; line-height: 1.55; padding: 10px; resize: vertical; font-family: inherit;
+}
+.timeline-card-text:focus { outline: none; border-color: var(--accent-blue); }
 
 /* CLIENTS / SALES SCRIPTS */
 .clients-container { padding: 24px; max-width: 1200px; margin: 0 auto; }

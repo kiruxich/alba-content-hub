@@ -15,10 +15,11 @@ let tgMeta = { chatId: '', hasToken: false, tokenPreview: '' };
 let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
-let selectedPickerDate = null;
 let contentPlanBlocks = [];
 let niches = [];
 let currentOpenNicheId = null;
+let projectInfo = {};
+let currentOpenDay = null;
 
 function escapeHtml(str) {
     return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -48,13 +49,14 @@ async function api(path, options = {}) {
 // ИНИЦИАЛИЗАЦИЯ: подтягиваем состояние с бэкенда вместо localStorage
 async function initApp() {
     try {
-        const [ideas, events, plan, telegram, contentPlan, nichesList] = await Promise.all([
+        const [ideas, events, plan, telegram, contentPlan, nichesList, projectInfoMap] = await Promise.all([
             api('/api/ideas'),
             api('/api/events'),
             api('/api/settings/plan'),
             api('/api/settings/telegram'),
             api('/api/content-plan'),
             api('/api/niches'),
+            api('/api/project-info'),
         ]);
         ideasBank = ideas;
         scheduledEvents = events;
@@ -62,6 +64,7 @@ async function initApp() {
         tgMeta = telegram;
         contentPlanBlocks = contentPlan.blocks;
         niches = nichesList;
+        projectInfo = projectInfoMap;
 
         const dailyInput = document.getElementById('plan-daily-input');
         const weeklyInput = document.getElementById('plan-weekly-input');
@@ -738,6 +741,19 @@ function renderMatrixView() {
     container.innerHTML = html;
 }
 
+async function saveProjectAbout(productId) {
+    const textarea = document.getElementById('project-about-textarea');
+    if (!textarea) return;
+    const about = textarea.value;
+    try {
+        await api(`/api/project-info/${productId}`, { method: 'PUT', body: JSON.stringify({ about }) });
+        projectInfo[productId] = about;
+        showToast('Описание проекта сохранено!');
+    } catch (e) {
+        showToast('Не удалось сохранить описание: ' + e.message);
+    }
+}
+
 function renderProductsGrid() {
     const container = document.getElementById('products-grid');
     if (!container) return;
@@ -766,14 +782,21 @@ function renderProductsGrid() {
 function openProductDetail(productId) {
     currentOpenProductId = productId;
     renderProductDetailContent(productId);
-    openOverlay('product-detail-overlay');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-product-detail').classList.add('active');
+}
+
+function closeProductDetailPage() {
+    currentOpenProductId = null;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-products').classList.add('active');
 }
 
 function renderProductDetailContent(productId) {
     const product = productsData.find(p => p.id === productId);
     if (!product) return;
 
-    const navTitle = document.getElementById('p-overlay-nav-title');
+    const navTitle = document.getElementById('product-detail-title');
     if (navTitle) navTitle.innerText = product.title;
 
     const favoritedIdeas = ideasBank.filter(i => i.targetGroups && i.targetGroups.includes(productId));
@@ -788,7 +811,11 @@ function renderProductDetailContent(productId) {
             <strong>Главный посыл:</strong> ${product.value}
         </div>
 
-        <div class="p-section-title">ROADMAP ПРОДВИЖЕНИЯ</div>
+        <div class="p-section-title">О ПРОЕКТЕ</div>
+        <textarea id="project-about-textarea" class="form-textarea" style="min-height:160px;" placeholder="Расскажите про проект: что это, для кого, как устроено...">${escapeHtml(projectInfo[productId] || '')}</textarea>
+        <button class="edit-btn" onclick="saveProjectAbout('${productId}')">💾 Сохранить описание проекта</button>
+
+        <div class="p-section-title" style="margin-top:24px;">ROADMAP ПРОДВИЖЕНИЯ</div>
         <div class="roadmap-list">`;
 
     product.roadmap.forEach(r => {
@@ -802,7 +829,7 @@ function renderProductDetailContent(productId) {
     html += `</div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin:24px 0 10px 4px;">
             <span class="p-section-title" style="margin:0;">ИЗБРАННЫЕ ИДЕИ (${favoritedIdeas.length})</span>
-            <button onclick="closeOverlay('product-detail-overlay'); switchTab('bank');" style="background:none; border:none; color:var(--accent-blue); font-size:12px; font-weight:600; cursor:pointer;">+ Из Банка</button>
+            <button onclick="switchTab('bank');" style="background:none; border:none; color:var(--accent-blue); font-size:12px; font-weight:600; cursor:pointer;">+ Из Банка</button>
         </div>
         <div>`;
 
@@ -880,7 +907,6 @@ async function confirmSchedule() {
         checkFunnelBalance();
 
         closeOverlay('schedule-overlay');
-        closeOverlay('product-detail-overlay');
         showToast(`Запланировано на ${d.getDate()} ${monthNames[d.getMonth()]}`);
         switchTab('calendar');
     } catch (e) {
@@ -911,11 +937,11 @@ function renderCalendar() {
         gridHtml += `
             <div class="cal-day-cell ${hasEvent ? 'has-event' : ''}">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-weight:600;" onclick="openDayDetail('${dateFormatted}')">${day}</span>
+                    <span style="font-weight:600;" onclick="openDayDetailPage('${dateFormatted}')">${day}</span>
                     <span style="font-size:10px; color:var(--text-secondary);">${totalCount}/${planSettings.daily}</span>
                 </div>
 
-                <div class="cal-slot-picker" onclick="openIdeaPickerForDay('${dateFormatted}')" title="Нажмите, чтобы добавить идею из Банка">
+                <div class="cal-slot-picker" onclick="openDayDetailPage('${dateFormatted}')" title="Нажмите, чтобы открыть день">
                     ${totalCount > 0 ? `
                         <div class="slot-badges">
                             ${reelsCount > 0 ? `<span class="slot-badge reels">🎬 ${reelsCount}</span>` : ''}
@@ -944,7 +970,7 @@ function renderCalendar() {
         const dayName = item.dateStr.split(',')[0];
 
         listHtml += `
-        <div class="list-item" onclick="openDayDetail('${item.rawDate}')">
+        <div class="list-item" onclick="openDayDetailPage('${item.rawDate}')">
             <div class="date-block">
                 <div class="date-day" style="color:${item.color}">${dayName}</div>
                 <div class="date-num">${dayNum}</div>
@@ -962,40 +988,75 @@ function renderCalendar() {
     listContainer.innerHTML = listHtml;
 }
 
-function openIdeaPickerForDay(dateFormatted) {
-    selectedPickerDate = dateFormatted;
-    const d = new Date(dateFormatted);
+// СТРАНИЦА ДНЯ (объединяет запланированные публикации и выбор идеи из банка)
+function openDayDetailPage(dateStr) {
+    currentOpenDay = dateStr;
+    renderDayDetailPage(dateStr);
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-day-detail').classList.add('active');
+}
+
+function closeDayDetailPage() {
+    currentOpenDay = null;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-calendar').classList.add('active');
+    renderCalendar();
+}
+
+function renderDayDetailPage(dateStr) {
+    const events = scheduledEvents.filter(e => e.rawDate === dateStr);
+    const dateParts = dateStr.split('-');
+    const dayNum = parseInt(dateParts[2], 10);
     const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+    const monthNum = parseInt(dateParts[1], 10) - 1;
 
-    const titleEl = document.getElementById('picker-date-title');
-    if (titleEl) titleEl.innerText = `Добавить публикацию на ${d.getDate()} ${monthNames[d.getMonth()]}`;
+    const titleEl = document.getElementById('day-detail-title');
+    if (titleEl) titleEl.innerText = `${dayNum} ${monthNames[monthNum]}`;
 
-    const body = document.getElementById('idea-picker-body');
-    if (!body) return;
+    let html = `<div class="p-section-title" style="margin-top:0;">ПУБЛИКАЦИИ НА ЭТОТ ДЕНЬ (${events.length})</div>`;
+
+    if (events.length === 0) {
+        html += `<div class="info-box" style="text-align:center; margin-bottom:24px;">На этот день публикаций пока нет.</div>`;
+    } else {
+        events.forEach(item => {
+            html += `
+            <div class="day-large-card" style="border-left: 4px solid ${item.color}; background: var(--bg-grouped); border-radius: 14px; padding: 16px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-weight:700; font-size:15px; color:var(--text-primary);">Публикация</span>
+                    <span class="slot-badge" style="background:${item.color}22; color:${item.color}; font-size:11px; padding:3px 8px; border-radius:6px; font-weight:600;">${item.format || 'Пост'}</span>
+                </div>
+                <div style="font-size:16px; font-weight:600; margin-bottom:6px;">${item.title}</div>
+                <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">${item.desc}</div>
+                <div class="info-box" style="font-size:12px; margin-bottom:10px; padding:8px;"><strong>CTA:</strong> ${item.cta}</div>
+                <button class="delete-btn" style="width:100%; justify-content:center; padding:8px;" onclick="deleteEvent(${item.id}, '${dateStr}')">🗑 Удалить публикацию</button>
+            </div>`;
+        });
+    }
+
+    html += `<div class="p-section-title" style="margin-top:28px;">ДОБАВИТЬ ПУБЛИКАЦИЮ ИЗ БАНКА</div>`;
 
     // Исключаем идеи, которые УЖЕ есть в календаре
     const scheduledIdeaIds = scheduledEvents.map(e => e.ideaId);
     const availableIdeas = ideasBank.filter(idea => !scheduledIdeaIds.includes(idea.id));
 
     if (availableIdeas.length === 0) {
-        body.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Все идеи из банка уже запланированы или банк пуст</div>`;
+        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Все идеи из банка уже запланированы или банк пуст</div>`;
     } else {
-        let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;
         availableIdeas.forEach(idea => {
             html += `
-            <div class="idea-card" style="margin-bottom:0;">
+            <div class="idea-card">
                 <div class="idea-header">
                     <div class="idea-title">${idea.title}</div>
                     <span class="format-tag">${idea.format || 'TG Пост'}</span>
                 </div>
                 ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
-                <button class="schedule-btn" style="width:100%; margin-top:8px;" onclick="attachIdeaToDay('${idea.id}', '${dateFormatted}')">+ Запланировать публикацию</button>
+                <button class="schedule-btn" style="width:100%; margin-top:8px;" onclick="attachIdeaToDay('${idea.id}', '${dateStr}')">+ Запланировать публикацию</button>
             </div>`;
         });
-        html += `</div>`;
-        body.innerHTML = html;
     }
-    openOverlay('idea-picker-overlay');
+
+    const body = document.getElementById('day-detail-body');
+    if (body) body.innerHTML = html;
 }
 
 async function attachIdeaToDay(ideaId, dateStr) {
@@ -1025,53 +1086,13 @@ async function attachIdeaToDay(ideaId, dateStr) {
 
         scheduledEvents.push(created);
         scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
-        renderCalendar();
         updatePlanProgress();
         checkFunnelBalance();
-
-        closeOverlay('idea-picker-overlay');
+        renderDayDetailPage(dateStr);
         showToast(`Публикация добавлена на ${d.getDate()} ${monthNames[d.getMonth()]}`);
     } catch (e) {
         showToast('Не удалось добавить публикацию: ' + e.message);
     }
-}
-
-// ОТДЕЛЬНАЯ СТРАНИЦА ДНЯ (КРУПНЫЕ КАРТОЧКИ ПУБЛИКАЦИЙ)
-function openDayDetail(dateStr) {
-    const events = scheduledEvents.filter(e => e.rawDate === dateStr);
-    const dateParts = dateStr.split('-');
-    const dayNum = parseInt(dateParts[2], 10);
-    const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-    const monthNum = parseInt(dateParts[1], 10) - 1;
-
-    let html = `<div>
-        <h2 style="font-size:22px; font-weight:700; margin-bottom:16px;">Публикации на ${dayNum} ${monthNames[monthNum]} (${events.length})</h2>`;
-
-    if (events.length === 0) {
-        html += `<div class="info-box" style="text-align:center;">На этот день публикаций пока нет.</div>`;
-    } else {
-        events.forEach(item => {
-            html += `
-            <div class="day-large-card" style="border-left: 4px solid ${item.color}; background: var(--bg-grouped); border-radius: 14px; padding: 16px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-weight:700; font-size:15px; color:var(--text-primary);">Публикация</span>
-                    <span class="slot-badge" style="background:${item.color}22; color:${item.color}; font-size:11px; padding:3px 8px; border-radius:6px; font-weight:600;">${item.format || 'Пост'}</span>
-                </div>
-                <div style="font-size:16px; font-weight:600; margin-bottom:6px;">${item.title}</div>
-                <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">${item.desc}</div>
-                <div class="info-box" style="font-size:12px; margin-bottom:10px; padding:8px;"><strong>CTA:</strong> ${item.cta}</div>
-                <button class="delete-btn" style="width:100%; justify-content:center; padding:8px;" onclick="deleteEvent(${item.id}, '${dateStr}')">🗑 Удалить публикацию</button>
-            </div>`;
-        });
-    }
-
-    html += `
-        <button class="schedule-btn" style="width:100%; margin-top:8px;" onclick="closeOverlay('event-detail-overlay'); openIdeaPickerForDay('${dateStr}');">+ Добавить публикацию из банка</button>
-    </div>`;
-
-    const body = document.getElementById('event-detail-body');
-    if (body) body.innerHTML = html;
-    openOverlay('event-detail-overlay');
 }
 
 // УДАЛЕНИЕ ЗАПЛАНИРОВАННОЙ ПУБЛИКАЦИИ
@@ -1083,48 +1104,77 @@ async function deleteEvent(eventId, dateStr) {
         updatePlanProgress();
         checkFunnelBalance();
 
-        if (dateStr) {
-            openDayDetail(dateStr); // Перерисовываем модалку дня
-        } else {
-            closeOverlay('event-detail-overlay');
-        }
+        if (dateStr) renderDayDetailPage(dateStr); // Обновляем страницу дня на месте
         showToast('Публикация удалена из календаря');
     } catch (e) {
         showToast('Не удалось удалить публикацию: ' + e.message);
     }
 }
 
-// КОНТЕНТ ПЛАН (редактируемая доска стратегии)
+// КОНТЕНТ ПЛАН (квартальный таймлайн + глобальные заметки стратегии)
 const PLAN_PALETTE = ['#0a84ff', '#30d158', '#bf5af2', '#ff9f0a', '#ff453a', '#64d2ff', '#ff375f', '#5e5ce6'];
 
 function renderContentPlan() {
-    const container = document.getElementById('content-plan-grid');
+    renderPlanNotes();
+    renderPlanTimeline();
+}
+
+function planSwatchesHtml(block) {
+    return `<div class="plan-card-swatches">${PLAN_PALETTE.map(c =>
+        `<button class="swatch ${c === block.color ? 'active' : ''}" style="background:${c}" title="${c}" onclick="setPlanBlockField('${block.id}','color','${c}')"></button>`
+    ).join('')}</div>`;
+}
+
+function renderPlanNotes() {
+    const container = document.getElementById('plan-notes-row');
     if (!container) return;
 
-    if (contentPlanBlocks.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">План пуст — добавьте первый блок.</div>`;
+    const notes = contentPlanBlocks.filter(b => b.kind !== 'quarter');
+    if (notes.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Заметок пока нет — добавьте первую.</div>`;
         return;
     }
 
-    let html = '';
-    contentPlanBlocks.forEach(block => {
-        html += `
+    container.innerHTML = notes.map(block => `
         <div class="plan-card" style="border-top-color:${block.color || '#0a84ff'}">
             <div class="plan-card-head">
-                <input type="text" class="plan-card-title" value="${escapeHtml(block.title)}" placeholder="Заголовок блока" oninput="setPlanBlockField('${block.id}','title',this.value)">
+                <input type="text" class="plan-card-title" value="${escapeHtml(block.title)}" placeholder="Заголовок заметки" oninput="setPlanBlockField('${block.id}','title',this.value)">
                 <div class="plan-card-actions">
                     <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
                     <button class="icon-btn" title="Удалить" onclick="removePlanBlock('${block.id}')">🗑</button>
                 </div>
             </div>
-            <div class="plan-card-swatches">
-                ${PLAN_PALETTE.map(c => `<button class="swatch ${c === block.color ? 'active' : ''}" style="background:${c}" title="${c}" onclick="setPlanBlockField('${block.id}','color','${c}')"></button>`).join('')}
-            </div>
-            <textarea class="plan-card-text" placeholder="Текст блока..." oninput="setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
-        </div>`;
-    });
+            ${planSwatchesHtml(block)}
+            <textarea class="plan-card-text" placeholder="Текст заметки..." oninput="setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
+        </div>`).join('');
+}
 
-    container.innerHTML = html;
+function renderPlanTimeline() {
+    const container = document.getElementById('plan-timeline');
+    if (!container) return;
+
+    const quarters = contentPlanBlocks.filter(b => b.kind === 'quarter');
+    if (quarters.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Кварталов пока нет — добавьте первый.</div>`;
+        return;
+    }
+
+    container.innerHTML = quarters.map((block, idx) => {
+        const card = `
+        <div class="timeline-card" style="border-top-color:${block.color || '#0a84ff'}">
+            <div class="plan-card-head">
+                <input type="text" class="timeline-card-title" value="${escapeHtml(block.title)}" placeholder="Продукт квартала" oninput="setPlanBlockField('${block.id}','title',this.value)">
+                <div class="plan-card-actions">
+                    <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
+                    <button class="icon-btn" title="Удалить" onclick="removePlanBlock('${block.id}')">🗑</button>
+                </div>
+            </div>
+            <input type="text" class="timeline-card-period" value="${escapeHtml(block.period || '')}" placeholder="Например: Январь — Март" oninput="setPlanBlockField('${block.id}','period',this.value)">
+            ${planSwatchesHtml(block)}
+            <textarea class="timeline-card-text" placeholder="Смысловой вектор и B2B-оффер..." oninput="setPlanBlockField('${block.id}','text',this.value)">${escapeHtml(block.text)}</textarea>
+        </div>`;
+        return idx < quarters.length - 1 ? card + `<div class="timeline-arrow">→</div>` : card;
+    }).join('');
 }
 
 function setPlanBlockField(id, field, value) {
@@ -1134,8 +1184,13 @@ function setPlanBlockField(id, field, value) {
     if (field === 'color') renderContentPlan();
 }
 
-function addPlanBlock() {
-    contentPlanBlocks.push({ id: String(Date.now()), title: 'Новый блок', color: '#0a84ff', text: '' });
+function addPlanNote() {
+    contentPlanBlocks.push({ id: String(Date.now()), kind: 'note', title: 'Новая заметка', color: '#0a84ff', text: '' });
+    renderContentPlan();
+}
+
+function addPlanQuarter() {
+    contentPlanBlocks.push({ id: String(Date.now()), kind: 'quarter', title: 'Новый квартал', period: '', color: '#0a84ff', text: '' });
     renderContentPlan();
 }
 
@@ -1147,7 +1202,8 @@ function removePlanBlock(id) {
 function copyPlanBlock(id) {
     const block = contentPlanBlocks.find(b => b.id === id);
     if (!block) return;
-    navigator.clipboard.writeText(`${block.title}\n\n${block.text}`);
+    const header = block.kind === 'quarter' ? `${block.title} (${block.period || ''})` : block.title;
+    navigator.clipboard.writeText(`${header}\n\n${block.text}`);
     showToast('Блок скопирован в буфер!');
 }
 

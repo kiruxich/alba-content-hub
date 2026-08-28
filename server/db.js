@@ -79,44 +79,73 @@ CREATE TABLE IF NOT EXISTS niches (
     sections TEXT DEFAULT '[]',
     created_at INTEGER DEFAULT (strftime('%s','now'))
 );
+
+CREATE TABLE IF NOT EXISTS project_info (
+    product_id TEXT PRIMARY KEY,
+    about TEXT DEFAULT ''
+);
 `);
 
-// Seed content_plan once with the studio's actual annual plan (INSERT OR IGNORE
-// is a no-op once row id=1 exists, so this never overwrites later edits).
+// Seed content_plan once with the studio's actual annual plan, shaped for the
+// quarterly-timeline UI: 'note' blocks are global strategy cards, 'quarter'
+// blocks render as a horizontal roadmap ordered by array position.
+// INSERT OR IGNORE is a no-op once row id=1 exists, so this never overwrites
+// later edits - see server/routes/contentPlan.js for the one-time migration
+// that upgrades any pre-timeline (flat, kind-less) blocks still on disk.
 const defaultContentPlanBlocks = [
     {
-        id: 'goal', title: 'Главная бизнес-цель', color: '#0a84ff',
+        id: 'goal', kind: 'note', title: 'Главная бизнес-цель', color: '#0a84ff',
         text: 'Получение квалифицированных лидов (SQL) на заказную веб-разработку и сложные IT-системы.',
     },
     {
-        id: 'distribution', title: 'Модель дистрибуции (Content Multiplier)', color: '#bf5af2',
+        id: 'distribution', kind: 'note', title: 'Модель дистрибуции (Content Multiplier)', color: '#bf5af2',
         text: '1 идея → Shorts / Reels / ВК Клипы → Threads → Telegram-канал с закрепом → Сайт alba-creation.ru / Лид-бот',
     },
     {
-        id: 'q1', title: 'Q1 · ДУЭТ (Январь — Март)', color: '#bf5af2',
+        id: 'prompt', kind: 'note', title: 'Промпт-шаблон для Claude (еженедельный генератор сценариев)', color: '#ff375f',
+        text: 'Действуй как Chief Marketing Officer IT-студии Alba Creation. Нам нужно создать сценарий для short-video (30-45 сек) и текстовый пост для Telegram/Threads.\n\n- Продукт недели: [Укажи продукт текущего квартала]\n- Тема: [Укажи тему дня из матрицы]\n- Целевая аудитория: Владельцы бизнеса и ЛПР, ценящие окупаемость, безопасность и скорость.\n- Тон: Экспертный, без воды, без погружения в хардкорный код, на языке бизнес-метрик и ROI.\n- Структура:\n  1. Хук (первые 3 секунды, цепляющий боль или цифру).\n  2. Проблема (почему традиционные методы не работают).\n  3. Решение (как Alba Creation или наш продукт закрывает эту задачу).\n  4. CTA (призыв перейти в Telegram-канал за бесплатным аудитом/демо).',
+    },
+    {
+        id: 'q1', kind: 'quarter', title: 'ДУЭТ', period: 'Январь — Март', color: '#bf5af2',
         text: 'Смысловой вектор: Веб-инфраструктура, скорость запуска сайтов, замена устаревшим конструкторам.\n\nB2B-оффер: Бесплатный аудит скорости и конверсии текущего сайта клиента + демо ДУЭТ.',
     },
     {
-        id: 'q2', title: 'Q2 · InSights (Апрель — Июнь)', color: '#0a84ff',
+        id: 'q2', kind: 'quarter', title: 'InSights', period: 'Апрель — Июнь', color: '#0a84ff',
         text: 'Смысловой вектор: Сквозная аналитика, оцифровка показателей, принятие решений на основе данных.\n\nB2B-оффер: Экспресс-разбор системы аналитики бизнеса и поиск слепых зон в воронке.',
     },
     {
-        id: 'q3', title: 'Q3 · «Хранитель» (Июль — Сентябрь)', color: '#30d158',
+        id: 'q3', kind: 'quarter', title: '«Хранитель»', period: 'Июль — Сентябрь', color: '#30d158',
         text: 'Смысловой вектор: Автономные ИИ-архивы в закрытом контуре (152-ФЗ), безопасность данных, мгновенный RAG-поиск.\n\nB2B-оффер: Расчёт экономии человеко-часов и стоимости развёртывания On-Premise / Cloud.',
     },
     {
-        id: 'q4', title: 'Q4 · Crista & Фантазия (Октябрь — Декабрь)', color: '#ff9f0a',
+        id: 'q4', kind: 'quarter', title: 'Crista & Фантазия', period: 'Октябрь — Декабрь', color: '#ff9f0a',
         text: 'Смысловой вектор: Геймдев-бэкстейдж, виральный визуал, сложная 3D-графика и интерактивные WebGL-интерфейсы.\n\nB2B-оффер: Разработка иммерсивных промо-сайтов и сложных нестандартных сервисов под ключ.',
-    },
-    {
-        id: 'prompt', title: 'Промпт-шаблон для Claude (еженедельный генератор сценариев)', color: '#ff375f',
-        text: 'Действуй как Chief Marketing Officer IT-студии Alba Creation. Нам нужно создать сценарий для short-video (30-45 сек) и текстовый пост для Telegram/Threads.\n\n- Продукт недели: [Укажи продукт текущего квартала]\n- Тема: [Укажи тему дня из матрицы]\n- Целевая аудитория: Владельцы бизнеса и ЛПР, ценящие окупаемость, безопасность и скорость.\n- Тон: Экспертный, без воды, без погружения в хардкорный код, на языке бизнес-метрик и ROI.\n- Структура:\n  1. Хук (первые 3 секунды, цепляющий боль или цифру).\n  2. Проблема (почему традиционные методы не работают).\n  3. Решение (как Alba Creation или наш продукт закрывает эту задачу).\n  4. CTA (призыв перейти в Telegram-канал за бесплатным аудитом/демо).',
     },
 ];
 await db.execute({
     sql: 'INSERT OR IGNORE INTO content_plan (id, blocks) VALUES (1, ?)',
     args: [JSON.stringify(defaultContentPlanBlocks)],
 });
+
+// Seed "О проекте" starters. Alba Creation gets a real description pulled
+// from alba-creation.ru; the other (fictional demo) products get a short
+// starter derived from their existing productsData fields for the user to
+// expand on later.
+const defaultProjectInfo = {
+    'alba-creation': 'Alba Creation — цифровая студия, работающая в формате remote-first и создающая IT-решения для бизнеса в России и за рубежом: боты, сайты, приложения и целые цифровые экосистемы.\n\nПодход студии — превращать бизнес-задачу в тот формат, который решает её быстрее всего: иногда это Telegram-бот, иногда полноценный сайт или личный кабинет, иногда мини-игра.\n\nОсновные направления:\n— Экосистемы: платформы, боты, личные кабинеты и автоматизация\n— Решения для бизнеса: внутренние инструменты под специфику конкретной компании\n— Сайты: разработка с нуля и редизайн устаревших проектов\n— Игры: от полноценных шутеров до мини-игр в Telegram\n— Партнёрские проекты: реальные кейсы с визуальной презентацией\n\nВсе проекты в портфолио — это реальные продакшен-запуски, а не пилоты. Студия работает с клиентом до результата.\n\nКонтакты: @albacreation в Telegram, +7 (915) 495-42-93.',
+    'insights': 'InSights — SaaS-платформа для анализа социальных сетей с использованием ИИ. Помогает маркетологам и B2B-клиентам находить релевантных блогеров и оценивать их аудиторию через AI-скоринг, экономя часы ручного подбора инфлюенсеров.',
+    'hranitel': 'Хранитель — RAG-система для работы с корпоративными архивами в закрытом контуре, без выхода в интернет. Позволяет находить нужный документ по смыслу за секунды вместо ручного перебора сканов, что особенно критично для Enterprise и госсектора.',
+    'duet': 'ДУЭТ — система автоматизации расписаний для образовательных учреждений. Убирает рутину и конфликты в сетке занятий, которые обычно ложатся на завучей и администрацию школ.',
+    'crista': 'Crista — CRM для сегмента HoReCa (рестораны, отели), решающая проблему пропущенных бронирований и разрозненной коммуникации с гостями.',
+    'fantaziya': 'Фантазия — сервис умных витрин с AI-рекомендациями для интернet-магазинов, подбирающий товары под интерес конкретного покупателя в реальном времени.',
+    'legitagent': 'legitAgent — набор open-source npm-пакетов и CLI-инструментов для фронтенд-разработчиков, служащий точкой входа для знакомства разработчиков со студией.',
+};
+for (const [productId, about] of Object.entries(defaultProjectInfo)) {
+    await db.execute({
+        sql: 'INSERT OR IGNORE INTO project_info (product_id, about) VALUES (?, ?)',
+        args: [productId, about],
+    });
+}
 
 // Seed the first niche script as requested: cold-call script for building
 // websites for hookah lounges. INSERT OR IGNORE on a fixed id keeps this
