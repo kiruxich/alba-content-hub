@@ -1,65 +1,73 @@
-// --- ВСТРОЕННЫЕ ДАННЫЕ ПРОДУКТОВ (data.js больше не нужен) ---
+// --- ВСТРОЕННЫЕ ДАННЫЕ ПРОДУКТОВ (статическая конфигурация студии, не хранится в БД) ---
 const productsData = [
-    { id: 'insights', title: 'InSights', badge: 'Аналитика', badgeBg: 'rgba(10,132,255,0.15)', badgeColor: '#0a84ff', target: 'B2B, Маркетологи', value: 'Поиск блогеров и AI-скоринг', desc: 'SaaS платформа для анализа соцсетей с ИИ', roadmap: [{ step: 'MVP', desc: 'Релиз базового поиска' }] },
-    { id: 'hranitel', title: 'Хранитель', badge: 'Документооборот', badgeBg: 'rgba(48,209,88,0.15)', badgeColor: '#30d158', target: 'Enterprise, Госсектор', value: 'Поиск по сканам в закрытом контуре', desc: 'RAG-система для работы с архивами', roadmap: [{ step: 'Пилот', desc: 'Внедрение в первую корпорацию' }] },
-    { id: 'duet', title: 'ДУЭТ', badge: 'Образование', badgeBg: 'rgba(191,90,242,0.15)', badgeColor: '#bf5af2', target: 'Школы, B2G', value: 'Автоматизация расписаний', desc: 'Управление образовательным процессом', roadmap: [{ step: 'Серт.', desc: 'Получение лицензий' }] },
-    { id: 'crista', title: 'Crista', badge: 'HoReCa', badgeBg: 'rgba(255,159,10,0.15)', badgeColor: '#ff9f0a', target: 'Рестораны, Отели', value: 'Автоматизация бронирований', desc: 'CRM для сегмента гостеприимства', roadmap: [{ step: 'Бета', desc: 'Тест на 3 ресторанах' }] },
-    { id: 'fantaziya', title: 'Фантазия', badge: 'E-commerce', badgeBg: 'rgba(255,55,95,0.15)', badgeColor: '#ff375f', target: 'Ритейл', value: 'Умные витрины', desc: 'AI-рекомендации для интернет-магазинов', roadmap: [{ step: 'Релиз', desc: 'Запуск интеграции с CMS' }] },
-    { id: 'legitagent', title: 'legitAgent', badge: 'Open Source', badgeBg: 'rgba(100,210,255,0.15)', badgeColor: '#64d2ff', target: 'Разработчики', value: 'NPM пакеты и CLI инструменты', desc: 'Инструментарий для фронтенд разработчиков', roadmap: [{ step: 'v1.0', desc: 'Стабильный релиз ядра' }] },
-    { id: 'alba-creation', title: 'Alba Creation', badge: 'Студия', badgeBg: 'rgba(94,92,230,0.15)', badgeColor: '#5e5ce6', target: 'Все клиенты', value: 'Full-stack разработка', desc: 'Цифровая веб-студия полного цикла', roadmap: [{ step: 'Масштаб', desc: 'Выход на международный рынок' }] }
+    { id: 'insights', title: 'InSights', badge: 'Аналитика', badgeBg: 'rgba(10,132,255,0.15)', badgeColor: '#0a84ff', target: 'B2B, Маркетологи', value: 'Поиск блогеров и AI-скоринг', desc: 'SaaS платформа для анализа соцсетей с ИИ', roadmap: [{ step: 'MVP', desc: 'Релиз базового поиска' }], synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'B2B-клиенты InSights, которым нужна кастомная доработка платформы, ведутся на full-stack услуги студии' }] },
+    { id: 'hranitel', title: 'Хранитель', badge: 'Документооборот', badgeBg: 'rgba(48,209,88,0.15)', badgeColor: '#30d158', target: 'Enterprise, Госсектор', value: 'Поиск по сканам в закрытом контуре', desc: 'RAG-система для работы с архивами', roadmap: [{ step: 'Пилот', desc: 'Внедрение в первую корпорацию' }], synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'Enterprise-клиенты Хранителя конвертируются в контракты на доп. интеграции и поддержку от студии' }] },
+    { id: 'duet', title: 'ДУЭТ', badge: 'Образование', badgeBg: 'rgba(191,90,242,0.15)', badgeColor: '#bf5af2', target: 'Школы, B2G', value: 'Автоматизация расписаний', desc: 'Управление образовательным процессом', roadmap: [{ step: 'Серт.', desc: 'Получение лицензий' }], synergies: [{ target: 'legitAgent', type: 'Кросс-промо', text: 'Разработчики образовательных модулей ДУЭТ используют open-source инструментарий legitAgent' }] },
+    { id: 'crista', title: 'Crista', badge: 'HoReCa', badgeBg: 'rgba(255,159,10,0.15)', badgeColor: '#ff9f0a', target: 'Рестораны, Отели', value: 'Автоматизация бронирований', desc: 'CRM для сегмента гостеприимства', roadmap: [{ step: 'Бета', desc: 'Тест на 3 ресторанах' }], synergies: [{ target: 'Фантазия', type: 'Кросс-промо', text: 'HoReCa-клиенты Crista с розничными точками переводятся на умные витрины Фантазии' }] },
+    { id: 'fantaziya', title: 'Фантазия', badge: 'E-commerce', badgeBg: 'rgba(255,55,95,0.15)', badgeColor: '#ff375f', target: 'Ритейл', value: 'Умные витрины', desc: 'AI-рекомендации для интернет-магазинов', roadmap: [{ step: 'Релиз', desc: 'Запуск интеграции с CMS' }], synergies: [{ target: 'InSights', type: 'Апсейл', text: 'Ритейлеры Фантазии, которым нужна аналитика инфлюенсеров, ведутся в InSights' }] },
+    { id: 'legitagent', title: 'legitAgent', badge: 'Open Source', badgeBg: 'rgba(100,210,255,0.15)', badgeColor: '#64d2ff', target: 'Разработчики', value: 'NPM пакеты и CLI инструменты', desc: 'Инструментарий для фронтенд разработчиков', roadmap: [{ step: 'v1.0', desc: 'Стабильный релиз ядра' }], synergies: [{ target: 'Alba Creation', type: 'Лид-магнит', text: 'Разработчики, познакомившиеся с open-source инструментами, заказывают кастомную разработку у студии' }] },
+    { id: 'alba-creation', title: 'Alba Creation', badge: 'Студия', badgeBg: 'rgba(94,92,230,0.15)', badgeColor: '#5e5ce6', target: 'Все клиенты', value: 'Full-stack разработка', desc: 'Цифровая веб-студия полного цикла', roadmap: [{ step: 'Масштаб', desc: 'Выход на международный рынок' }], synergies: [] }
 ];
 
 let ideasBank = [];
 let scheduledEvents = [];
-let tgSettings = { token: '', chatId: '' };
+let tgMeta = { chatId: '', hasToken: false, tokenPreview: '' };
 let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
 let selectedPickerDate = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    initStorageEngine();
-    renderProductsGrid();
-    renderMatrixView();
-    renderCalendar();
-    renderKanbanView();
-    renderAnalyticsView();
+    initApp();
     const schedInput = document.getElementById('schedule-date-input');
     if (schedInput) schedInput.value = new Date().toISOString().split('T')[0];
 });
 
-// ИНИЦИАЛИЗАЦИЯ И ХРАНИЛИЩЕ (Только localStorage)
-function initStorageEngine() {
+// --- API-КЛИЕНТ (все данные живут в SQLite на сервере, см. server/) ---
+async function api(path, options = {}) {
+    const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options,
+    });
+    if (!res.ok) {
+        let message = res.statusText;
+        try { message = (await res.json()).error || message; } catch (_) {}
+        throw new Error(message);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+}
+
+// ИНИЦИАЛИЗАЦИЯ: подтягиваем состояние с бэкенда вместо localStorage
+async function initApp() {
     try {
-        const savedIdeas = localStorage.getItem('alba_ideas_bank');
-        ideasBank = savedIdeas ? JSON.parse(savedIdeas) : [];
-
-        const savedEvents = localStorage.getItem('alba_scheduled_events');
-        scheduledEvents = savedEvents ? JSON.parse(savedEvents) : [];
-
-        const savedPlan = localStorage.getItem('alba_plan_settings');
-        if (savedPlan) planSettings = JSON.parse(savedPlan);
-
-        const savedTg = localStorage.getItem('alba_tg_settings');
-        if (savedTg) tgSettings = JSON.parse(savedTg);
+        const [ideas, events, plan, telegram] = await Promise.all([
+            api('/api/ideas'),
+            api('/api/events'),
+            api('/api/settings/plan'),
+            api('/api/settings/telegram'),
+        ]);
+        ideasBank = ideas;
+        scheduledEvents = events;
+        planSettings = plan;
+        tgMeta = telegram;
 
         const dailyInput = document.getElementById('plan-daily-input');
         const weeklyInput = document.getElementById('plan-weekly-input');
-        if (dailyInput) dailyInput.value = planSettings.daily || 1;
-        if (weeklyInput) weeklyInput.value = planSettings.weekly || 7;
+        if (dailyInput) dailyInput.value = planSettings.daily;
+        if (weeklyInput) weeklyInput.value = planSettings.weekly;
 
-        renderBankView();
+        renderProductsGrid();
+        renderMatrixView();
+        renderCalendar();
+        renderKanbanView();
+        renderAnalyticsView();
+        await renderBankView();
         updatePlanProgress();
     } catch (e) {
-        console.warn("Storage init warning:", e);
+        console.error("Не удалось загрузить данные с сервера:", e);
+        showToast('Нет связи с сервером. Запустите backend: pnpm run server');
     }
-}
-
-function saveState() {
-    localStorage.setItem('alba_ideas_bank', JSON.stringify(ideasBank));
-    localStorage.setItem('alba_scheduled_events', JSON.stringify(scheduledEvents));
-    localStorage.setItem('alba_plan_settings', JSON.stringify(planSettings));
-    localStorage.setItem('alba_tg_settings', JSON.stringify(tgSettings));
 }
 
 // УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ И НАВИГАЦИЯ
@@ -69,7 +77,7 @@ function switchTab(tabName) {
 
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
-    
+
     const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
@@ -84,14 +92,14 @@ function switchTab(tabName) {
     }
 }
 
-function openOverlay(id) { 
+function openOverlay(id) {
     const el = document.getElementById(id);
-    if (el) el.classList.add('active'); 
+    if (el) el.classList.add('active');
 }
 
-function closeOverlay(id) { 
+function closeOverlay(id) {
     const el = document.getElementById(id);
-    if (el) el.classList.remove('active'); 
+    if (el) el.classList.remove('active');
 }
 
 function showToast(text) {
@@ -103,27 +111,29 @@ function showToast(text) {
 }
 
 // НАСТРОЙКА ПЛАНА ПУБЛИКАЦИЙ И ПРОГРЕСС
-function savePlanSettings() {
+async function savePlanSettings() {
     const dailyInput = document.getElementById('plan-daily-input');
     const weeklyInput = document.getElementById('plan-weekly-input');
-    
+
     const daily = parseInt(dailyInput ? dailyInput.value : 1, 10) || 1;
     const weekly = parseInt(weeklyInput ? weeklyInput.value : 7, 10) || 7;
-    
-    planSettings = { daily, weekly };
-    saveState();
-    
-    updatePlanProgress();
-    renderCalendar();
-    showToast('План публикаций сохранен и применен!');
+
+    try {
+        planSettings = await api('/api/settings/plan', { method: 'PUT', body: JSON.stringify({ daily, weekly }) });
+        updatePlanProgress();
+        renderCalendar();
+        showToast('План публикаций сохранен и применен!');
+    } catch (e) {
+        showToast('Не удалось сохранить план: ' + e.message);
+    }
 }
 
 function updatePlanProgress() {
     const todayStr = new Date().toISOString().split('T')[0];
-    
+
     const todayCount = scheduledEvents.filter(e => e.rawDate === todayStr).length;
     const todayPct = Math.min(100, Math.round((todayCount / planSettings.daily) * 100));
-    
+
     const tText = document.getElementById('today-progress-text');
     const tFill = document.getElementById('today-progress-fill');
     if (tText) tText.innerText = `${todayCount} / ${planSettings.daily} (${todayPct}%)`;
@@ -134,7 +144,7 @@ function updatePlanProgress() {
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - (dayOfWeek - 1));
     startOfWeek.setHours(0,0,0,0);
-    
+
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23,59,59,999);
@@ -152,22 +162,32 @@ function updatePlanProgress() {
     if (wFill) wFill.style.width = `${weekPct}%`;
 }
 
-// БАНК ИДЕЙ
-function renderBankView() {
+// БАНК ИДЕЙ (поиск делегирован в SQLite FTS5 на сервере)
+async function renderBankView() {
     const countBadge = document.getElementById('tab-bank-count');
     if (countBadge) countBadge.innerText = ideasBank.length;
-    
+
     const container = document.getElementById('bank-list-content');
     if (!container) return;
 
-    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase();
+    const searchQuery = (document.getElementById('search-input')?.value || '').trim();
 
-    const filtered = ideasBank.filter(i => 
-        i.title.toLowerCase().includes(searchQuery) ||
-        (i.desc && i.desc.toLowerCase().includes(searchQuery)) ||
-        (i.format && i.format.toLowerCase().includes(searchQuery)) ||
-        (i.funnel && i.funnel.toLowerCase().includes(searchQuery))
-    );
+    let filtered;
+    if (searchQuery) {
+        try {
+            filtered = await api(`/api/ideas?q=${encodeURIComponent(searchQuery)}`);
+        } catch (e) {
+            const q = searchQuery.toLowerCase();
+            filtered = ideasBank.filter(i =>
+                i.title.toLowerCase().includes(q) ||
+                (i.desc && i.desc.toLowerCase().includes(q)) ||
+                (i.format && i.format.toLowerCase().includes(q)) ||
+                (i.funnel && i.funnel.toLowerCase().includes(q))
+            );
+        }
+    } else {
+        filtered = ideasBank;
+    }
 
     if (filtered.length === 0) {
         container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Идеи не найдены или банк пуст</div>`;
@@ -192,7 +212,7 @@ function renderBankView() {
             </div>
             ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
             <div class="idea-cta">CTA: ${idea.cta || '—'}</div>
-            
+
             <div class="meta-stats">
                 <span>📏 ${charCount} симв.</span>
                 <span>⏱ ~${readTime} мин.</span>
@@ -202,7 +222,7 @@ function renderBankView() {
             <div style="margin-top:8px; padding-top:8px; border-top:0.5px solid var(--separator);">
                 <span style="font-size:11px; color:var(--text-secondary); font-weight:600; text-transform:uppercase;">Продукты:</span>
                 <div>`;
-        
+
         productsData.forEach(p => {
             const isFavorited = idea.targetGroups && idea.targetGroups.includes(p.id);
             html += `
@@ -273,16 +293,20 @@ function handleDragStart(e, ideaId) {
 
 function allowDrop(e) { e.preventDefault(); }
 
-function handleDrop(e, targetStatus) {
+async function handleDrop(e, targetStatus) {
     e.preventDefault();
     const ideaId = e.dataTransfer.getData("text/plain");
     const idea = ideasBank.find(i => i.id === ideaId);
-    if (idea) {
-        idea.status = targetStatus;
-        saveState();
+    if (!idea) return;
+
+    try {
+        const updated = await api(`/api/ideas/${ideaId}`, { method: 'PUT', body: JSON.stringify({ status: targetStatus }) });
+        ideasBank = ideasBank.map(i => i.id === ideaId ? updated : i);
         renderKanbanView();
         renderBankView();
         showToast(`Статус изменен на ${targetStatus}`);
+    } catch (err) {
+        showToast('Не удалось изменить статус: ' + err.message);
     }
 }
 
@@ -462,35 +486,46 @@ function openMetricsModal(ideaId) {
     openOverlay('metrics-overlay');
 }
 
-function saveMetrics() {
+async function saveMetrics() {
     const id = document.getElementById('metrics-idea-id').value;
     const idea = ideasBank.find(i => i.id === id);
-    if (idea) {
-        idea.metrics = {
-            views: parseInt(document.getElementById('m-views').value, 10) || 0,
-            saves: parseInt(document.getElementById('m-saves').value, 10) || 0,
-            clicks: parseInt(document.getElementById('m-clicks').value, 10) || 0,
-            leads: parseInt(document.getElementById('m-leads').value, 10) || 0
-        };
-        saveState();
+    if (!idea) return;
+
+    const metrics = {
+        views: parseInt(document.getElementById('m-views').value, 10) || 0,
+        saves: parseInt(document.getElementById('m-saves').value, 10) || 0,
+        clicks: parseInt(document.getElementById('m-clicks').value, 10) || 0,
+        leads: parseInt(document.getElementById('m-leads').value, 10) || 0
+    };
+
+    try {
+        const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ metrics }) });
+        ideasBank = ideasBank.map(i => i.id === id ? updated : i);
         showToast('Метрики сохранены!');
         closeOverlay('metrics-overlay');
         renderBankView();
         renderAnalyticsView();
+    } catch (e) {
+        showToast('Не удалось сохранить метрики: ' + e.message);
     }
 }
 
-function toggleGroupForIdea(ideaId, groupId) {
-    ideasBank = ideasBank.map(idea => {
-        if (idea.id !== ideaId) return idea;
-        const targetGroups = idea.targetGroups || [];
-        const exists = targetGroups.includes(groupId);
-        return { ...idea, targetGroups: exists ? targetGroups.filter(g => g !== groupId) : [...targetGroups, groupId] };
-    });
+async function toggleGroupForIdea(ideaId, groupId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
 
-    saveState();
-    renderBankView();
-    if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
+    const targetGroups = idea.targetGroups || [];
+    const exists = targetGroups.includes(groupId);
+    const nextGroups = exists ? targetGroups.filter(g => g !== groupId) : [...targetGroups, groupId];
+
+    try {
+        const updated = await api(`/api/ideas/${ideaId}`, { method: 'PUT', body: JSON.stringify({ targetGroups: nextGroups }) });
+        ideasBank = ideasBank.map(i => i.id === ideaId ? updated : i);
+        renderBankView();
+        if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
+    } catch (e) {
+        showToast('Не удалось обновить продукт идеи: ' + e.message);
+    }
 }
 
 function openEditIdeaModal(ideaId) {
@@ -524,7 +559,7 @@ function openNewIdeaModal() {
     openOverlay('edit-idea-overlay');
 }
 
-function saveIdeaChanges() {
+async function saveIdeaChanges() {
     const id = document.getElementById('edit-idea-id').value;
     const title = document.getElementById('edit-idea-title-input').value.trim();
     const desc = document.getElementById('edit-idea-desc-input').value.trim();
@@ -535,42 +570,43 @@ function saveIdeaChanges() {
 
     if (!title) return alert('Укажите название идеи');
 
-    if (id) {
-        ideasBank = ideasBank.map(item => item.id === id ? { ...item, title, desc, format, funnel, status, cta } : item);
-        showToast('Идея обновлена!');
-    } else {
-        ideasBank.unshift({ 
-            id: String(Date.now()), 
-            title, desc, format, funnel, status, cta, 
-            targetGroups: [], 
-            metrics: { views: 0, saves: 0, clicks: 0, leads: 0 } 
-        });
-        showToast('Новая идея создана!');
-    }
+    try {
+        if (id) {
+            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta }) });
+            ideasBank = ideasBank.map(item => item.id === id ? updated : item);
+            showToast('Идея обновлена!');
+        } else {
+            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ title, desc, format, funnel, status, cta }) });
+            ideasBank.unshift(created);
+            showToast('Новая идея создана!');
+        }
 
-    saveState();
-    renderBankView();
-    renderKanbanView();
-    renderAnalyticsView();
-    if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
-    closeOverlay('edit-idea-overlay');
+        renderBankView();
+        renderKanbanView();
+        renderAnalyticsView();
+        if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
+        closeOverlay('edit-idea-overlay');
+    } catch (e) {
+        showToast('Не удалось сохранить идею: ' + e.message);
+    }
 }
 
-function deleteIdea(ideaId) {
+async function deleteIdea(ideaId) {
     if (!confirm('Удалить эту идею?')) return;
-    
-    // Удаляем из банка
-    ideasBank = ideasBank.filter(i => i.id !== ideaId);
-    
-    // Также можно удалить связанные события из календаря
-    scheduledEvents = scheduledEvents.filter(e => e.ideaId !== ideaId);
 
-    saveState();
-    renderBankView();
-    renderKanbanView();
-    renderAnalyticsView();
-    renderCalendar();
-    showToast('Идея удалена');
+    try {
+        await api(`/api/ideas/${ideaId}`, { method: 'DELETE' });
+        ideasBank = ideasBank.filter(i => i.id !== ideaId);
+        scheduledEvents = scheduledEvents.filter(e => e.ideaId !== ideaId);
+
+        renderBankView();
+        renderKanbanView();
+        renderAnalyticsView();
+        renderCalendar();
+        showToast('Идея удалена');
+    } catch (e) {
+        showToast('Не удалось удалить идею: ' + e.message);
+    }
 }
 
 function exportIdeasJSON() {
@@ -589,60 +625,65 @@ function processImportJSON(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             const data = JSON.parse(e.target.result);
-            if (Array.isArray(data)) {
-                ideasBank = data;
-                saveState();
-                renderBankView();
-                renderKanbanView();
-                renderAnalyticsView();
-                showToast('Импортировано успешно!');
-            }
-        } catch (err) { alert('Ошибка чтения JSON файла'); }
+            if (!Array.isArray(data)) throw new Error('Ожидался массив идей');
+            ideasBank = await api('/api/ideas/import', { method: 'POST', body: JSON.stringify(data) });
+            renderBankView();
+            renderKanbanView();
+            renderAnalyticsView();
+            showToast('Импортировано успешно!');
+        } catch (err) { alert('Ошибка чтения JSON файла: ' + err.message); }
     };
     reader.readAsText(file);
 }
 
-// TELEGRAM BOT API
-function openTgSettings() {
-    document.getElementById('tg-token-input').value = tgSettings.token || '';
-    document.getElementById('tg-chat-input').value = tgSettings.chatId || '';
+// TELEGRAM BOT API (токен хранится и используется только на сервере)
+async function openTgSettings() {
+    try {
+        tgMeta = await api('/api/settings/telegram');
+    } catch (e) {
+        showToast('Не удалось получить настройки Telegram: ' + e.message);
+    }
+
+    const tokenInput = document.getElementById('tg-token-input');
+    const chatInput = document.getElementById('tg-chat-input');
+    if (tokenInput) {
+        tokenInput.value = '';
+        tokenInput.placeholder = tgMeta.hasToken
+            ? `Сохранён токен ${tgMeta.tokenPreview} — введите новый, чтобы заменить`
+            : '123456789:ABCdefGHI...';
+    }
+    if (chatInput) chatInput.value = tgMeta.chatId || '';
     openOverlay('tg-config-overlay');
 }
 
-function saveTgSettings() {
-    tgSettings.token = document.getElementById('tg-token-input').value.trim();
-    tgSettings.chatId = document.getElementById('tg-chat-input').value.trim();
-    saveState();
-    closeOverlay('tg-config-overlay');
-    showToast('Настройки Telegram сохранены');
+async function saveTgSettings() {
+    const token = document.getElementById('tg-token-input').value.trim();
+    const chatId = document.getElementById('tg-chat-input').value.trim();
+
+    try {
+        tgMeta = await api('/api/settings/telegram', { method: 'PUT', body: JSON.stringify({ token, chatId }) });
+        closeOverlay('tg-config-overlay');
+        showToast('Настройки Telegram сохранены');
+    } catch (e) {
+        showToast('Не удалось сохранить настройки Telegram: ' + e.message);
+    }
 }
 
 async function postToTelegram(ideaId) {
-    if (!tgSettings.token || !tgSettings.chatId) {
+    if (!tgMeta.hasToken || !tgMeta.chatId) {
         alert('Укажите Bot Token и Chat ID в настройках Telegram!');
         openTgSettings();
         return;
     }
 
-    const idea = ideasBank.find(i => i.id === ideaId);
-    if (!idea) return;
-
-    const messageText = `*${idea.title}*\n\n${idea.desc || ''}\n\n👉 _${idea.cta || ''}_\n\n#${(idea.funnel || 'TOFU')} #AlbaCreation`;
-
     try {
-        const res = await fetch(`https://api.telegram.org/bot${tgSettings.token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: tgSettings.chatId, text: messageText, parse_mode: 'Markdown' })
-        });
-        const data = await res.json();
-        if (data.ok) showToast('Опубликовано в Telegram!');
-        else alert('Ошибка отправки: ' + data.description);
+        await api('/api/telegram/post', { method: 'POST', body: JSON.stringify({ ideaId }) });
+        showToast('Опубликовано в Telegram!');
     } catch (e) {
-        alert('Не удалось отправить запрос в Telegram API.');
+        alert('Ошибка отправки: ' + e.message);
     }
 }
 
@@ -719,7 +760,7 @@ function renderProductDetailContent(productId) {
 
     const navTitle = document.getElementById('p-overlay-nav-title');
     if (navTitle) navTitle.innerText = product.title;
-    
+
     const favoritedIdeas = ideasBank.filter(i => i.targetGroups && i.targetGroups.includes(productId));
 
     let html = `
@@ -734,7 +775,7 @@ function renderProductDetailContent(productId) {
 
         <div class="p-section-title">ROADMAP ПРОДВИЖЕНИЯ</div>
         <div class="roadmap-list">`;
-    
+
     product.roadmap.forEach(r => {
         html += `
             <div class="roadmap-step" style="border-left-color:${product.badgeColor}">
@@ -775,17 +816,16 @@ function renderProductDetailContent(productId) {
     if (body) body.innerHTML = html;
 }
 
-// ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ И ПИKЕР ИДЕЙ
+// ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ И ПИКЕР ИДЕЙ
 function openScheduleForIdea(ideaId) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
 
     const targetProduct = productsData.find(p => idea.targetGroups && idea.targetGroups.includes(p.id));
     const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
-    const pColor = targetProduct ? targetProduct.badgeColor : "#0a84ff";
 
-    currentSelectedIdea = idea; 
-    
+    currentSelectedIdea = idea;
+
     const sTitle = document.getElementById('schedule-title');
     const sCat = document.getElementById('schedule-category');
     if (sTitle) sTitle.innerText = idea.title;
@@ -793,7 +833,7 @@ function openScheduleForIdea(ideaId) {
     openOverlay('schedule-overlay');
 }
 
-function confirmSchedule() {
+async function confirmSchedule() {
     const chosenDate = document.getElementById('schedule-date-input').value;
     if (!chosenDate || !currentSelectedIdea) return;
 
@@ -806,28 +846,31 @@ function confirmSchedule() {
     const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
     const dateStr = `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
 
-    scheduledEvents.push({
-        id: Date.now(),
-        ideaId: currentSelectedIdea.id,
-        title: `${pTitle}: ${currentSelectedIdea.title}`,
-        dateStr: dateStr,
-        rawDate: chosenDate,
-        color: pColor,
-        format: currentSelectedIdea.format || 'TG Пост',
-        cta: currentSelectedIdea.cta || 'Консультация Alba Creation',
-        desc: currentSelectedIdea.desc || `Запланировано (${pTitle})`
-    });
+    try {
+        const created = await api('/api/events', { method: 'POST', body: JSON.stringify({
+            ideaId: currentSelectedIdea.id,
+            title: `${pTitle}: ${currentSelectedIdea.title}`,
+            dateStr,
+            rawDate: chosenDate,
+            color: pColor,
+            format: currentSelectedIdea.format || 'TG Пост',
+            cta: currentSelectedIdea.cta || 'Консультация Alba Creation',
+            desc: currentSelectedIdea.desc || `Запланировано (${pTitle})`,
+        }) });
 
-    scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
-    saveState();
-    renderCalendar();
-    updatePlanProgress();
-    checkFunnelBalance();
+        scheduledEvents.push(created);
+        scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
+        renderCalendar();
+        updatePlanProgress();
+        checkFunnelBalance();
 
-    closeOverlay('schedule-overlay');
-    closeOverlay('product-detail-overlay');
-    showToast(`Запланировано на ${d.getDate()} ${monthNames[d.getMonth()]}`);
-    switchTab('calendar');
+        closeOverlay('schedule-overlay');
+        closeOverlay('product-detail-overlay');
+        showToast(`Запланировано на ${d.getDate()} ${monthNames[d.getMonth()]}`);
+        switchTab('calendar');
+    } catch (e) {
+        showToast('Не удалось запланировать публикацию: ' + e.message);
+    }
 }
 
 function renderCalendar() {
@@ -838,7 +881,7 @@ function renderCalendar() {
     let gridHtml = '';
     const daysInMonth = 31;
     const weekDays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
-    
+
     weekDays.forEach(wd => gridHtml += `<div class="cal-day-header">${wd}</div>`);
 
     for (let day = 1; day <= daysInMonth; day++) {
@@ -856,7 +899,7 @@ function renderCalendar() {
                     <span style="font-weight:600;" onclick="openDayDetail('${dateFormatted}')">${day}</span>
                     <span style="font-size:10px; color:var(--text-secondary);">${totalCount}/${planSettings.daily}</span>
                 </div>
-                
+
                 <div class="cal-slot-picker" onclick="openIdeaPickerForDay('${dateFormatted}')" title="Нажмите, чтобы добавить идею из Банка">
                     ${totalCount > 0 ? `
                         <div class="slot-badges">
@@ -908,7 +951,7 @@ function openIdeaPickerForDay(dateFormatted) {
     selectedPickerDate = dateFormatted;
     const d = new Date(dateFormatted);
     const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-    
+
     const titleEl = document.getElementById('picker-date-title');
     if (titleEl) titleEl.innerText = `Добавить публикацию на ${d.getDate()} ${monthNames[d.getMonth()]}`;
 
@@ -940,7 +983,7 @@ function openIdeaPickerForDay(dateFormatted) {
     openOverlay('idea-picker-overlay');
 }
 
-function attachIdeaToDay(ideaId, dateStr) {
+async function attachIdeaToDay(ideaId, dateStr) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
 
@@ -953,26 +996,29 @@ function attachIdeaToDay(ideaId, dateStr) {
     const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
     const pColor = targetProduct ? targetProduct.badgeColor : "#0a84ff";
 
-    scheduledEvents.push({
-        id: Date.now(),
-        ideaId: idea.id, // Сохраняем ID идеи для фильтрации
-        title: `${pTitle}: ${idea.title}`,
-        dateStr: dateDisplayStr,
-        rawDate: dateStr,
-        color: pColor,
-        format: idea.format || 'TG Пост',
-        cta: idea.cta || 'Ссылка на Alba Creation',
-        desc: idea.desc || `Запланировано из банка (${pTitle})`
-    });
+    try {
+        const created = await api('/api/events', { method: 'POST', body: JSON.stringify({
+            ideaId: idea.id,
+            title: `${pTitle}: ${idea.title}`,
+            dateStr: dateDisplayStr,
+            rawDate: dateStr,
+            color: pColor,
+            format: idea.format || 'TG Пост',
+            cta: idea.cta || 'Ссылка на Alba Creation',
+            desc: idea.desc || `Запланировано из банка (${pTitle})`,
+        }) });
 
-    scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
-    saveState();
-    renderCalendar();
-    updatePlanProgress();
-    checkFunnelBalance();
+        scheduledEvents.push(created);
+        scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
+        renderCalendar();
+        updatePlanProgress();
+        checkFunnelBalance();
 
-    closeOverlay('idea-picker-overlay');
-    showToast(`Публикация добавлена на ${d.getDate()} ${monthNames[d.getMonth()]}`);
+        closeOverlay('idea-picker-overlay');
+        showToast(`Публикация добавлена на ${d.getDate()} ${monthNames[d.getMonth()]}`);
+    } catch (e) {
+        showToast('Не удалось добавить публикацию: ' + e.message);
+    }
 }
 
 // ОТДЕЛЬНАЯ СТРАНИЦА ДНЯ (КРУПНЫЕ КАРТОЧКИ ПУБЛИКАЦИЙ)
@@ -982,7 +1028,7 @@ function openDayDetail(dateStr) {
     const dayNum = parseInt(dateParts[2], 10);
     const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
     const monthNum = parseInt(dateParts[1], 10) - 1;
-    
+
     let html = `<div>
         <h2 style="font-size:22px; font-weight:700; margin-bottom:16px;">Публикации на ${dayNum} ${monthNames[monthNum]} (${events.length})</h2>`;
 
@@ -1014,17 +1060,21 @@ function openDayDetail(dateStr) {
 }
 
 // УДАЛЕНИЕ ЗАПЛАНИРОВАННОЙ ПУБЛИКАЦИИ
-function deleteEvent(eventId, dateStr) {
-    scheduledEvents = scheduledEvents.filter(e => e.id !== eventId);
-    saveState();
-    renderCalendar();
-    updatePlanProgress();
-    checkFunnelBalance();
+async function deleteEvent(eventId, dateStr) {
+    try {
+        await api(`/api/events/${eventId}`, { method: 'DELETE' });
+        scheduledEvents = scheduledEvents.filter(e => e.id !== eventId);
+        renderCalendar();
+        updatePlanProgress();
+        checkFunnelBalance();
 
-    if (dateStr) {
-        openDayDetail(dateStr); // Перерисовываем модалку дня
-    } else {
-        closeOverlay('event-detail-overlay');
+        if (dateStr) {
+            openDayDetail(dateStr); // Перерисовываем модалку дня
+        } else {
+            closeOverlay('event-detail-overlay');
+        }
+        showToast('Публикация удалена из календаря');
+    } catch (e) {
+        showToast('Не удалось удалить публикацию: ' + e.message);
     }
-    showToast('Публикация удалена из календаря');
 }

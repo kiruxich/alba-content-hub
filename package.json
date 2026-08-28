@@ -1,14 +1,22 @@
 {
-    "name": "alba-content-hub",
-    "private": true,
-    "version": "2.0.0",
-    "type": "module",
-    "scripts": {
-      "dev": "vite",
-      "build": "vite build",
-      "preview": "vite preview"
-    },
-    "devDependencies": {
-      "vite": "^5.4.0"
-    }
+  "name": "alba-content-hub",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"node --env-file-if-exists=.env server/index.js\" \"vite\"",
+    "server": "node --env-file-if-exists=.env server/index.js",
+    "build": "vite build",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
   }
+}
