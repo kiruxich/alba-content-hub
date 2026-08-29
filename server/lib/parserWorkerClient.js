@@ -1,0 +1,49 @@
+// Thin client for the Python parser-worker service (runs directly on the VPS
+// host, not in Docker, so it can drive headed Chromium inside Xvfb). Reached
+// from inside the hub's container via the Docker bridge gateway IP.
+const WORKER_URL = process.env.PARSER_WORKER_URL || 'http://10.0.1.1:8787';
+const WORKER_TOKEN = process.env.PARSER_WORKER_TOKEN || '';
+
+async function workerFetch(path, options = {}) {
+    const res = await fetch(`${WORKER_URL}${path}`, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...(WORKER_TOKEN ? { 'X-Worker-Token': WORKER_TOKEN } : {}),
+            ...(options.headers || {}),
+        },
+    });
+    if (!res.ok) {
+        let detail = res.statusText;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        throw new Error(`parser-worker ${path}: ${detail}`);
+    }
+    return res;
+}
+
+export async function createParserJob({ nicheId, category, description, queries }) {
+    const res = await workerFetch('/jobs', {
+        method: 'POST',
+        body: JSON.stringify({ niche_id: nicheId, category, description, queries }),
+    });
+    return res.json();
+}
+
+export async function getParserJob(jobId) {
+    const res = await workerFetch(`/jobs/${jobId}`);
+    return res.json();
+}
+
+export async function dedupeParserJob(jobId) {
+    const res = await workerFetch(`/jobs/${jobId}/dedupe`, { method: 'POST' });
+    return res.json();
+}
+
+export async function archiveParserJob(jobId) {
+    const res = await workerFetch(`/jobs/${jobId}/archive`, { method: 'POST' });
+    return res.json();
+}
+
+export async function fetchParserFile(jobId, kind) {
+    return workerFetch(`/jobs/${jobId}/files/${kind}`);
+}

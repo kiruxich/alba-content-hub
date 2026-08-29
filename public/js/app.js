@@ -97,7 +97,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7 };
+    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'urlchecker': 9 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -111,6 +111,7 @@ function switchTab(tabName) {
     }
     if (tabName === 'contentplan') renderContentPlan();
     if (tabName === 'clients') renderClientsView();
+    if (tabName === 'customers') renderParserNiches();
 }
 
 function openOverlay(id) {
@@ -1544,5 +1545,281 @@ async function createNiche() {
         openNicheDetail(created.id);
     } catch (e) {
         showToast('Не удалось создать нишу: ' + e.message);
+    }
+}
+
+// ПРОВЕРКА САЙТА (legitAgent legal scan + load test)
+let urlCheckerLastReport = null;
+
+async function runUrlCheck() {
+    const input = document.getElementById('url-checker-input');
+    const btn = document.getElementById('url-checker-scan-btn');
+    const url = input.value.trim();
+    if (!url) return showToast('Введите URL');
+
+    btn.disabled = true;
+    btn.textContent = 'Проверяю...';
+    document.getElementById('url-checker-results').innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary); margin-top:20px;">Сканирую сайт и запускаю нагрузочный тест...</div>`;
+
+    try {
+        const report = await api('/api/url-checker/scan', { method: 'POST', body: JSON.stringify({ url }) });
+        urlCheckerLastReport = report;
+        renderUrlCheckReport(report);
+    } catch (e) {
+        document.getElementById('url-checker-results').innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red); margin-top:20px;">Ошибка: ${escapeHtml(e.message)}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Проверить';
+    }
+}
+
+function renderUrlCheckReport(report) {
+    const container = document.getElementById('url-checker-results');
+    const health = report.health || {};
+    const findings = report.findings || [];
+    const summary = report.findingsSummary || {};
+    const lt = report.loadTest || {};
+
+    const healthStats = health.ok !== undefined ? `
+        <div class="uc-stat"><span class="uc-stat-label">Статус</span><span class="uc-stat-value">${health.status ?? '—'}</span></div>
+        <div class="uc-stat"><span class="uc-stat-label">HTTPS</span><span class="uc-stat-value" style="color:${health.https ? 'var(--accent-green)' : 'var(--accent-red)'}">${health.https ? 'да' : 'нет'}</span></div>
+        <div class="uc-stat"><span class="uc-stat-label">Ответ</span><span class="uc-stat-value">${health.responseTimeMs ?? '—'} мс</span></div>
+    ` : `<div class="uc-stat"><span class="uc-stat-label">Ошибка</span><span class="uc-stat-value" style="color:var(--accent-red)">${escapeHtml(health.error || 'нет данных')}</span></div>`;
+
+    const missingHeaders = health.securityHeaders
+        ? Object.entries(health.securityHeaders).filter(([, v]) => !v).map(([k]) => k)
+        : [];
+
+    const severityColor = { high: 'var(--accent-red)', medium: 'var(--accent-orange)', low: 'var(--text-secondary)' };
+    const severityBg = { high: 'rgba(255,69,58,0.15)', medium: 'rgba(255,159,10,0.15)', low: 'rgba(255,255,255,0.08)' };
+
+    const findingsHtml = findings.length === 0
+        ? `<div class="info-box" style="color:var(--text-secondary);">Находок не обнаружено статическим анализом HTML.</div>`
+        : findings.map(f => `
+            <div class="uc-finding">
+                <div class="uc-finding-head">
+                    <span class="format-tag" style="background:${severityBg[f.severity] || severityBg.low}; color:${severityColor[f.severity] || severityColor.low}">${escapeHtml(String(f.severity || '').toUpperCase())}</span>
+                    <b>${escapeHtml(f.ruleId || '')}</b>
+                </div>
+                <div class="idea-desc-text">${escapeHtml(f.message || '')}</div>
+                ${f.fix ? `<div style="color:var(--accent-green); font-size:12px;">Исправление: ${escapeHtml(f.fix)}</div>` : ''}
+            </div>`).join('');
+
+    const loadTestHtml = lt.error
+        ? `<div class="info-box" style="color:var(--accent-red);">Ошибка нагрузочного теста: ${escapeHtml(lt.error)}</div>`
+        : `<div class="uc-stats-row">
+            <div class="uc-stat"><span class="uc-stat-label">Запросов</span><span class="uc-stat-value">${lt.totalRequests ?? '—'}</span></div>
+            <div class="uc-stat"><span class="uc-stat-label">Ошибок</span><span class="uc-stat-value">${lt.errors ?? 0} (${Math.round((lt.errorRate || 0) * 100)}%)</span></div>
+            <div class="uc-stat"><span class="uc-stat-label">RPS</span><span class="uc-stat-value">${lt.requestsPerSecond ?? '—'}</span></div>
+            <div class="uc-stat"><span class="uc-stat-label">Средний</span><span class="uc-stat-value">${lt.avgMs ?? '—'} мс</span></div>
+            <div class="uc-stat"><span class="uc-stat-label">p95</span><span class="uc-stat-value">${lt.p95Ms ?? '—'} мс</span></div>
+            <div class="uc-stat"><span class="uc-stat-label">Макс</span><span class="uc-stat-value">${lt.maxMs ?? '—'} мс</span></div>
+        </div>`;
+
+    container.innerHTML = `
+        <div class="p-section-title" style="margin-top:20px;">ДОСТУПНОСТЬ</div>
+        <div class="uc-stats-row">${healthStats}</div>
+        ${missingHeaders.length ? `<div class="warning-banner" style="margin-top:10px;">Отсутствуют заголовки безопасности: ${missingHeaders.join(', ')}</div>` : ''}
+
+        <div class="p-section-title" style="margin-top:24px;">ЮРИДИЧЕСКИЕ РИСКИ (152-ФЗ / 38-ФЗ / ЗоЗПП) — найдено ${findings.length}</div>
+        <div class="uc-stats-row" style="margin-bottom:12px;">
+            <div class="uc-stat"><span class="uc-stat-label">Критично</span><span class="uc-stat-value" style="color:var(--accent-red)">${summary.high || 0}</span></div>
+            <div class="uc-stat"><span class="uc-stat-label">Средне</span><span class="uc-stat-value" style="color:var(--accent-orange)">${summary.medium || 0}</span></div>
+            <div class="uc-stat"><span class="uc-stat-label">Низко</span><span class="uc-stat-value">${summary.low || 0}</span></div>
+        </div>
+        <div class="uc-findings-list">${findingsHtml}</div>
+
+        <div class="p-section-title" style="margin-top:24px;">НАГРУЗОЧНЫЙ ТЕСТ</div>
+        ${loadTestHtml}
+
+        <div class="controls-row" style="margin-top:24px;">
+            <p style="color:var(--text-secondary); font-size:11px; margin:0;">Эвристическая проверка, не юридическое заключение. Нагрузочный тест — только для своих/клиентских проектов.</p>
+            <button class="edit-btn" onclick="generateUrlCheckPdf()">📄 Сформировать и скачать PDF</button>
+        </div>
+    `;
+}
+
+async function generateUrlCheckPdf() {
+    if (!urlCheckerLastReport) return;
+    try {
+        const res = await fetch('/api/url-checker/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(urlCheckerLastReport),
+        });
+        if (!res.ok) throw new Error('Не удалось сформировать PDF');
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `site-check-${Date.now()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+        showToast('PDF готов, скачивание началось!');
+    } catch (e) {
+        showToast('Ошибка: ' + e.message);
+    }
+}
+
+// ЗАКАЗЧИКИ (2ГИС-парсер по нишам)
+let parserNiches = [];
+let parserPollTimers = {};
+
+async function renderParserNiches() {
+    const container = document.getElementById('parser-niches-grid');
+    if (!container) return;
+    try {
+        parserNiches = await api('/api/parser-niches');
+    } catch (e) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    drawParserNiches();
+    parserNiches.forEach(n => {
+        if (['queued', 'running', 'captcha', 'dedupe_running'].includes(n.status)) startParserPolling(n.id);
+    });
+}
+
+function drawParserNiches() {
+    const container = document.getElementById('parser-niches-grid');
+    if (!container) return;
+
+    if (parserNiches.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую кнопкой выше.</div>`;
+        return;
+    }
+
+    const statusLabels = {
+        idle: 'Не запущено', queued: 'В очереди', running: 'Парсинг идёт',
+        captcha: 'Ждёт капчу', dedupe_running: 'Чистка дублей', done: 'Готово', error: 'Ошибка',
+    };
+
+    container.innerHTML = parserNiches.map(n => `
+        <div class="parser-niche-card" id="parser-card-${n.id}">
+            <div class="parser-niche-head">
+                <input type="text" class="form-input" style="font-weight:700;" value="${escapeHtml(n.category)}"
+                    placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
+                <span class="parser-niche-status ${n.status}">${statusLabels[n.status] || n.status}</span>
+            </div>
+            <input type="text" class="form-input" value="${escapeHtml(n.description)}"
+                placeholder="Описание ниши (для генерации запросов)" onblur="saveParserNicheField('${n.id}','description',this.value)">
+
+            <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log || '')}</div>
+
+            <div class="parser-niche-files">
+                ${n.files.raw ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','raw')">📊 raw.xlsx</div>` : ''}
+                ${n.files.dedup ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','dedup')">✨ dedup.xlsx</div>` : ''}
+                ${n.files.archive ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','archive')">🗄 archive.zip</div>` : ''}
+            </div>
+
+            <div class="parser-niche-actions">
+                <button class="schedule-btn" onclick="runParserNiche('${n.id}')" ${['queued', 'running'].includes(n.status) ? 'disabled' : ''}>▶ Обновить парсер</button>
+                ${n.files.raw && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
+                ${n.files.raw ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
+                <button class="delete-btn" onclick="removeParserNiche('${n.id}')">Удалить</button>
+            </div>
+        </div>
+    `).join('');
+
+    parserNiches.forEach(n => {
+        const logEl = document.getElementById(`parser-log-${n.id}`);
+        if (logEl) logEl.scrollTop = logEl.scrollHeight;
+    });
+}
+
+async function addParserNicheCard() {
+    try {
+        const created = await api('/api/parser-niches', {
+            method: 'POST',
+            body: JSON.stringify({ category: 'Новая ниша', description: '' }),
+        });
+        parserNiches.push(created);
+        drawParserNiches();
+    } catch (e) {
+        showToast('Не удалось создать нишу: ' + e.message);
+    }
+}
+
+async function saveParserNicheField(id, field, value) {
+    const niche = parserNiches.find(n => n.id === id);
+    if (!niche || niche[field] === value) return;
+    niche[field] = value;
+    try {
+        await api(`/api/parser-niches/${id}`, { method: 'PUT', body: JSON.stringify({ [field]: value }) });
+    } catch (e) {
+        showToast('Не удалось сохранить: ' + e.message);
+    }
+}
+
+async function runParserNiche(id) {
+    try {
+        const updated = await api(`/api/parser-niches/${id}/run`, { method: 'POST' });
+        const idx = parserNiches.findIndex(n => n.id === id);
+        if (idx !== -1) parserNiches[idx] = updated;
+        drawParserNiches();
+        startParserPolling(id);
+        showToast('Парсер запущен, следите за логом в карточке');
+    } catch (e) {
+        showToast('Не удалось запустить парсер: ' + e.message);
+    }
+}
+
+function startParserPolling(id) {
+    if (parserPollTimers[id]) return;
+    parserPollTimers[id] = setInterval(async () => {
+        try {
+            const updated = await api(`/api/parser-niches/${id}/status`);
+            const idx = parserNiches.findIndex(n => n.id === id);
+            if (idx !== -1) parserNiches[idx] = updated;
+            drawParserNiches();
+            if (!['queued', 'running', 'captcha', 'dedupe_running'].includes(updated.status)) {
+                clearInterval(parserPollTimers[id]);
+                delete parserPollTimers[id];
+            }
+        } catch (e) {
+            clearInterval(parserPollTimers[id]);
+            delete parserPollTimers[id];
+        }
+    }, 4000);
+}
+
+async function dedupeParserNiche(id) {
+    try {
+        await api(`/api/parser-niches/${id}/dedupe`, { method: 'POST' });
+        startParserPolling(id);
+        showToast('Чистка дублей запущена');
+    } catch (e) {
+        showToast('Ошибка: ' + e.message);
+    }
+}
+
+async function archiveParserNiche(id) {
+    try {
+        await api(`/api/parser-niches/${id}/archive`, { method: 'POST' });
+        const updated = await api(`/api/parser-niches/${id}/status`);
+        const idx = parserNiches.findIndex(n => n.id === id);
+        if (idx !== -1) parserNiches[idx] = updated;
+        drawParserNiches();
+        showToast('Архив собран');
+    } catch (e) {
+        showToast('Ошибка: ' + e.message);
+    }
+}
+
+function downloadParserFile(id, kind) {
+    window.open(`/api/parser-niches/${id}/download/${kind}`, '_blank');
+}
+
+async function removeParserNiche(id) {
+    if (!confirm('Удалить эту нишу вместе со всеми файлами?')) return;
+    if (parserPollTimers[id]) { clearInterval(parserPollTimers[id]); delete parserPollTimers[id]; }
+    try {
+        await api(`/api/parser-niches/${id}`, { method: 'DELETE' });
+        parserNiches = parserNiches.filter(n => n.id !== id);
+        drawParserNiches();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
     }
 }

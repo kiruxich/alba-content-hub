@@ -16,6 +16,7 @@ import agentExpensesRouter from './routes/agentExpenses.js';
 import agentRunsRouter from './routes/agentRuns.js';
 import agentResearcherRouter from './routes/agentResearcher.js';
 import urlCheckerRouter from './routes/urlChecker.js';
+import parserNichesRouter from './routes/parserNiches.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -35,6 +36,7 @@ app.use('/api/agent-expenses', agentExpensesRouter);
 app.use('/api/agent-runs', agentRunsRouter);
 app.use('/api/agent-researcher', agentResearcherRouter);
 app.use('/api/url-checker', urlCheckerRouter);
+app.use('/api/parser-niches', parserNichesRouter);
 
 // Traditional Node hosting (pnpm start): serve the Vite-built frontend from the
 // same process. On Vercel this branch is never hit - static files are served

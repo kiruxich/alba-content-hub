@@ -190,6 +190,24 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
     created_at INTEGER DEFAULT (strftime('%s','now')),
     expires_at INTEGER
 );
+
+-- One card per niche on the "Заказчики" tab - drives the 2GIS parser worker.
+-- status: idle | queued | running | captcha | dedupe_running | done | error
+CREATE TABLE IF NOT EXISTS parser_niches (
+    id TEXT PRIMARY KEY,
+    category TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    status TEXT DEFAULT 'idle',
+    queries_json TEXT,
+    log TEXT DEFAULT '',
+    stats_json TEXT,
+    raw_file TEXT,
+    dedup_file TEXT,
+    archive_file TEXT,
+    job_id TEXT,
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
 `);
 
 // Additive columns on existing tables - safe to run on every startup.

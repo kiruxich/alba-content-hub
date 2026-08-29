@@ -1,0 +1,145 @@
+import asyncio
+import os
+import uuid
+import zipfile
+
+import httpx
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+from parser_core import Job, run_parser_job, dedupe_franchises
+
+DATA_DIR = os.environ.get("PARSER_DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
+NOVNC_URL = os.environ.get("NOVNC_URL", "https://vnc.alba-creation.ru")
+HUB_CALLBACK_URL = os.environ.get("HUB_CALLBACK_URL", "")  # e.g. http://10.0.1.1:3001/api/parser-niches
+WORKER_TOKEN = os.environ.get("PARSER_WORKER_TOKEN", "")
+
+app = FastAPI(title="alba-parser-worker")
+
+jobs: dict[str, Job] = {}
+queue: asyncio.Queue = asyncio.Queue()
+
+
+class QueryItem(BaseModel):
+    query: str
+    keywords: list[str] = []
+
+
+class CreateJobRequest(BaseModel):
+    niche_id: str
+    category: str
+    description: str = ""
+    queries: list[QueryItem]
+
+
+async def notify_captcha(job: Job):
+    if not HUB_CALLBACK_URL:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                f"{HUB_CALLBACK_URL}/{job.id}/captcha-alert",
+                json={"novncUrl": NOVNC_URL, "category": job.category},
+                headers={"X-Worker-Token": WORKER_TOKEN} if WORKER_TOKEN else {},
+            )
+    except Exception as e:
+        job.log(f"Не удалось уведомить hub о капче: {e}")
+
+
+async def worker_loop():
+    while True:
+        job: Job = await queue.get()
+        try:
+            job.on_captcha = notify_captcha
+            await run_parser_job(job)
+        except Exception as e:
+            job.status = "error"
+            job.log(f"Фатальная ошибка: {e}")
+        queue.task_done()
+
+
+@app.on_event("startup")
+async def startup():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    asyncio.create_task(worker_loop())
+
+
+def check_token(x_worker_token: str | None):
+    if WORKER_TOKEN and x_worker_token != WORKER_TOKEN:
+        raise HTTPException(401, "bad worker token")
+
+
+@app.post("/jobs")
+async def create_job(body: CreateJobRequest):
+    job_id = str(uuid.uuid4())[:8]
+    out_dir = os.path.join(DATA_DIR, job_id)
+    job = Job(job_id, body.category, body.description, [q.model_dump() for q in body.queries], out_dir)
+    jobs[job_id] = job
+    await queue.put(job)
+    job.log(f"Job поставлен в очередь (позиция: {queue.qsize()})")
+    return {"job_id": job_id, "status": job.status}
+
+
+@app.get("/jobs/{job_id}")
+async def get_job(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "log": "\n".join(job.log_lines[-200:]),
+        "stats": job.stats,
+        "files": {
+            "raw": os.path.exists(job.raw_path),
+            "dedup": os.path.exists(job.dedup_path),
+            "archive": os.path.exists(job.archive_path),
+        },
+    }
+
+
+@app.post("/jobs/{job_id}/dedupe")
+async def dedupe_job(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    if not os.path.exists(job.raw_path):
+        raise HTTPException(400, "raw file not ready yet")
+    try:
+        stats = dedupe_franchises(job.raw_path, job.dedup_path)
+        job.log(f"Дубликаты/франшизы удалены: {stats['deleted_rows']} строк, {stats['franchise_domains']} сетей")
+        return {"ok": True, **stats}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/jobs/{job_id}/archive")
+async def archive_job(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    files = [p for p in [job.raw_path, job.dedup_path] if os.path.exists(p)]
+    if not files:
+        raise HTTPException(400, "nothing to archive yet")
+    with zipfile.ZipFile(job.archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            zf.write(f, arcname=os.path.basename(f))
+    return {"ok": True}
+
+
+@app.get("/jobs/{job_id}/files/{kind}")
+async def get_file(job_id: str, kind: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    path = {"raw": job.raw_path, "dedup": job.dedup_path, "archive": job.archive_path}.get(kind)
+    if not path or not os.path.exists(path):
+        raise HTTPException(404, "file not ready")
+    filename = f"{job.category}-{kind}.{'zip' if kind == 'archive' else 'xlsx'}"
+    return FileResponse(path, filename=filename)
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True, "queue_size": queue.qsize(), "jobs": len(jobs)}
