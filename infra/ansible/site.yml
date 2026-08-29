@@ -2,14 +2,22 @@
 # Провижининг сервера alba-creation.ru "с нуля": Docker+Coolify, nginx+SSL
 # для доменов из vars/main.yml, Node.js+pm2 для приложений вне Coolify
 # (сейчас это alba-creation.ru — крутится на pm2, деплоится отдельно, не
-# этим плейбуком).
+# этим плейбуком), plus 2ГИС parser-worker (Xvfb+noVNC+FastAPI).
 #
 # Запуск:
-#   cd infra/ansible && ansible-playbook site.yml
+#   cd infra/ansible
+#   ansible-playbook site.yml -e parser_worker_token=$(openssl rand -hex 24) -e vnc_basic_auth_password=$(openssl rand -hex 12)
+#
+# Требует коллекцию community.general (для модуля ufw):
+#   ansible-galaxy collection install community.general
 #
 # Идемпотентен — можно гонять повторно. Сертификаты Let's Encrypt для
 # доменов, у которых DNS ещё не настроен на этот сервер, будут пропущены —
 # перезапустите плейбук после того как DNS пропагируется.
+#
+# После первого прогона нужно вручную прописать PARSER_WORKER_URL и
+# PARSER_WORKER_TOKEN в переменных окружения hub-приложения в Coolify
+# (тот же токен, что передали через -e выше) — плейбук не лезет в Coolify API.
 
 - hosts: vps
   become: true
@@ -57,8 +65,19 @@
       shell: curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
       when: not coolify_installed.stat.exists
 
+    # Before the nginx vhosts: hub's config references /etc/nginx/.vnc_htpasswd
+    # (auth_basic_user_file) via extra_locations - nginx refuses to reload if
+    # that file doesn't exist yet, so this has to create it first.
+    - name: Установить и запустить parser-worker (Xvfb, noVNC, FastAPI)
+      include_tasks: tasks/setup_parser_worker.yml
+
     - name: Настроить nginx-vhost + SSL для каждого сайта
       include_tasks: tasks/setup_site.yml
       loop: "{{ sites }}"
       loop_control:
         loop_var: site
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: true
