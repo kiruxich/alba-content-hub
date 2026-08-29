@@ -1,49 +1,26 @@
-# Provisions the 2GIS parser worker: Xvfb (virtual display so headed
-# Chromium looks like a real browser to 2GIS's anti-bot checks), x11vnc +
-# noVNC (so a human can solve a CAPTCHA remotely when the parser hits one),
-# and the FastAPI job-queue service itself. Runs directly on the host, not
-# in Docker - Playwright + Xvfb inside a Coolify/Railpack container would
-# need a custom Dockerfile, and this keeps it consistent with how Coolify
-# and nginx themselves run on this box.
-
-- name: Установить системные пакеты для parser-worker
-  apt:
-    name:
-      - xvfb
-      - x11vnc
-      - novnc
-      - websockify
-      - python3-venv
-      - python3-pip
-      - python3-passlib
-    state: present
-
-- name: Скопировать код parser-worker на сервер
-  copy:
-    src: "{{ playbook_dir }}/../../parser-worker/"
-    dest: /opt/parser-worker/
-    mode: "0644"
-
-- name: Создать python venv
-  command: python3 -m venv /opt/parser-worker/venv
-  args:
-    creates: /opt/parser-worker/venv/bin/python
-
-- name: Установить python-зависимости
-  pip:
-    requirements: /opt/parser-worker/requirements.txt
-    virtualenv: /opt/parser-worker/venv
-
-- name: Установить Chromium для Playwright
-  command: /opt/parser-worker/venv/bin/playwright install --with-deps chromium
-  args:
-    creates: /root/.cache/ms-playwright
+# parser-worker and LibreTranslate are Coolify-managed resources now (git
+# push / Docker Image, same as hub and alba-creation) - not provisioned by
+# this playbook. That part is manual, one-time, via the Coolify UI:
+#   - parser-worker: "Git Repository" -> this repo -> Build pack: Dockerfile,
+#     Base directory: /parser-worker, Port mappings: 8787:8787,6080:6080,
+#     env vars PARSER_WORKER_TOKEN / HUB_CALLBACK_URL / NOVNC_URL (the last
+#     two reference hub.alba-creation.ru and the vnc_basic_auth_* below).
+#   - libretranslate: "Docker Image" -> libretranslate/libretranslate:latest,
+#     env vars LT_LOAD_ONLY=en,ru / LT_DISABLE_WEB_UI=true / LT_UPDATE_MODELS=false,
+#     Ports exposes 5000, Port mappings 5000:5000.
+#   - hub's own env vars then need PARSER_WORKER_URL=http://10.0.1.1:8787 and
+#     LIBRETRANSLATE_URL=http://10.0.1.1:5000 (Coolify container names change
+#     on every redeploy, so reaching either by container-name DNS doesn't
+#     work - the docker bridge gateway + published host port is the only
+#     stable address).
+#
+# What this playbook still owns at the VM level, because Coolify resources
+# don't manage it themselves:
 
 # A `creates:`-guarded `htpasswd -cb` shell would only ever run once - a
-# later rerun with a rotated vnc_basic_auth_password would update the
-# systemd unit's NOVNC_URL but silently leave the old password in the
-# htpasswd file, breaking the embedded credentials. This module compares
-# desired vs actual and updates in place either way.
+# later rerun with a rotated vnc_basic_auth_password would leave the old
+# password in the htpasswd file. This module compares desired vs actual and
+# updates in place either way.
 - name: Создать/обновить пользователя basic-auth для noVNC
   community.general.htpasswd:
     path: /etc/nginx/.vnc_htpasswd
@@ -51,100 +28,18 @@
     password: "{{ vnc_basic_auth_password }}"
     mode: "0644"
 
-- name: systemd unit - Xvfb
-  copy:
-    dest: /etc/systemd/system/parser-xvfb.service
-    content: |
-      [Unit]
-      Description=Xvfb virtual display for parser worker
-      After=network.target
-
-      [Service]
-      ExecStart=/usr/bin/Xvfb :99 -screen 0 1280x800x24 -ac
-      Restart=always
-      RestartSec=3
-
-      [Install]
-      WantedBy=multi-user.target
-  notify: reload systemd
-
-- name: systemd unit - x11vnc
-  copy:
-    dest: /etc/systemd/system/parser-x11vnc.service
-    content: |
-      [Unit]
-      Description=x11vnc share of Xvfb display :99
-      After=parser-xvfb.service
-      Requires=parser-xvfb.service
-
-      [Service]
-      ExecStart=/usr/bin/x11vnc -display :99 -forever -shared -rfbport 5900 -localhost -nopw -quiet
-      Restart=always
-      RestartSec=3
-
-      [Install]
-      WantedBy=multi-user.target
-  notify: reload systemd
-
-- name: systemd unit - noVNC
-  copy:
-    dest: /etc/systemd/system/parser-novnc.service
-    content: |
-      [Unit]
-      Description=noVNC web client + websocket bridge to x11vnc
-      After=parser-x11vnc.service
-      Requires=parser-x11vnc.service
-
-      [Service]
-      ExecStart=/usr/bin/websockify --web=/usr/share/novnc 6080 localhost:5900
-      Restart=always
-      RestartSec=3
-
-      [Install]
-      WantedBy=multi-user.target
-  notify: reload systemd
-
-- name: systemd unit - parser-worker (FastAPI)
-  copy:
-    dest: /etc/systemd/system/parser-worker.service
-    content: |
-      [Unit]
-      Description=Alba parser worker (FastAPI, 2GIS scraping)
-      After=network.target parser-xvfb.service
-      Requires=parser-xvfb.service
-
-      [Service]
-      WorkingDirectory=/opt/parser-worker
-      Environment=DISPLAY=:99
-      Environment=PARSER_DATA_DIR=/opt/parser-worker/data
-      Environment=HUB_CALLBACK_URL=https://hub.alba-creation.ru/api/parser-niches
-      Environment=PARSER_WORKER_TOKEN={{ parser_worker_token }}
-      Environment=NOVNC_URL=https://{{ vnc_basic_auth_user }}:{{ vnc_basic_auth_password }}@hub.alba-creation.ru/vnc/vnc.html?autoconnect=true
-      ExecStart=/opt/parser-worker/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8787
-      Restart=always
-      RestartSec=3
-
-      [Install]
-      WantedBy=multi-user.target
-  notify: reload systemd
-
-- meta: flush_handlers
-
-- name: Включить и запустить сервисы parser-worker
-  systemd:
-    name: "{{ item }}"
-    enabled: true
-    state: started
-  loop:
-    - parser-xvfb
-    - parser-x11vnc
-    - parser-novnc
-    - parser-worker
-
-- name: Разрешить порт воркера только из docker-подсети Coolify (не из интернета)
+- name: Разрешить порт parser-worker только из docker-подсети Coolify (не из интернета)
   community.general.ufw:
     rule: allow
     port: "8787"
     proto: tcp
     from_ip: 10.0.1.0/24
     comment: "parser-worker from coolify docker net"
+
+- name: Разрешить порт LibreTranslate только из docker-подсети Coolify (не из интернета)
+  community.general.ufw:
+    rule: allow
+    port: "5000"
+    proto: tcp
+    from_ip: 10.0.1.0/24
+    comment: "libretranslate from coolify docker net"

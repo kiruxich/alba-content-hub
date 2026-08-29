@@ -1,4 +1,3 @@
-node_version: 20
 letsencrypt_email: root@alba-creation.ru
 
 # Shared secret between the hub backend and parser-worker (X-Worker-Token
