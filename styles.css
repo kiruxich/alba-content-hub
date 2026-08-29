@@ -489,6 +489,8 @@ html, body {
 .parser-niche-status.captcha { background: rgba(255,159,10,0.15); color: var(--accent-orange); }
 .parser-niche-status.done { background: rgba(48,209,88,0.15); color: var(--accent-green); }
 .parser-niche-status.error { background: rgba(255,69,58,0.15); color: var(--accent-red); }
+.parser-niche-status.cancelled { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+.parser-niche-status.dedupe_running { background: rgba(191,90,242,0.15); color: var(--accent-purple); }
 .parser-niche-card .form-input { margin-top: 0; }
 .parser-niche-console {
     background: #05050a; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;

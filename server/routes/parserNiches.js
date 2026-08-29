@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { generateParserQueries } from '../lib/generateParserQueries.js';
-import { createParserJob, getParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
+import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
 
 const router = Router();
 const WORKER_TOKEN = process.env.PARSER_WORKER_TOKEN || '';
@@ -103,6 +103,17 @@ router.get('/:id/status', async (req, res) => {
         res.json(serialize(result.rows[0]));
     } catch (e) {
         res.json(serialize(row));
+    }
+});
+
+router.post('/:id/cancel', async (req, res) => {
+    const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row || !row.job_id) return res.status(404).json({ error: 'no job for this niche yet' });
+    try {
+        await cancelParserJob(row.job_id);
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(502).json({ error: e.message });
     }
 });
 

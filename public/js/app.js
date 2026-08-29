@@ -1693,8 +1693,9 @@ function drawParserNiches() {
 
     const statusLabels = {
         idle: 'Не запущено', queued: 'В очереди', running: 'Парсинг идёт',
-        captcha: 'Ждёт капчу', dedupe_running: 'Чистка дублей', done: 'Готово', error: 'Ошибка',
+        captcha: 'Ждёт капчу', dedupe_running: 'Чистка дублей', done: 'Готово', error: 'Ошибка', cancelled: 'Остановлено',
     };
+    const isActive = n => ['queued', 'running', 'captcha', 'dedupe_running'].includes(n);
 
     container.innerHTML = parserNiches.map(n => `
         <div class="parser-niche-card" id="parser-card-${n.id}">
@@ -1715,7 +1716,9 @@ function drawParserNiches() {
             </div>
 
             <div class="parser-niche-actions">
-                <button class="schedule-btn" onclick="runParserNiche('${n.id}')" ${['queued', 'running'].includes(n.status) ? 'disabled' : ''}>▶ Обновить парсер</button>
+                <button class="schedule-btn" onclick="runParserNiche('${n.id}')" ${isActive(n.status) ? 'disabled' : ''}>▶ Обновить парсер</button>
+                ${isActive(n.status) ? `<button class="delete-btn" onclick="cancelParserNiche('${n.id}')">⏹ Стоп</button>` : ''}
+                ${n.status === 'captcha' ? `<a class="edit-btn" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
                 ${n.files.raw && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
                 ${n.files.raw ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
                 <button class="delete-btn" onclick="removeParserNiche('${n.id}')">Удалить</button>
@@ -1783,6 +1786,15 @@ function startParserPolling(id) {
             delete parserPollTimers[id];
         }
     }, 4000);
+}
+
+async function cancelParserNiche(id) {
+    try {
+        await api(`/api/parser-niches/${id}/cancel`, { method: 'POST' });
+        showToast('Останавливаю...');
+    } catch (e) {
+        showToast('Не удалось остановить: ' + e.message);
+    }
 }
 
 async function dedupeParserNiche(id) {

@@ -34,6 +34,11 @@ export async function getParserJob(jobId) {
     return res.json();
 }
 
+export async function cancelParserJob(jobId) {
+    const res = await workerFetch(`/jobs/${jobId}/cancel`, { method: 'POST' });
+    return res.json();
+}
+
 export async function dedupeParserJob(jobId) {
     const res = await workerFetch(`/jobs/${jobId}/dedupe`, { method: 'POST' });
     return res.json();

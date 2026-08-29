@@ -17,6 +17,19 @@ WORKER_TOKEN = os.environ.get("PARSER_WORKER_TOKEN", "")
 
 app = FastAPI(title="alba-parser-worker")
 
+
+@app.middleware("http")
+async def require_worker_token(request, call_next):
+    # Defense in depth on top of the ufw rule scoping this port to the
+    # Coolify docker subnet - every request (except /health) must carry the
+    # shared token the Node backend sends.
+    if WORKER_TOKEN and request.url.path != "/health":
+        if request.headers.get("x-worker-token") != WORKER_TOKEN:
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "bad worker token"}, status_code=401)
+    return await call_next(request)
+
+
 jobs: dict[str, Job] = {}
 queue: asyncio.Queue = asyncio.Queue()
 
@@ -52,10 +65,16 @@ async def worker_loop():
         job: Job = await queue.get()
         try:
             job.on_captcha = notify_captcha
+            job.task = asyncio.current_task()
             await run_parser_job(job)
+        except asyncio.CancelledError:
+            job.status = "cancelled"
+            job.log("⏹ Остановлено пользователем")
         except Exception as e:
             job.status = "error"
             job.log(f"Фатальная ошибка: {e}")
+        finally:
+            job.task = None
         queue.task_done()
 
 
@@ -63,11 +82,6 @@ async def worker_loop():
 async def startup():
     os.makedirs(DATA_DIR, exist_ok=True)
     asyncio.create_task(worker_loop())
-
-
-def check_token(x_worker_token: str | None):
-    if WORKER_TOKEN and x_worker_token != WORKER_TOKEN:
-        raise HTTPException(401, "bad worker token")
 
 
 @app.post("/jobs")
@@ -97,6 +111,17 @@ async def get_job(job_id: str):
             "archive": os.path.exists(job.archive_path),
         },
     }
+
+
+@app.post("/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    if job.task and not job.task.done():
+        job.task.cancel()
+        return {"ok": True, "cancelled": True}
+    return {"ok": True, "cancelled": False}
 
 
 @app.post("/jobs/{job_id}/dedupe")

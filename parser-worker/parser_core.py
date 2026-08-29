@@ -92,6 +92,7 @@ class Job:
         self.dedup_path = os.path.join(out_dir, "dedup.xlsx")
         self.archive_path = os.path.join(out_dir, "archive.zip")
         self.on_captcha = None  # async callback(job) -> None, set by the API layer
+        self.task = None  # asyncio.Task running this job, set by worker_loop - used to cancel
 
     def log(self, msg):
         line = f"[{time.strftime('%H:%M:%S')}] {msg}"
