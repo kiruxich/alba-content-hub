@@ -6,7 +6,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "server/models/**",
+      "includeFiles": "server/{models,fonts}/**",
       "maxDuration": 60
     }
   },
