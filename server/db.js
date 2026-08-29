@@ -106,6 +106,23 @@ CREATE TABLE IF NOT EXISTS telegram_settings (
 );
 INSERT OR IGNORE INTO telegram_settings (id, token, chat_id) VALUES (1, '', '');
 
+-- Two-way approval workflow: one row per idea sent to Telegram for review,
+-- keyed by the sendMessage-returned message_id so an incoming reply (whose
+-- reply_to_message.message_id points back at it) can be correlated to the
+-- idea it's about. See server/lib/telegramApproval.js (creates rows) and
+-- server/routes/telegramWebhook.js (consumes them on reply).
+CREATE TABLE IF NOT EXISTS telegram_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    idea_id TEXT REFERENCES ideas(id) ON DELETE CASCADE,
+    message_id TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    regenerate_notes TEXT,
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_telegram_approvals_message_id ON telegram_approvals(message_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_approvals_idea_id ON telegram_approvals(idea_id);
+
 CREATE TABLE IF NOT EXISTS content_plan (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     blocks TEXT NOT NULL DEFAULT '[]'
@@ -294,6 +311,11 @@ await ensureColumn('agent_settings', 'generator_prompt', "TEXT DEFAULT ''");
 // alongside agent_runs' free-text log so Generator (and the UI) can read the
 // exact trends/products it picked without re-scanning RSS sources.
 await ensureColumn('agent_runs', 'brief_json', 'TEXT');
+// Secret Telegram sends back on every webhook call (set via setWebhook's
+// secret_token param, see scripts/register-telegram-webhook.mjs) - verified
+// on each incoming request in server/routes/telegramWebhook.js so the
+// endpoint can't be driven by spoofed requests once it's public.
+await ensureColumn('telegram_settings', 'webhook_secret', 'TEXT');
 
 // Seed content_plan once with the studio's actual annual plan, shaped for the
 // quarterly-timeline UI: 'note' blocks are global strategy cards, 'quarter'

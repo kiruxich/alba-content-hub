@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { translateToEnglish } from '../lib/translateToEnglish.js';
 import { validateDraft } from '../lib/editorValidation.js';
+import { sendIdeaForApproval } from '../lib/telegramApproval.js';
 
 const router = Router();
 
@@ -128,7 +129,22 @@ router.post('/', async (req, res) => {
         }),
     });
     const result = await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [id] });
-    res.status(201).json(serialize(result.rows[0]));
+    const savedIdea = serialize(result.rows[0]);
+
+    // Agent-authored drafts go to Telegram for human approval instead of
+    // sitting silently in the "AI Agent Center" until someone happens to
+    // check - see server/lib/telegramApproval.js and the reply handler in
+    // server/routes/telegramWebhook.js. Best-effort: a Telegram hiccup must
+    // never fail idea creation itself.
+    if (savedIdea.source === 'agent') {
+        try {
+            await sendIdeaForApproval(savedIdea);
+        } catch (e) {
+            console.error('Failed to send idea for Telegram approval:', e.message);
+        }
+    }
+
+    res.status(201).json(savedIdea);
 });
 
 router.put('/:id', async (req, res) => {
