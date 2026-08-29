@@ -5,11 +5,31 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// The VPS this now runs on silently hangs (no error, no timeout) any HTTP
+// request to Turso past the ~5th one on a kept-alive connection - some
+// middlebox on that network path breaks on connection reuse specifically
+// (confirmed: fresh connections always work instantly, reused ones stall
+// forever). Forcing "Connection: close" makes undici drop the socket after
+// every response instead of pooling it, which sidesteps the issue entirely.
+function noKeepAliveFetch(input, init) {
+    // @libsql/client calls this with a pre-built Request object as `input`
+    // (not a bare URL string) - cloning its headers instead of init.headers
+    // is what keeps the Authorization header intact.
+    if (input instanceof Request) {
+        const headers = new Headers(input.headers);
+        headers.set('Connection', 'close');
+        return fetch(new Request(input, { headers }));
+    }
+    const headers = new Headers((init && init.headers) || {});
+    headers.set('Connection', 'close');
+    return fetch(input, { ...init, headers });
+}
+
 function makeClient() {
     const url = process.env.TURSO_DATABASE_URL;
     if (url) {
         // Production (Vercel) and any dev session pointed at a real Turso db.
-        return createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+        return createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN, fetch: noKeepAliveFetch });
     }
     // Local dev fallback: a file-based libSQL db, no Turso account needed.
     // Vercel's filesystem is read-only/ephemeral per invocation, so this branch
