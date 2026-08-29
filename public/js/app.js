@@ -97,7 +97,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'urlchecker': 9, 'agentsettings': 10, 'systeminfo': 11 };
+    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'urlchecker': 9, 'agentsettings': 10, 'systeminfo': 11, 'agentcenter': 12 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -113,6 +113,7 @@ function switchTab(tabName) {
     if (tabName === 'clients') renderClientsView();
     if (tabName === 'customers') renderParserNiches();
     if (tabName === 'agentsettings') renderAgentSettingsForm();
+    if (tabName === 'agentcenter') renderAgentCenter();
 }
 
 function openOverlay(id) {
@@ -1910,4 +1911,98 @@ async function saveAgentSettingsForm() {
     } catch (e) {
         showToast('Не удалось сохранить: ' + e.message);
     }
+}
+
+// ЦЕНТР АГЕНТОВ (наблюдаемость: agent_runs / agent_expenses, только чтение)
+async function renderAgentCenter() {
+    const todayEl = document.getElementById('ac-stat-today');
+    const monthEl = document.getElementById('ac-stat-month');
+    const runsEl = document.getElementById('ac-runs-list');
+    const expensesEl = document.getElementById('ac-expenses-tbody');
+    if (!runsEl || !expensesEl) return;
+
+    try {
+        const summary = await api('/api/agent-expenses/summary');
+        if (todayEl) todayEl.innerText = `$${(summary.todayUsd || 0).toFixed(2)}`;
+        if (monthEl) monthEl.innerText = `$${(summary.monthUsd || 0).toFixed(2)}`;
+    } catch (e) {
+        if (todayEl) todayEl.innerText = '—';
+        if (monthEl) monthEl.innerText = '—';
+    }
+
+    try {
+        const runs = await api('/api/agent-runs');
+        drawAgentRuns(runs);
+    } catch (e) {
+        runsEl.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить историю запусков: ${escapeHtml(e.message)}</div>`;
+    }
+
+    try {
+        const expenses = await api('/api/agent-expenses');
+        drawAgentExpenses(expenses);
+    } catch (e) {
+        expensesEl.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--accent-red); padding:16px;">Не удалось загрузить расходы: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function formatAcTimestamp(value) {
+    if (!value) return '—';
+    // Accepts an epoch-seconds number/numeric-string or an ISO/date string.
+    const ms = /^\d+$/.test(String(value)) ? Number(value) * 1000 : Date.parse(value);
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return escapeHtml(String(value));
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function drawAgentRuns(runs) {
+    const container = document.getElementById('ac-runs-list');
+    if (!container) return;
+
+    if (!runs || runs.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Запусков агентов пока нет.</div>`;
+        return;
+    }
+
+    const statusLabels = { success: 'Успех', skipped: 'Пропущен', failed: 'Ошибка' };
+
+    container.innerHTML = `<div class="parser-niches-grid">${runs.map(r => {
+        const logFull = r.log || '';
+        const logShort = logFull.length > 160 ? logFull.slice(0, 160) + '…' : logFull;
+        return `
+        <div class="parser-niche-card">
+            <div class="parser-niche-head">
+                <b>${escapeHtml(r.agentName)}</b>
+                <span class="ac-run-status ${escapeHtml(r.status)}">${statusLabels[r.status] || escapeHtml(r.status)}</span>
+            </div>
+            <div class="meta-stats">
+                <span>${formatAcTimestamp(r.runDate)}</span>
+                <span>Трендов найдено: ${r.trendsFound ?? 0}</span>
+                <span>Стоимость: $${(r.costUsd || 0).toFixed(2)}</span>
+            </div>
+            ${logFull ? `<div class="parser-niche-console" title="${escapeHtml(logFull)}">${escapeHtml(logShort)}</div>` : ''}
+        </div>`;
+    }).join('')}</div>`;
+}
+
+function drawAgentExpenses(expenses) {
+    const tbody = document.getElementById('ac-expenses-tbody');
+    if (!tbody) return;
+
+    if (!expenses || expenses.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-secondary); padding:16px;">Расходов пока нет.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = expenses.map(e => `
+        <tr>
+            <td>${formatAcTimestamp(e.timestamp)}</td>
+            <td>${escapeHtml(e.agentName)}</td>
+            <td>${escapeHtml(e.modelUsed || '—')}</td>
+            <td>${e.inputTokens ?? 0}</td>
+            <td>${e.outputTokens ?? 0}</td>
+            <td>${e.cachedTokens ?? 0}</td>
+            <td>${e.kieCreditsSpent ?? 0}</td>
+            <td>$${(e.totalUsd || 0).toFixed(2)}</td>
+        </tr>
+    `).join('');
 }
