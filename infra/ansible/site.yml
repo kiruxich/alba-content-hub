@@ -2,7 +2,8 @@
 # Провижининг сервера alba-creation.ru "с нуля": Docker+Coolify, nginx+SSL
 # для доменов из vars/main.yml, Node.js+pm2 для приложений вне Coolify
 # (сейчас это alba-creation.ru — крутится на pm2, деплоится отдельно, не
-# этим плейбуком), plus 2ГИС parser-worker (Xvfb+noVNC+FastAPI).
+# этим плейбуком), plus 2ГИС parser-worker (Xvfb+noVNC+FastAPI) и LibreTranslate
+# (перевод карточек идей на английский, без платного API).
 #
 # Запуск:
 #   cd infra/ansible
@@ -15,9 +16,10 @@
 # доменов, у которых DNS ещё не настроен на этот сервер, будут пропущены —
 # перезапустите плейбук после того как DNS пропагируется.
 #
-# После первого прогона нужно вручную прописать PARSER_WORKER_URL и
-# PARSER_WORKER_TOKEN в переменных окружения hub-приложения в Coolify
-# (тот же токен, что передали через -e выше) — плейбук не лезет в Coolify API.
+# После первого прогона нужно вручную прописать в переменных окружения
+# hub-приложения в Coolify: PARSER_WORKER_URL, PARSER_WORKER_TOKEN (тот же
+# токен, что передали через -e выше) и LIBRETRANSLATE_URL=http://libretranslate:5000
+# — плейбук не лезет в Coolify API.
 
 - hosts: vps
   become: true
@@ -81,6 +83,19 @@
     # that file doesn't exist yet, so this has to create it first.
     - name: Установить и запустить parser-worker (Xvfb, noVNC, FastAPI)
       include_tasks: tasks/setup_parser_worker.yml
+
+    - name: Проверить наличие контейнера LibreTranslate
+      command: docker inspect libretranslate
+      register: libretranslate_inspect
+      changed_when: false
+      failed_when: false
+
+    - name: "Запустить LibreTranslate (перевод RU→EN для карточек идей, без внешнего API)"
+      command: >
+        docker run -d --name libretranslate --restart unless-stopped --network coolify
+        -e LT_LOAD_ONLY=en,ru -e LT_DISABLE_WEB_UI=true -e LT_UPDATE_MODELS=false
+        libretranslate/libretranslate:latest
+      when: libretranslate_inspect.rc != 0
 
     - name: Настроить nginx-vhost + SSL для каждого сайта
       include_tasks: tasks/setup_site.yml
