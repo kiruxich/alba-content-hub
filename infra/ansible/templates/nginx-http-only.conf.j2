@@ -1,0 +1,13 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ site.domain }}{% if site.www_alias %} www.{{ site.domain }}{% endif %};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://{{ site.domain }}$request_uri;
+    }
+}

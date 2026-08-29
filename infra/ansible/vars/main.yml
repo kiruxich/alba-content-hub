@@ -1,0 +1,18 @@
+node_version: 20
+letsencrypt_email: root@alba-creation.ru
+
+sites:
+  - name: alba-creation
+    domain: alba-creation.ru
+    www_alias: true
+    proxy_port: 3002
+
+  - name: coolify
+    domain: coolify.alba-creation.ru
+    www_alias: false
+    proxy_port: 8000
+
+  - name: hub
+    domain: hub.alba-creation.ru
+    www_alias: false
+    proxy_port: 3001

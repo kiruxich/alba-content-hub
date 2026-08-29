@@ -12,6 +12,8 @@ function serialize(row) {
         videoGenerationEnabled: Boolean(row.video_generation_enabled),
         platformAutoPublish: JSON.parse(row.platform_auto_publish || '{}'),
         productOfWeekOverride: row.product_of_week_override || null,
+        weeklySchedule: JSON.parse(row.weekly_schedule || '[]'),
+        postFormula: row.post_formula || '',
     };
 }
 
@@ -34,11 +36,15 @@ router.put('/', async (req, res) => {
         ? JSON.stringify(b.platformAutoPublish) : current.platform_auto_publish;
     const product_of_week_override = b.productOfWeekOverride !== undefined
         ? b.productOfWeekOverride : current.product_of_week_override;
+    const weekly_schedule = b.weeklySchedule !== undefined ? JSON.stringify(b.weeklySchedule) : current.weekly_schedule;
+    const post_formula = b.postFormula !== undefined ? b.postFormula : current.post_formula;
 
     await db.execute({
         sql: `UPDATE agent_settings SET sources = ?, keywords = ?, tone_of_voice = ?, budget_daily_cap_usd = ?,
-              video_generation_enabled = ?, platform_auto_publish = ?, product_of_week_override = ? WHERE id = 1`,
-        args: [sources, keywords, tone_of_voice, budget_daily_cap_usd, video_generation_enabled, platform_auto_publish, product_of_week_override],
+              video_generation_enabled = ?, platform_auto_publish = ?, product_of_week_override = ?,
+              weekly_schedule = ?, post_formula = ? WHERE id = 1`,
+        args: [sources, keywords, tone_of_voice, budget_daily_cap_usd, video_generation_enabled,
+            platform_auto_publish, product_of_week_override, weekly_schedule, post_formula],
     });
     const result = await db.execute('SELECT * FROM agent_settings WHERE id = 1');
     res.json(serialize(result.rows[0]));

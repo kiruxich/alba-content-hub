@@ -20,6 +20,7 @@ let niches = [];
 let currentOpenNicheId = null;
 let projectInfo = {};
 let currentOpenDay = null;
+let agentSettings = { weeklySchedule: [], postFormula: '' };
 
 function escapeHtml(str) {
     return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -49,7 +50,7 @@ async function api(path, options = {}) {
 // ИНИЦИАЛИЗАЦИЯ: подтягиваем состояние с бэкенда вместо localStorage
 async function initApp() {
     try {
-        const [ideas, events, plan, telegram, contentPlan, nichesList, projectInfoMap] = await Promise.all([
+        const [ideas, events, plan, telegram, contentPlan, nichesList, projectInfoMap, agentSettingsData] = await Promise.all([
             api('/api/ideas'),
             api('/api/events'),
             api('/api/settings/plan'),
@@ -57,6 +58,7 @@ async function initApp() {
             api('/api/content-plan'),
             api('/api/niches'),
             api('/api/project-info'),
+            api('/api/agent-settings'),
         ]);
         ideasBank = ideas;
         scheduledEvents = events;
@@ -65,6 +67,7 @@ async function initApp() {
         contentPlanBlocks = contentPlan.blocks;
         niches = nichesList;
         projectInfo = projectInfoMap;
+        agentSettings = agentSettingsData;
 
         const dailyInput = document.getElementById('plan-daily-input');
         const weeklyInput = document.getElementById('plan-weekly-input');
@@ -1117,8 +1120,67 @@ const PLAN_PALETTE = ['#0a84ff', '#30d158', '#bf5af2', '#ff9f0a', '#ff453a', '#6
 function renderContentPlan() {
     renderPlanNotes();
     renderPlanTimeline();
+    renderWeeklySchedule();
+    renderPostFormula();
     growTextareasIn(document.getElementById('plan-notes-row'));
     growTextareasIn(document.getElementById('plan-timeline'));
+}
+
+function renderWeeklySchedule() {
+    const container = document.getElementById('weekly-schedule-wrap');
+    if (!container) return;
+
+    const schedule = agentSettings.weeklySchedule || [];
+    if (schedule.length === 0) {
+        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Расписание пока не задано.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="weekly-schedule-table">
+            <thead><tr><th>День</th><th>Продукт</th><th>Фокус дня</th></tr></thead>
+            <tbody>
+                ${schedule.map(day => {
+                    const product = productsData.find(p => p.id === day.product);
+                    const accent = product ? product.badgeColor : 'var(--text-secondary)';
+                    const accentBg = product ? product.badgeBg : 'rgba(255,255,255,0.08)';
+                    return `
+                    <tr style="--card-accent:${accent}; --card-accent-bg:${accentBg}">
+                        <td><div class="wsd-day"><span class="wsd-day-dot"></span>${escapeHtml(day.label)}</div></td>
+                        <td>${product ? `<span class="wsd-product-badge">${escapeHtml(product.title)}</span>` : '<span class="wsd-product-badge">Разное</span>'}</td>
+                        <td class="wsd-focus">${escapeHtml(day.focus)}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>`;
+}
+
+function renderPostFormula() {
+    const container = document.getElementById('post-formula-callout');
+    if (!container) return;
+
+    const formula = agentSettings.postFormula || '';
+    if (!formula) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const lines = formula.split('\n').filter(Boolean);
+    const title = lines[0] || '';
+    const steps = lines.slice(1).map(line => {
+        const m = line.match(/^\d+\.\s*([^:]+):\s*(.+)$/);
+        return m ? { label: m[1], text: m[2] } : { label: '', text: line };
+    });
+
+    container.innerHTML = `
+        <div class="formula-callout-title">⚖️ ${escapeHtml(title)}</div>
+        <div class="formula-steps">
+            ${steps.map((s, i) => `
+                <div class="formula-step">
+                    <div class="formula-step-num">${i + 1}</div>
+                    <div class="formula-step-text">${s.label ? `<b>${escapeHtml(s.label)}:</b> ` : ''}${escapeHtml(s.text)}</div>
+                </div>`).join('')}
+        </div>`;
 }
 
 // Textareas auto-grow to fit their content instead of showing an internal

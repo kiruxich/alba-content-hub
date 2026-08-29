@@ -227,6 +227,13 @@ await ensureColumn('scheduled_events', 'metrics_synced_at', 'INTEGER');
 // page/lead-bot can report back which specific post a lead came from -
 // this is what makes the ROI numbers real instead of manually guessed.
 await ensureColumn('scheduled_events', 'utm_code', 'TEXT');
+// Weekly day->product rotation and the required post structure ("Золотая
+// середина"), set by the founder. Stored here (not just as Content Plan
+// text) so the Generator can read it programmatically once built - the
+// Content Plan display and the agent's actual behavior read the same data
+// instead of drifting apart.
+await ensureColumn('agent_settings', 'weekly_schedule', "TEXT DEFAULT '[]'");
+await ensureColumn('agent_settings', 'post_formula', "TEXT DEFAULT ''");
 
 // Seed content_plan once with the studio's actual annual plan, shaped for the
 // quarterly-timeline UI: 'note' blocks are global strategy cards, 'quarter'
@@ -321,4 +328,23 @@ const defaultNicheSections = [
 await db.execute({
     sql: 'INSERT OR IGNORE INTO niches (id, name, subtitle, sections) VALUES (?, ?, ?, ?)',
     args: ['kalyannye', 'Кальянные', 'Создание сайтов для кальянных лаунджей', JSON.stringify(defaultNicheSections)],
+});
+
+// Seed the weekly day->product schedule and post formula once (only while
+// still at the column default, so later edits via the UI are never
+// overwritten on restart).
+const defaultWeeklySchedule = [
+    { day: 'mon', label: 'Понедельник', product: 'hranitel', focus: 'Хранитель (Enterprise, документооборот, OCR)' },
+    { day: 'tue', label: 'Вторник', product: 'duet', focus: 'ДУЭТ (Event SaaS, генерация сайтов и приглашений)' },
+    { day: 'wed', label: 'Среда', product: 'alba-creation', focus: 'Alba Creation (кастомная разработка под ключ, нагрузочные тесты)' },
+    { day: 'thu', label: 'Четверг', product: 'insights', focus: 'InSights (AI-аналитика, скоринг блогеров, парсинг)' },
+    { day: 'fri', label: 'Пятница', product: null, focus: 'Ретро-кейсы из портфолио студии (Murla, Merfy, Архивариус и др.)' },
+    { day: 'sat', label: 'Суббота', product: null, focus: 'Gamedev и Open-Source (Crista, Фантазия, legitAgent)' },
+    { day: 'sun', label: 'Воскресенье', product: null, focus: 'Мемы, дедлайны, забавные правки клиентов, вайб фаундера' },
+];
+const defaultPostFormula = 'Золотая середина — обязательная структура для экспертных постов Пн–Сб:\n1. Бизнес-проблема: какую боль, потерю времени или денег мы решаем.\n2. Техническое решение: как именно мы это закодили (наш стек), простыми бытовыми аналогиями.\n3. Бизнес-результат: измеримая метрика (ускорили в X раз, сэкономили Y бюджета, выдержали Z запросов).';
+await db.execute({
+    sql: `UPDATE agent_settings SET weekly_schedule = ?, post_formula = ?
+          WHERE id = 1 AND weekly_schedule = '[]'`,
+    args: [JSON.stringify(defaultWeeklySchedule), defaultPostFormula],
 });

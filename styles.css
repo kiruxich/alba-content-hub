@@ -392,6 +392,43 @@ html, body {
     .timeline-card-period { width: 100%; }
 }
 
+.weekly-schedule-wrap { margin-top: 16px; border-radius: 20px; overflow: hidden; border: 1px solid rgba(255,255,255,0.09); }
+.weekly-schedule-table { width: 100%; border-collapse: collapse; }
+.weekly-schedule-table th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-secondary); font-weight: 700; padding: 12px 16px;
+    background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.09);
+}
+.weekly-schedule-table td { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: middle; }
+.weekly-schedule-table tr:last-child td { border-bottom: none; }
+.weekly-schedule-table tr { transition: background 0.15s ease; }
+.weekly-schedule-table tr:hover td { background: rgba(255,255,255,0.03); }
+.wsd-day {
+    display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; white-space: nowrap;
+}
+.wsd-day-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--card-accent, var(--accent-blue)); box-shadow: 0 0 10px 0 var(--card-accent, var(--accent-blue)); flex-shrink: 0; }
+.wsd-product-badge {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 7px;
+    background: var(--card-accent-bg, rgba(255,255,255,0.08)); color: var(--card-accent, var(--text-secondary));
+}
+.wsd-focus { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+
+.formula-callout {
+    margin-top: 16px; border-radius: 20px; padding: 22px 24px;
+    background: linear-gradient(135deg, rgba(191,90,242,0.12), rgba(10,132,255,0.08));
+    border: 1px solid rgba(191,90,242,0.3);
+    display: flex; flex-direction: column; gap: 14px;
+}
+.formula-callout-title { font-size: 16px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.formula-steps { display: flex; flex-direction: column; gap: 10px; }
+.formula-step { display: flex; align-items: flex-start; gap: 12px; }
+.formula-step-num {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; background: var(--accent-purple);
+    color: #05050a; font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center;
+}
+.formula-step-text { font-size: 13.5px; color: var(--text-primary); line-height: 1.5; padding-top: 3px; }
+.formula-step-text b { color: var(--accent-purple); }
+
 /* CLIENTS / SALES SCRIPTS */
 .clients-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
 .script-section-card {

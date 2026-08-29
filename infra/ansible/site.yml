@@ -1,0 +1,64 @@
+---
+# Провижининг сервера alba-creation.ru "с нуля": Docker+Coolify, nginx+SSL
+# для доменов из vars/main.yml, Node.js+pm2 для приложений вне Coolify
+# (сейчас это alba-creation.ru — крутится на pm2, деплоится отдельно, не
+# этим плейбуком).
+#
+# Запуск:
+#   cd infra/ansible && ansible-playbook site.yml
+#
+# Идемпотентен — можно гонять повторно. Сертификаты Let's Encrypt для
+# доменов, у которых DNS ещё не настроен на этот сервер, будут пропущены —
+# перезапустите плейбук после того как DNS пропагируется.
+
+- hosts: vps
+  become: true
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Обновить apt-кэш
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Установить базовые пакеты
+      apt:
+        name:
+          - curl
+          - git
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Проверить наличие Node.js
+      stat:
+        path: /usr/bin/node
+      register: node_bin
+
+    - name: "Установить Node.js {{ node_version }}.x"
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | bash -
+        apt-get install -y nodejs
+      when: not node_bin.stat.exists
+
+    - name: Установить pm2 глобально
+      npm:
+        name: pm2
+        global: true
+
+    - name: Проверить наличие Coolify
+      stat:
+        path: /data/coolify/source/.env
+      register: coolify_installed
+
+    - name: Установить Coolify (Docker + control-plane)
+      shell: curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+      when: not coolify_installed.stat.exists
+
+    - name: Настроить nginx-vhost + SSL для каждого сайта
+      include_tasks: tasks/setup_site.yml
+      loop: "{{ sites }}"
+      loop_control:
+        loop_var: site
