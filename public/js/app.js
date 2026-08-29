@@ -97,7 +97,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'urlchecker': 9, 'agentsettings': 10, 'systeminfo': 11 };
+    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'mediaassets': 9, 'urlchecker': 10, 'agentsettings': 11, 'systeminfo': 12 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -112,6 +112,7 @@ function switchTab(tabName) {
     if (tabName === 'contentplan') renderContentPlan();
     if (tabName === 'clients') renderClientsView();
     if (tabName === 'customers') renderParserNiches();
+    if (tabName === 'mediaassets') renderMediaAssets();
     if (tabName === 'agentsettings') renderAgentSettingsForm();
 }
 
@@ -569,6 +570,8 @@ function openEditIdeaModal(ideaId) {
     document.getElementById('edit-idea-desc-en-input').value = idea.descEn || '';
     document.getElementById('edit-idea-cta-en-input').value = idea.ctaEn || '';
 
+    setCoverAssetField(idea.coverAssetId || '');
+
     validateLimits();
     openOverlay('edit-idea-overlay');
 }
@@ -585,8 +588,65 @@ function openNewIdeaModal() {
 
     document.getElementById('edit-idea-en-section').style.display = 'none';
 
+    setCoverAssetField('');
+
     validateLimits();
     openOverlay('edit-idea-overlay');
+}
+
+// COVER PICKER (choose a media_assets row as the idea's cover) - reuses the
+// same .media-asset-card look as the Медиатека grid, just without the delete button.
+function setCoverAssetField(assetId) {
+    document.getElementById('edit-idea-cover-asset-id').value = assetId || '';
+    const preview = document.getElementById('edit-idea-cover-preview');
+    if (!assetId) {
+        preview.innerHTML = 'Не выбрана';
+        return;
+    }
+    const asset = mediaAssets.find(a => a.id === assetId);
+    preview.innerHTML = asset
+        ? `<div style="display:flex; align-items:center; gap:8px;">${mediaAssetPreviewHtml(asset)}<span style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(asset.url)}</span></div>`
+        : `выбрано: ${escapeHtml(assetId)}`;
+    // The inline preview above is small - cap it with a style override rather
+    // than a second CSS class just for the 40px thumbnail case.
+    const img = preview.querySelector('img, video');
+    if (img) { img.style.width = '40px'; img.style.height = '40px'; img.style.borderRadius = '8px'; img.style.flexShrink = '0'; }
+}
+
+function clearCoverAsset() {
+    setCoverAssetField('');
+}
+
+async function openCoverPickerModal() {
+    const grid = document.getElementById('cover-picker-grid');
+    grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
+    openOverlay('cover-picker-overlay');
+    try {
+        // Always fetch fresh - the picker can be opened before the user ever
+        // visits the Медиатека tab, so the module-level cache may be empty.
+        mediaAssets = await api('/api/media-assets');
+    } catch (e) {
+        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    if (mediaAssets.length === 0) {
+        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">В медиатеке пока пусто — добавьте медиа во вкладке «Медиатека».</div>`;
+        return;
+    }
+    grid.innerHTML = mediaAssets.map(asset => `
+        <div class="media-asset-card" style="cursor:pointer;" onclick="selectCoverAsset('${asset.id}')">
+            ${mediaAssetPreviewHtml(asset)}
+            <div class="media-asset-body">
+                <div class="media-asset-meta-row"><span class="format-tag">${escapeHtml(asset.type)}</span></div>
+                <div class="media-asset-url" title="${escapeHtml(asset.url)}">${escapeHtml(asset.url)}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function selectCoverAsset(assetId) {
+    setCoverAssetField(assetId);
+    closeOverlay('cover-picker-overlay');
 }
 
 async function saveIdeaChanges() {
@@ -597,21 +657,30 @@ async function saveIdeaChanges() {
     const funnel = document.getElementById('edit-idea-funnel-input').value;
     const status = document.getElementById('edit-idea-status-input').value;
     const cta = document.getElementById('edit-idea-cta-input').value.trim();
+    const coverAssetId = document.getElementById('edit-idea-cover-asset-id').value || null;
 
     if (!title) return alert('Укажите название идеи');
 
     try {
+        const existingIdea = id ? ideasBank.find(i => i.id === id) : null;
+        const coverChanged = coverAssetId && coverAssetId !== (existingIdea ? existingIdea.coverAssetId : null);
+
         if (id) {
             const titleEn = document.getElementById('edit-idea-title-en-input').value.trim();
             const descEn = document.getElementById('edit-idea-desc-en-input').value.trim();
             const ctaEn = document.getElementById('edit-idea-cta-en-input').value.trim();
-            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta, titleEn, descEn, ctaEn }) });
+            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta, titleEn, descEn, ctaEn, coverAssetId }) });
             ideasBank = ideasBank.map(item => item.id === id ? updated : item);
             showToast('Идея обновлена!');
         } else {
-            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ title, desc, format, funnel, status, cta }) });
+            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ title, desc, format, funnel, status, cta, coverAssetId }) });
             ideasBank.unshift(created);
             showToast('Новая идея создана!');
+        }
+
+        // Best-effort usage counter bump - never blocks the save if it fails.
+        if (coverChanged) {
+            try { await api(`/api/media-assets/${coverAssetId}/use`, { method: 'POST' }); } catch (_) {}
         }
 
         renderBankView();
@@ -1878,6 +1947,164 @@ async function removeParserNiche(id) {
         await api(`/api/parser-niches/${id}`, { method: 'DELETE' });
         parserNiches = parserNiches.filter(n => n.id !== id);
         drawParserNiches();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+// МЕДИАТЕКА (каталог по URL уже размещённых картинок/видео - без загрузки файлов)
+let mediaAssets = [];
+let mediaAssetFilterType = '';
+let mediaAssetFilterProduct = '';
+
+function mediaAssetProductLabel(productId) {
+    const p = productsData.find(p => p.id === productId);
+    return p ? p.title : productId;
+}
+
+async function renderMediaAssets() {
+    const grid = document.getElementById('media-assets-grid');
+    if (!grid) return;
+
+    // Product select in the add-form only needs populating once per session.
+    const productSelect = document.getElementById('ma-product-input');
+    if (productSelect && productSelect.options.length <= 1) {
+        productsData.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.title;
+            productSelect.appendChild(opt);
+        });
+    }
+
+    try {
+        const params = new URLSearchParams();
+        if (mediaAssetFilterType) params.set('type', mediaAssetFilterType);
+        if (mediaAssetFilterProduct) params.set('product_id', mediaAssetFilterProduct);
+        const qs = params.toString();
+        mediaAssets = await api(`/api/media-assets${qs ? '?' + qs : ''}`);
+    } catch (e) {
+        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    drawMediaAssetFilters();
+    drawMediaAssetsGrid();
+}
+
+function drawMediaAssetFilters() {
+    const container = document.getElementById('media-asset-filters');
+    if (!container) return;
+
+    const typeChips = [
+        { value: '', label: 'Все типы' },
+        { value: 'image', label: 'Изображения' },
+        { value: 'video', label: 'Видео' },
+        { value: 'gif', label: 'GIF' },
+    ];
+    const productOptions = [`<option value="">Все продукты</option>`]
+        .concat(productsData.map(p => `<option value="${escapeHtml(p.id)}" ${mediaAssetFilterProduct === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`));
+
+    container.innerHTML = `
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+            ${typeChips.map(c => `<span class="group-chip ${mediaAssetFilterType === c.value ? 'active' : ''}" onclick="setMediaAssetTypeFilter('${c.value}')">${c.label}</span>`).join('')}
+        </div>
+        <select class="form-select" style="width:auto; margin:0;" onchange="setMediaAssetProductFilter(this.value)">
+            ${productOptions.join('')}
+        </select>
+    `;
+}
+
+function setMediaAssetTypeFilter(type) {
+    mediaAssetFilterType = type;
+    renderMediaAssets();
+}
+
+function setMediaAssetProductFilter(productId) {
+    mediaAssetFilterProduct = productId;
+    renderMediaAssets();
+}
+
+function mediaAssetPreviewHtml(asset) {
+    // Built with single-quoted HTML attrs and HTML-entity-escaped single quotes so it can be
+    // safely embedded inside the (double-quoted) onerror="..." attribute below without the
+    // placeholder's own quotes prematurely closing that attribute.
+    const placeholder = `<div class='media-asset-placeholder'>&#9888;&#65039; Не удалось загрузить превью</div>`;
+    if (asset.type === 'video') {
+        return `<video class="media-asset-preview" src="${escapeHtml(asset.url)}" muted preload="metadata"
+                    onerror="this.outerHTML='${placeholder}'"></video>`;
+    }
+    return `<img class="media-asset-preview" src="${escapeHtml(asset.url)}" loading="lazy" alt=""
+                onerror="this.outerHTML='${placeholder}'">`;
+}
+
+function drawMediaAssetsGrid() {
+    const grid = document.getElementById('media-assets-grid');
+    if (!grid) return;
+
+    if (mediaAssets.length === 0) {
+        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Медиа пока нет — добавьте первую ссылку кнопкой выше.</div>`;
+        return;
+    }
+
+    grid.innerHTML = mediaAssets.map(asset => `
+        <div class="media-asset-card">
+            ${mediaAssetPreviewHtml(asset)}
+            <div class="media-asset-body">
+                <div class="media-asset-meta-row">
+                    <span class="format-tag">${escapeHtml(asset.type)}</span>
+                    ${asset.productId ? `<span class="format-tag" style="color:var(--accent-blue);">${escapeHtml(mediaAssetProductLabel(asset.productId))}</span>` : ''}
+                    <span style="font-size:11px; color:var(--text-secondary); margin-left:auto;">исп.: ${asset.usedCount}</span>
+                </div>
+                ${asset.tags.length ? `<div class="media-asset-tags">${asset.tags.map(t => `<span class="group-chip" style="cursor:default;">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+                <div class="media-asset-url" title="${escapeHtml(asset.url)}">${escapeHtml(asset.url)}</div>
+                <div class="parser-niche-actions">
+                    <button class="delete-btn" onclick="deleteMediaAsset('${asset.id}')">Удалить</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openAddMediaAssetForm() {
+    document.getElementById('media-asset-form').style.display = 'block';
+    document.getElementById('ma-url-input').value = '';
+    document.getElementById('ma-tags-input').value = '';
+    document.getElementById('ma-type-input').value = 'image';
+    document.getElementById('ma-product-input').value = '';
+}
+
+function closeAddMediaAssetForm() {
+    document.getElementById('media-asset-form').style.display = 'none';
+}
+
+async function submitNewMediaAsset() {
+    const url = document.getElementById('ma-url-input').value.trim();
+    const type = document.getElementById('ma-type-input').value;
+    const productId = document.getElementById('ma-product-input').value;
+    const tags = document.getElementById('ma-tags-input').value.split(',').map(t => t.trim()).filter(Boolean);
+
+    if (!url) return alert('Укажите URL медиа');
+
+    try {
+        const created = await api('/api/media-assets', {
+            method: 'POST',
+            body: JSON.stringify({ url, type, productId: productId || null, tags }),
+        });
+        mediaAssets.unshift(created);
+        drawMediaAssetsGrid();
+        closeAddMediaAssetForm();
+        showToast('Медиа добавлено!');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function deleteMediaAsset(id) {
+    if (!confirm('Удалить это медиа из библиотеки?')) return;
+    try {
+        await api(`/api/media-assets/${id}`, { method: 'DELETE' });
+        mediaAssets = mediaAssets.filter(a => a.id !== id);
+        drawMediaAssetsGrid();
     } catch (e) {
         showToast('Не удалось удалить: ' + e.message);
     }
