@@ -338,6 +338,22 @@
                 <label class="form-label">Призыв к действию (CTA):</label>
                 <input type="text" id="edit-idea-cta-input" class="form-input" placeholder="Укажите оффер или ссылку...">
 
+                <div id="edit-idea-en-section" style="display:none;">
+                    <div class="controls-row" style="margin-top:20px; margin-bottom:0;">
+                        <label class="form-label" style="margin:0;">English version:</label>
+                        <button class="edit-btn" type="button" onclick="translateIdeaToEnglish()">🌍 Перевести на английский</button>
+                    </div>
+
+                    <label class="form-label">Title:</label>
+                    <input type="text" id="edit-idea-title-en-input" class="form-input" placeholder="Translated automatically, editable">
+
+                    <label class="form-label">Text:</label>
+                    <textarea id="edit-idea-desc-en-input" class="form-textarea" placeholder="Translated automatically, editable"></textarea>
+
+                    <label class="form-label">CTA:</label>
+                    <input type="text" id="edit-idea-cta-en-input" class="form-input" placeholder="Translated automatically, editable">
+                </div>
+
                 <button class="submit-btn" onclick="saveIdeaChanges()">Сохранить изменения</button>
             </div>
         </div>

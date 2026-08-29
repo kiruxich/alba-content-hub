@@ -563,6 +563,11 @@ function openEditIdeaModal(ideaId) {
     document.getElementById('edit-idea-status-input').value = idea.status || 'idea';
     document.getElementById('edit-idea-cta-input').value = idea.cta || '';
 
+    document.getElementById('edit-idea-en-section').style.display = 'block';
+    document.getElementById('edit-idea-title-en-input').value = idea.titleEn || '';
+    document.getElementById('edit-idea-desc-en-input').value = idea.descEn || '';
+    document.getElementById('edit-idea-cta-en-input').value = idea.ctaEn || '';
+
     validateLimits();
     openOverlay('edit-idea-overlay');
 }
@@ -576,6 +581,8 @@ function openNewIdeaModal() {
     document.getElementById('edit-idea-funnel-input').value = "TOFU";
     document.getElementById('edit-idea-status-input').value = "idea";
     document.getElementById('edit-idea-cta-input').value = "Консультация Alba Creation";
+
+    document.getElementById('edit-idea-en-section').style.display = 'none';
 
     validateLimits();
     openOverlay('edit-idea-overlay');
@@ -594,7 +601,10 @@ async function saveIdeaChanges() {
 
     try {
         if (id) {
-            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta }) });
+            const titleEn = document.getElementById('edit-idea-title-en-input').value.trim();
+            const descEn = document.getElementById('edit-idea-desc-en-input').value.trim();
+            const ctaEn = document.getElementById('edit-idea-cta-en-input').value.trim();
+            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta, titleEn, descEn, ctaEn }) });
             ideasBank = ideasBank.map(item => item.id === id ? updated : item);
             showToast('Идея обновлена!');
         } else {
@@ -610,6 +620,28 @@ async function saveIdeaChanges() {
         closeOverlay('edit-idea-overlay');
     } catch (e) {
         showToast('Не удалось сохранить идею: ' + e.message);
+    }
+}
+
+async function translateIdeaToEnglish() {
+    const id = document.getElementById('edit-idea-id').value;
+    if (!id) return;
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Перевожу...';
+    try {
+        const updated = await api(`/api/ideas/${id}/translate`, { method: 'POST' });
+        document.getElementById('edit-idea-title-en-input').value = updated.titleEn || '';
+        document.getElementById('edit-idea-desc-en-input').value = updated.descEn || '';
+        document.getElementById('edit-idea-cta-en-input').value = updated.ctaEn || '';
+        ideasBank = ideasBank.map(item => item.id === id ? updated : item);
+        showToast('Переведено на английский!');
+    } catch (e) {
+        showToast('Не удалось перевести: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
 }
 

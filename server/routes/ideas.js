@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { translateToEnglish } from '../lib/translateToEnglish.js';
 
 const router = Router();
 
@@ -12,6 +13,9 @@ function serialize(row) {
         funnel: row.funnel,
         status: row.status,
         cta: row.cta,
+        titleEn: row.title_en || '',
+        descEn: row.desc_en || '',
+        ctaEn: row.cta_en || '',
         targetGroups: JSON.parse(row.target_groups || '[]'),
         metrics: {
             views: row.metrics_views,
@@ -31,8 +35,8 @@ function serialize(row) {
 }
 
 const upsertSql = `
-    INSERT INTO ideas (id, title, desc, format, funnel, status, cta, target_groups, metrics_views, metrics_saves, metrics_clicks, metrics_leads, source, agent_meta, draft_text, content_type, expires_at, rubric_id, quality_flags, cover_asset_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO ideas (id, title, desc, format, funnel, status, cta, target_groups, metrics_views, metrics_saves, metrics_clicks, metrics_leads, source, agent_meta, draft_text, content_type, expires_at, rubric_id, quality_flags, cover_asset_id, title_en, desc_en, cta_en)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         title = excluded.title, desc = excluded.desc, format = excluded.format,
         funnel = excluded.funnel, status = excluded.status, cta = excluded.cta,
@@ -42,14 +46,16 @@ const upsertSql = `
         source = excluded.source, agent_meta = excluded.agent_meta, draft_text = excluded.draft_text,
         content_type = excluded.content_type, expires_at = excluded.expires_at,
         rubric_id = excluded.rubric_id, quality_flags = excluded.quality_flags,
-        cover_asset_id = excluded.cover_asset_id
+        cover_asset_id = excluded.cover_asset_id,
+        title_en = excluded.title_en, desc_en = excluded.desc_en, cta_en = excluded.cta_en
 `;
 
 function upsertArgs(row) {
     return [row.id, row.title, row.desc, row.format, row.funnel, row.status, row.cta,
         row.target_groups, row.metrics_views, row.metrics_saves, row.metrics_clicks, row.metrics_leads,
         row.source, row.agent_meta, row.draft_text,
-        row.content_type, row.expires_at, row.rubric_id, row.quality_flags, row.cover_asset_id];
+        row.content_type, row.expires_at, row.rubric_id, row.quality_flags, row.cover_asset_id,
+        row.title_en ?? null, row.desc_en ?? null, row.cta_en ?? null];
 }
 
 // GET /api/ideas?q=search+term  -- indexed LIKE scan over title/desc
@@ -103,6 +109,7 @@ router.post('/', async (req, res) => {
             rubric_id: b.rubricId || null,
             quality_flags: JSON.stringify(b.qualityFlags || []),
             cover_asset_id: b.coverAssetId || null,
+            title_en: null, desc_en: null, cta_en: null,
         }),
     });
     const result = await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [id] });
@@ -136,10 +143,32 @@ router.put('/:id', async (req, res) => {
         rubric_id: b.rubricId !== undefined ? b.rubricId : existing.rubric_id,
         quality_flags: b.qualityFlags !== undefined ? JSON.stringify(b.qualityFlags) : existing.quality_flags,
         cover_asset_id: b.coverAssetId !== undefined ? b.coverAssetId : existing.cover_asset_id,
+        title_en: b.titleEn !== undefined ? b.titleEn : existing.title_en,
+        desc_en: b.descEn !== undefined ? b.descEn : existing.desc_en,
+        cta_en: b.ctaEn !== undefined ? b.ctaEn : existing.cta_en,
     };
     await db.execute({ sql: upsertSql, args: upsertArgs(merged) });
     const result = await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [existing.id] });
     res.json(serialize(result.rows[0]));
+});
+
+// "Перевести на английский" - Russian stays the source of truth, this just
+// (re)generates the EN mirror from the current RU title/desc/cta.
+router.post('/:id/translate', async (req, res) => {
+    const row = (await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'idea not found' });
+
+    try {
+        const { titleEn, descEn, ctaEn } = await translateToEnglish({ title: row.title, desc: row.desc, cta: row.cta });
+        await db.execute({
+            sql: 'UPDATE ideas SET title_en = ?, desc_en = ?, cta_en = ? WHERE id = ?',
+            args: [titleEn, descEn, ctaEn, row.id],
+        });
+        const result = await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [row.id] });
+        res.json(serialize(result.rows[0]));
+    } catch (e) {
+        res.status(502).json({ error: e.message });
+    }
 });
 
 router.delete('/:id', async (req, res) => {
@@ -185,6 +214,7 @@ router.post('/import', async (req, res) => {
                     source: 'manual', agent_meta: null, draft_text: null,
                     content_type: item.contentType || 'evergreen', expires_at: null,
                     rubric_id: null, quality_flags: '[]', cover_asset_id: null,
+                    title_en: item.titleEn || null, desc_en: item.descEn || null, cta_en: item.ctaEn || null,
                 }),
             });
         }

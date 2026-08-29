@@ -230,6 +230,12 @@ await ensureColumn('ideas', 'rubric_id', 'TEXT');
 // a JSON array of issue codes; empty array = passed the quality gate.
 await ensureColumn('ideas', 'quality_flags', "TEXT DEFAULT '[]'");
 await ensureColumn('ideas', 'cover_asset_id', 'TEXT');
+// English translation of the same post, generated on demand from the
+// (always-primary) Russian title/desc/cta - for the studio's English-speaking
+// audience. Empty until "Перевести на английский" is clicked.
+await ensureColumn('ideas', 'title_en', 'TEXT');
+await ensureColumn('ideas', 'desc_en', 'TEXT');
+await ensureColumn('ideas', 'cta_en', 'TEXT');
 
 // scheduled_events: one row already represents one idea's post on one day;
 // adding `platform` turns it into one row per idea per platform (an idea can
