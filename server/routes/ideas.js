@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { translateToEnglish } from '../lib/translateToEnglish.js';
+import { validateDraft } from '../lib/editorValidation.js';
 
 const router = Router();
 
@@ -89,12 +90,26 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: 'title is required' });
     }
     const id = String(Date.now());
+
+    // Editor / quality-gate: agent-authored drafts carry their "Золотая
+    // середина" structure as separate fields in draftText - the server
+    // recomputes quality_flags itself (never trusts the caller's) and
+    // assembles the final post text from those fields, rather than the
+    // client sending pre-joined desc text.
+    let desc = b.desc || '';
+    let qualityFlags = b.qualityFlags || [];
+    if (b.source === 'agent' && b.draftText) {
+        const { flags, assembledText } = validateDraft({ ...b.draftText, format: b.format });
+        qualityFlags = flags;
+        desc = assembledText;
+    }
+
     await db.execute({
         sql: upsertSql,
         args: upsertArgs({
             id,
             title: b.title.trim(),
-            desc: b.desc || '',
+            desc,
             format: b.format || 'TG Пост',
             funnel: b.funnel || 'TOFU',
             status: b.status || 'idea',
@@ -107,7 +122,7 @@ router.post('/', async (req, res) => {
             content_type: b.contentType || 'evergreen',
             expires_at: b.expiresAt || null,
             rubric_id: b.rubricId || null,
-            quality_flags: JSON.stringify(b.qualityFlags || []),
+            quality_flags: JSON.stringify(qualityFlags),
             cover_asset_id: b.coverAssetId || null,
             title_en: null, desc_en: null, cta_en: null,
         }),

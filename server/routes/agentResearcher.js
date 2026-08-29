@@ -89,11 +89,32 @@ async function fetchCandidates(sources) {
     return candidates;
 }
 
-async function logRun(runDate, status, log, trendsFound, costUsd) {
+async function logRun(runDate, status, log, trendsFound, costUsd, briefJson) {
     await db.execute({
-        sql: `INSERT INTO agent_runs (run_date, agent_name, status, log, cost_usd, trends_found) VALUES (?, 'researcher', ?, ?, ?, ?)`,
-        args: [runDate, status, log, costUsd, trendsFound],
+        sql: `INSERT INTO agent_runs (run_date, agent_name, status, log, cost_usd, trends_found, brief_json) VALUES (?, 'researcher', ?, ?, ?, ?, ?)`,
+        args: [runDate, status, log, costUsd, trendsFound, briefJson ? JSON.stringify(briefJson) : null],
     });
+}
+
+async function notifyTelegram(brief) {
+    const settingsRes = await db.execute('SELECT token, chat_id FROM telegram_settings WHERE id = 1');
+    const settings = settingsRes.rows[0];
+    if (!settings?.token || !settings?.chat_id) return;
+
+    const lines = brief.trends.map((t, i) =>
+        `${i + 1}. *${t.topic}*\n   Продукт: ${t.target_product} · релевантность ${t.relevance_score}\n   ${t.source_url}`
+    );
+    const text = `🔎 *Сводка Researcher за ${brief.date}*\n\n${lines.join('\n\n') || 'Актуальных тем не найдено сегодня.'}`;
+
+    try {
+        await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: settings.chat_id, text, parse_mode: 'Markdown' }),
+        });
+    } catch (e) {
+        console.error('Researcher: failed to notify Telegram:', e.message);
+    }
 }
 
 async function runResearcher(req, res) {
@@ -168,8 +189,9 @@ async function runResearcher(req, res) {
         await logRun(
             runDate, 'success',
             `Scanned ${candidates.length} candidates from ${sources.length} source(s) in ${durationSec}s, picked ${top.length}.`,
-            top.length, 0
+            top.length, 0, brief
         );
+        await notifyTelegram(brief);
 
         res.json({ status: 'success', brief });
     } catch (e) {
@@ -182,5 +204,16 @@ async function runResearcher(req, res) {
 // Vercel Cron Jobs issue GET requests; POST is kept for manual/local testing.
 router.get('/run', runResearcher);
 router.post('/run', runResearcher);
+
+// Consumed by the Generator agent (a Claude Code routine, not this backend)
+// to pick up the day's trends without re-scanning RSS itself.
+router.get('/latest-brief', async (req, res) => {
+    const result = await db.execute(
+        "SELECT run_date, brief_json FROM agent_runs WHERE agent_name = 'researcher' AND status = 'success' AND brief_json IS NOT NULL ORDER BY id DESC LIMIT 1"
+    );
+    const row = result.rows[0];
+    if (!row) return res.status(404).json({ error: 'no successful researcher run yet' });
+    res.json(JSON.parse(row.brief_json));
+});
 
 export default router;

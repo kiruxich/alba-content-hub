@@ -97,7 +97,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'urlchecker': 9 };
+    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'urlchecker': 9, 'agentsettings': 10, 'systeminfo': 11 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -112,6 +112,7 @@ function switchTab(tabName) {
     if (tabName === 'contentplan') renderContentPlan();
     if (tabName === 'clients') renderClientsView();
     if (tabName === 'customers') renderParserNiches();
+    if (tabName === 'agentsettings') renderAgentSettingsForm();
 }
 
 function openOverlay(id) {
@@ -1879,5 +1880,34 @@ async function removeParserNiche(id) {
         drawParserNiches();
     } catch (e) {
         showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+// НАСТРОЙКИ АГЕНТОВ (источники, тон голоса, промпты Researcher/Generator)
+function renderAgentSettingsForm() {
+    document.getElementById('as-sources-input').value = (agentSettings.sources || []).join('\n');
+    document.getElementById('as-keywords-input').value = (agentSettings.keywords || []).join(', ');
+    document.getElementById('as-tone-input').value = agentSettings.toneOfVoice || '';
+    document.getElementById('as-formula-input').value = agentSettings.postFormula || '';
+    document.getElementById('as-generator-prompt-input').value = agentSettings.generatorPrompt || '';
+}
+
+async function saveAgentSettingsForm() {
+    const sources = document.getElementById('as-sources-input').value
+        .split('\n').map(s => s.trim()).filter(Boolean);
+    const keywords = document.getElementById('as-keywords-input').value
+        .split(',').map(s => s.trim()).filter(Boolean);
+    const toneOfVoice = document.getElementById('as-tone-input').value;
+    const postFormula = document.getElementById('as-formula-input').value;
+    const generatorPrompt = document.getElementById('as-generator-prompt-input').value;
+
+    try {
+        agentSettings = await api('/api/agent-settings', {
+            method: 'PUT',
+            body: JSON.stringify({ sources, keywords, toneOfVoice, postFormula, generatorPrompt }),
+        });
+        showToast('Настройки агентов сохранены!');
+    } catch (e) {
+        showToast('Не удалось сохранить: ' + e.message);
     }
 }

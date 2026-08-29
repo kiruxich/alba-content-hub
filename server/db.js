@@ -286,6 +286,14 @@ await ensureColumn('scheduled_events', 'utm_code', 'TEXT');
 // instead of drifting apart.
 await ensureColumn('agent_settings', 'weekly_schedule', "TEXT DEFAULT '[]'");
 await ensureColumn('agent_settings', 'post_formula', "TEXT DEFAULT ''");
+// Editable prompt template the Generator agent uses to turn a Researcher
+// brief into a drafted post - surfaced in the "Настройки агентов" tab so it
+// can be tuned without touching code.
+await ensureColumn('agent_settings', 'generator_prompt', "TEXT DEFAULT ''");
+// Latest structured Researcher brief (see agent-researcher/run) - kept
+// alongside agent_runs' free-text log so Generator (and the UI) can read the
+// exact trends/products it picked without re-scanning RSS sources.
+await ensureColumn('agent_runs', 'brief_json', 'TEXT');
 
 // Seed content_plan once with the studio's actual annual plan, shaped for the
 // quarterly-timeline UI: 'note' blocks are global strategy cards, 'quarter'
@@ -395,8 +403,28 @@ const defaultWeeklySchedule = [
     { day: 'sun', label: 'Воскресенье', product: null, focus: 'Мемы, дедлайны, забавные правки клиентов, вайб фаундера' },
 ];
 const defaultPostFormula = 'Золотая середина — обязательная структура для экспертных постов Пн–Сб:\n1. Бизнес-проблема: какую боль, потерю времени или денег мы решаем.\n2. Техническое решение: как именно мы это закодили (наш стек), простыми бытовыми аналогиями.\n3. Бизнес-результат: измеримая метрика (ускорили в X раз, сэкономили Y бюджета, выдержали Z запросов).';
+const defaultGeneratorPrompt = `Ты — копирайтер студии Alba Creation. Пишешь пост для соцсетей на основе темы, которую нашёл агент-исследователь.
+
+Продукт дня: {{product}}
+Тема: {{topic}}
+Источник: {{snippet}}
+Тон голоса: {{tone_of_voice}}
+Формат: {{format}}
+
+Обязательно следуй структуре "Золотая середина":
+{{post_formula}}
+
+Ответь СТРОГО валидным JSON без пояснений:
+{"title": "...", "businessProblem": "...", "technicalSolution": "...", "businessResult": "...", "cta": "..."}`;
 await db.execute({
     sql: `UPDATE agent_settings SET weekly_schedule = ?, post_formula = ?
           WHERE id = 1 AND weekly_schedule = '[]'`,
     args: [JSON.stringify(defaultWeeklySchedule), defaultPostFormula],
+});
+// Separate guard (its own column, not weekly_schedule) - the UPDATE above
+// already stopped firing once weekly_schedule was first populated, so
+// generator_prompt needs its own once-only seed instead of riding along.
+await db.execute({
+    sql: `UPDATE agent_settings SET generator_prompt = ? WHERE id = 1 AND generator_prompt = ''`,
+    args: [defaultGeneratorPrompt],
 });
