@@ -53,6 +53,10 @@
             <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
             <span>Заказчики</span>
         </button>
+        <button class="tab-item" onclick="switchTab('mediaassets')">
+            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+            <span>Медиатека</span>
+        </button>
         <button class="tab-item" onclick="switchTab('urlchecker')">
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
             <span>Проверка сайта</span>
@@ -287,6 +291,49 @@
                     <button class="schedule-btn" onclick="addParserNicheCard()">+ Добавить нишу</button>
                 </div>
                 <div class="parser-niches-grid" id="parser-niches-grid"></div>
+            </div>
+        </div>
+
+        <!-- TAB 9b: MEDIA LIBRARY (URL-based catalog of already-hosted images/video) -->
+        <div id="view-mediaassets" class="view">
+            <div class="large-header">
+                <p>Обложки, кадры, ролики</p>
+                <h1>Медиатека</h1>
+            </div>
+            <div class="clients-container">
+                <div class="controls-row">
+                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Каталог уже размещённых картинок/видео по URL (S3 alba-creation.ru и т.п.) — файлы сюда не загружаются, только ссылки</p>
+                    <button class="schedule-btn" onclick="openAddMediaAssetForm()">+ Добавить медиа</button>
+                </div>
+
+                <div id="media-asset-form" class="info-box" style="display:none; margin-bottom:16px;">
+                    <label class="form-label">URL изображения/видео:</label>
+                    <input type="text" id="ma-url-input" class="form-input" placeholder="https://alba-creation.ru/assets/cover.jpg">
+
+                    <label class="form-label">Тип:</label>
+                    <select id="ma-type-input" class="form-select">
+                        <option value="image">Изображение</option>
+                        <option value="video">Видео</option>
+                        <option value="gif">GIF</option>
+                    </select>
+
+                    <label class="form-label">Продукт (необязательно):</label>
+                    <select id="ma-product-input" class="form-select">
+                        <option value="">— без привязки —</option>
+                    </select>
+
+                    <label class="form-label">Теги (через запятую):</label>
+                    <input type="text" id="ma-tags-input" class="form-input" placeholder="обложка, промо, reels">
+
+                    <div style="display:flex; gap:8px;">
+                        <button class="submit-btn" style="margin-top:0;" onclick="submitNewMediaAsset()">Добавить</button>
+                        <button class="edit-btn" onclick="closeAddMediaAssetForm()">Отмена</button>
+                    </div>
+                </div>
+
+                <div class="controls-row" id="media-asset-filters" style="margin-bottom:4px;"></div>
+
+                <div class="media-assets-grid" id="media-assets-grid"></div>
             </div>
         </div>
 
@@ -542,6 +589,14 @@
                 <label class="form-label">Призыв к действию (CTA):</label>
                 <input type="text" id="edit-idea-cta-input" class="form-input" placeholder="Укажите оффер или ссылку...">
 
+                <label class="form-label">Обложка (из Медиатеки):</label>
+                <input type="hidden" id="edit-idea-cover-asset-id">
+                <div id="edit-idea-cover-preview" style="margin-bottom:8px; color:var(--text-secondary); font-size:12px;">Не выбрана</div>
+                <div style="display:flex; gap:8px;">
+                    <button class="edit-btn" type="button" onclick="openCoverPickerModal()">🖼 Выбрать обложку</button>
+                    <button class="edit-btn" type="button" onclick="clearCoverAsset()">✕ Убрать</button>
+                </div>
+
                 <div id="edit-idea-en-section" style="display:none;">
                     <div class="controls-row" style="margin-top:20px; margin-bottom:0;">
                         <label class="form-label" style="margin:0;">English version:</label>
@@ -559,6 +614,19 @@
                 </div>
 
                 <button class="submit-btn" onclick="saveIdeaChanges()">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- COVER PICKER (choose a media_assets row as the idea's cover, from Медиатека) -->
+    <div id="cover-picker-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Выбрать обложку</span>
+                <button class="back-btn" onclick="closeOverlay('cover-picker-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="media-assets-grid" id="cover-picker-grid"></div>
             </div>
         </div>
     </div>
