@@ -4,3 +4,4 @@ data
 graphify-out
 .env
 .vercel
+server/models
