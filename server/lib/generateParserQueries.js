@@ -4,7 +4,7 @@
 // so "Обновить парсер" still works without that key configured.
 
 function heuristicQueries(category, description) {
-    const words = `${category} ${description}`
+    const words = `${category} ${description || ''}`
         .toLowerCase()
         .split(/[\s,;.!?]+/)
         .map(w => w.trim())

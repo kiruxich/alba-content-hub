@@ -46,13 +46,20 @@ router.put('/:id', async (req, res) => {
     const { category, description } = req.body || {};
     await db.execute({
         sql: `UPDATE parser_niches SET category = ?, description = ?, updated_at = strftime('%s','now') WHERE id = ?`,
-        args: [category !== undefined ? category : row.category, description !== undefined ? description : row.description, row.id],
+        args: [category !== undefined ? category : row.category, description !== undefined ? (description || '') : row.description, row.id],
     });
     const result = await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [row.id] });
     res.json(serialize(result.rows[0]));
 });
 
 router.delete('/:id', async (req, res) => {
+    const row = (await db.execute({ sql: 'SELECT job_id FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (row?.job_id) {
+        // Best-effort - the niche row (the only place job_id lived) is about to
+        // be gone, so this is the last chance to stop an active scrape instead
+        // of leaving it running on the VPS with nothing left to cancel it.
+        try { await cancelParserJob(row.job_id); } catch (_) {}
+    }
     await db.execute({ sql: 'DELETE FROM parser_niches WHERE id = ?', args: [req.params.id] });
     res.status(204).end();
 });
@@ -117,9 +124,14 @@ router.post('/:id/cancel', async (req, res) => {
     }
 });
 
+const ACTIVE_STATUSES = ['queued', 'running', 'captcha', 'dedupe_running'];
+
 router.post('/:id/dedupe', async (req, res) => {
     const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
     if (!row || !row.job_id) return res.status(404).json({ error: 'no job for this niche yet' });
+    if (ACTIVE_STATUSES.includes(row.status)) {
+        return res.status(409).json({ error: 'Парсинг ещё идёт — дождитесь завершения перед чисткой дублей' });
+    }
     try {
         await dedupeParserJob(row.job_id);
         await db.execute({ sql: `UPDATE parser_niches SET status = 'dedupe_running' WHERE id = ?`, args: [row.id] });
@@ -132,6 +144,9 @@ router.post('/:id/dedupe', async (req, res) => {
 router.post('/:id/archive', async (req, res) => {
     const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
     if (!row || !row.job_id) return res.status(404).json({ error: 'no job for this niche yet' });
+    if (ACTIVE_STATUSES.includes(row.status)) {
+        return res.status(409).json({ error: 'Парсинг ещё идёт — дождитесь завершения перед архивацией' });
+    }
     try {
         await archiveParserJob(row.job_id);
         res.json({ ok: true });
@@ -157,7 +172,12 @@ router.get('/:id/download/:kind', async (req, res) => {
 // Called by the parser-worker (not the browser) when it hits a CAPTCHA -
 // forwards the noVNC link to the existing Telegram bot.
 router.post('/:id/captcha-alert', async (req, res) => {
-    if (WORKER_TOKEN && req.headers['x-worker-token'] !== WORKER_TOKEN) {
+    // Unlike other routes, this one is unconditional: unlike PARSER_WORKER_URL
+    // being unset (which just breaks outbound calls loudly), an unset
+    // PARSER_WORKER_TOKEN here would silently let anyone on the internet get
+    // an arbitrary link relayed into the studio's Telegram bot as a trusted
+    // message - so a missing token means "reject", not "skip the check".
+    if (!WORKER_TOKEN || req.headers['x-worker-token'] !== WORKER_TOKEN) {
         return res.status(401).json({ error: 'bad worker token' });
     }
     const { novncUrl, category } = req.body || {};

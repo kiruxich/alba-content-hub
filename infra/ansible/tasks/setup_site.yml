@@ -1,24 +1,32 @@
 # Один прогон = один сайт из vars/main.yml (site), вызывается через include_tasks
 # с loop_var: site.
+#
+# Сертификат проверяется ПЕРВЫМ и весь ACME-бутстрап (временный HTTP-конфиг +
+# certbot) пропускается, если он уже есть - иначе повторный прогон на уже
+# работающем сайте на секунду подменяет боевой HTTPS-конфиг на голый
+# редирект-заглушку и перезагружает nginx, обрывая реальный трафик.
+
+- name: "{{ site.name }}: проверить сертификат"
+  stat:
+    path: "/etc/letsencrypt/live/{{ site.domain }}/fullchain.pem"
+  register: cert_stat
 
 - name: "{{ site.name }}: временный HTTP-конфиг для ACME-челленджа"
   template:
     src: "{{ playbook_dir }}/templates/nginx-http-only.conf.j2"
     dest: "/etc/nginx/sites-available/{{ site.name }}.conf"
+  when: not cert_stat.stat.exists
 
 - name: "{{ site.name }}: включить конфиг"
   file:
     src: "/etc/nginx/sites-available/{{ site.name }}.conf"
     dest: "/etc/nginx/sites-enabled/{{ site.name }}.conf"
     state: link
+  when: not cert_stat.stat.exists
 
 - name: "{{ site.name }}: nginx -t && reload"
   shell: nginx -t && systemctl reload nginx
-
-- name: "{{ site.name }}: проверить сертификат"
-  stat:
-    path: "/etc/letsencrypt/live/{{ site.domain }}/fullchain.pem"
-  register: cert_stat
+  when: not cert_stat.stat.exists
 
 - name: "{{ site.name }}: выпустить сертификат Let's Encrypt"
   shell: >
@@ -34,6 +42,11 @@
   stat:
     path: "/etc/letsencrypt/live/{{ site.domain }}/fullchain.pem"
   register: cert_stat2
+  when: not cert_stat.stat.exists
+
+- name: "{{ site.name }}: определить, есть ли сертификат сейчас"
+  set_fact:
+    cert_ready: "{{ cert_stat.stat.exists or (cert_stat2.stat.exists | default(false)) }}"
 
 - name: "{{ site.name }}: DNS/сертификат ещё не готов — финальный конфиг пропущен"
   debug:
@@ -41,14 +54,21 @@
       DNS для {{ site.domain }} ещё не указывает на этот сервер (или certbot
       упал) — HTTPS reverse-proxy конфиг не записан. Настройте DNS и
       перезапустите плейбук.
-  when: not cert_stat2.stat.exists
+  when: not cert_ready
 
 - name: "{{ site.name }}: финальный конфиг (HTTP redirect + HTTPS reverse-proxy)"
   template:
     src: "{{ playbook_dir }}/templates/nginx-app.conf.j2"
     dest: "/etc/nginx/sites-available/{{ site.name }}.conf"
-  when: cert_stat2.stat.exists
+  when: cert_ready
   register: final_conf
+
+- name: "{{ site.name }}: включить финальный конфиг"
+  file:
+    src: "/etc/nginx/sites-available/{{ site.name }}.conf"
+    dest: "/etc/nginx/sites-enabled/{{ site.name }}.conf"
+    state: link
+  when: cert_ready
 
 - name: "{{ site.name }}: reload nginx после финального конфига"
   shell: nginx -t && systemctl reload nginx

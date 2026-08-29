@@ -8,8 +8,8 @@
 #   cd infra/ansible
 #   ansible-playbook site.yml -e parser_worker_token=$(openssl rand -hex 24) -e vnc_basic_auth_password=$(openssl rand -hex 12)
 #
-# Требует коллекцию community.general (для модуля ufw):
-#   ansible-galaxy collection install community.general
+# Требует коллекцию community.general (для модулей ufw и htpasswd):
+#   ansible-galaxy collection install -r requirements.yml
 #
 # Идемпотентен — можно гонять повторно. Сертификаты Let's Encrypt для
 # доменов, у которых DNS ещё не настроен на этот сервер, будут пропущены —
@@ -25,6 +25,17 @@
     - vars/main.yml
 
   tasks:
+    - name: Проверить, что секреты переданы явно (не оставлены дефолтом)
+      assert:
+        that:
+          - parser_worker_token != 'CHANGE_ME'
+          - vnc_basic_auth_password != 'CHANGE_ME'
+        fail_msg: >
+          parser_worker_token и/или vnc_basic_auth_password оставлены равны
+          плейсхолдеру CHANGE_ME. Это реальный секрет worker-API и пароль от
+          noVNC (удалённый доступ к живому Chromium-сеансу) — передайте оба
+          явно: -e parser_worker_token=$(openssl rand -hex 24) -e vnc_basic_auth_password=$(openssl rand -hex 12)
+
     - name: Обновить apt-кэш
       apt:
         update_cache: true

@@ -63,6 +63,12 @@ async def notify_captcha(job: Job):
 async def worker_loop():
     while True:
         job: Job = await queue.get()
+        if job.cancelled:
+            # Cancelled while still sitting in the queue, before any task
+            # existed to call .cancel() on - honor it now instead of running
+            # a scrape the operator already tried to stop.
+            queue.task_done()
+            continue
         try:
             job.on_captcha = notify_captcha
             job.task = asyncio.current_task()
@@ -121,7 +127,17 @@ async def cancel_job(job_id: str):
     if job.task and not job.task.done():
         job.task.cancel()
         return {"ok": True, "cancelled": True}
+    if job.status == "queued":
+        # Not dequeued yet, so there's no task to cancel - worker_loop checks
+        # this flag right after pulling it off the queue and skips running it.
+        job.cancelled = True
+        job.status = "cancelled"
+        job.log("⏹ Остановлено пользователем (было в очереди)")
+        return {"ok": True, "cancelled": True}
     return {"ok": True, "cancelled": False}
+
+
+ACTIVE_STATUSES = {"queued", "running", "captcha"}
 
 
 @app.post("/jobs/{job_id}/dedupe")
@@ -129,14 +145,25 @@ async def dedupe_job(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, "job not found")
+    if job.status in ACTIVE_STATUSES:
+        raise HTTPException(409, "scrape still running - wait for it to finish first")
     if not os.path.exists(job.raw_path):
         raise HTTPException(400, "raw file not ready yet")
     try:
-        stats = dedupe_franchises(job.raw_path, job.dedup_path)
+        # openpyxl is synchronous; running it inline would block this whole
+        # event loop (including any other job's page.goto/timeouts) for
+        # however long the workbook takes to load and rewrite.
+        stats = await asyncio.to_thread(dedupe_franchises, job.raw_path, job.dedup_path)
         job.log(f"Дубликаты/франшизы удалены: {stats['deleted_rows']} строк, {stats['franchise_domains']} сетей")
         return {"ok": True, **stats}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+def _write_archive(archive_path, files):
+    with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            zf.write(f, arcname=os.path.basename(f))
 
 
 @app.post("/jobs/{job_id}/archive")
@@ -144,12 +171,12 @@ async def archive_job(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, "job not found")
+    if job.status in ACTIVE_STATUSES:
+        raise HTTPException(409, "scrape still running - wait for it to finish first")
     files = [p for p in [job.raw_path, job.dedup_path] if os.path.exists(p)]
     if not files:
         raise HTTPException(400, "nothing to archive yet")
-    with zipfile.ZipFile(job.archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for f in files:
-            zf.write(f, arcname=os.path.basename(f))
+    await asyncio.to_thread(_write_archive, job.archive_path, files)
     return {"ok": True}
 
 

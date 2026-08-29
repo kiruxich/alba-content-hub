@@ -485,6 +485,7 @@ html, body {
 .parser-niche-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .parser-niche-status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 7px; text-transform: uppercase; }
 .parser-niche-status.idle { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+.parser-niche-status.queued { background: rgba(10,132,255,0.08); color: var(--accent-blue); }
 .parser-niche-status.running { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
 .parser-niche-status.captcha { background: rgba(255,159,10,0.15); color: var(--accent-orange); }
 .parser-niche-status.done { background: rgba(48,209,88,0.15); color: var(--accent-green); }

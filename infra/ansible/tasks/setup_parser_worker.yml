@@ -15,7 +15,7 @@
       - websockify
       - python3-venv
       - python3-pip
-      - apache2-utils
+      - python3-passlib
     state: present
 
 - name: Скопировать код parser-worker на сервер
@@ -39,12 +39,17 @@
   args:
     creates: /root/.cache/ms-playwright
 
-- name: Создать пользователя basic-auth для noVNC
-  command: >
-    htpasswd -cb /etc/nginx/.vnc_htpasswd
-    {{ vnc_basic_auth_user }} {{ vnc_basic_auth_password }}
-  args:
-    creates: /etc/nginx/.vnc_htpasswd
+# A `creates:`-guarded `htpasswd -cb` shell would only ever run once - a
+# later rerun with a rotated vnc_basic_auth_password would update the
+# systemd unit's NOVNC_URL but silently leave the old password in the
+# htpasswd file, breaking the embedded credentials. This module compares
+# desired vs actual and updates in place either way.
+- name: Создать/обновить пользователя basic-auth для noVNC
+  community.general.htpasswd:
+    path: /etc/nginx/.vnc_htpasswd
+    name: "{{ vnc_basic_auth_user }}"
+    password: "{{ vnc_basic_auth_password }}"
+    mode: "0644"
 
 - name: systemd unit - Xvfb
   copy:

@@ -1718,6 +1718,14 @@ function drawParserNiches() {
     const container = document.getElementById('parser-niches-grid');
     if (!container) return;
 
+    // Polling ticks re-run this every 4s while any niche is active - skip the
+    // rebuild if the user is mid-edit in any card's text input, otherwise a
+    // status refresh wipes their unsaved keystrokes and steals focus.
+    const activeEl = document.activeElement;
+    if (activeEl && container.contains(activeEl) && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+    }
+
     if (parserNiches.length === 0) {
         container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую кнопкой выше.</div>`;
         return;
@@ -1780,15 +1788,20 @@ async function addParserNicheCard() {
 async function saveParserNicheField(id, field, value) {
     const niche = parserNiches.find(n => n.id === id);
     if (!niche || niche[field] === value) return;
+    const previous = niche[field];
     niche[field] = value;
     try {
         await api(`/api/parser-niches/${id}`, { method: 'PUT', body: JSON.stringify({ [field]: value }) });
     } catch (e) {
+        niche[field] = previous;
+        drawParserNiches();
         showToast('Не удалось сохранить: ' + e.message);
     }
 }
 
 async function runParserNiche(id) {
+    const btn = event && event.target;
+    if (btn) btn.disabled = true;
     try {
         const updated = await api(`/api/parser-niches/${id}/run`, { method: 'POST' });
         const idx = parserNiches.findIndex(n => n.id === id);
@@ -1797,6 +1810,7 @@ async function runParserNiche(id) {
         startParserPolling(id);
         showToast('Парсер запущен, следите за логом в карточке');
     } catch (e) {
+        if (btn) btn.disabled = false;
         showToast('Не удалось запустить парсер: ' + e.message);
     }
 }

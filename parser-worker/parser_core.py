@@ -16,7 +16,12 @@ ZOOM = 13
 LAT_MIN, LAT_MAX = 55.1, 56.2
 LON_MIN, LON_MAX = 36.7, 38.4
 
-CAPTCHA_MARKERS = ["подтвердите, что вы не робот", "капча", "captcha", "unusual traffic", "доступ ограничен"]
+CAPTCHA_MARKERS = [
+    "подтвердите, что вы не робот", "капча", "captcha", "unusual traffic", "доступ ограничен",
+    "just a moment", "checking your browser", "access denied", "attention required",
+    "please verify you are a human", "too many requests",
+]
+CAPTCHA_STATUS_CODES = {403, 429}
 
 
 def get_firm_id(url):
@@ -93,6 +98,7 @@ class Job:
         self.archive_path = os.path.join(out_dir, "archive.zip")
         self.on_captcha = None  # async callback(job) -> None, set by the API layer
         self.task = None  # asyncio.Task running this job, set by worker_loop - used to cancel
+        self.cancelled = False  # set when cancelled while still queued (before a task exists)
 
     def log(self, msg):
         line = f"[{time.strftime('%H:%M:%S')}] {msg}"
@@ -268,10 +274,11 @@ async def run_parser_job(job: Job):
                     while True:
                         search_url = f"https://2gis.ru/moscow/search/{encoded_query}/page/{page_num}?m={lon}%2C{lat}%2F{ZOOM}"
                         try:
-                            await main_page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                            nav_response = await main_page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
                             await main_page.wait_for_timeout(1200)
 
-                            if await page_looks_like_captcha(main_page):
+                            blocked_by_status = nav_response is not None and nav_response.status in CAPTCHA_STATUS_CODES
+                            if blocked_by_status or await page_looks_like_captcha(main_page):
                                 job.status = "captcha"
                                 job.log("⚠️ Обнаружена капча/блокировка 2ГИС — жду ручного решения (до 8 минут)")
                                 if job.on_captcha:
@@ -279,8 +286,9 @@ async def run_parser_job(job: Job):
                                 cleared = False
                                 for _ in range(32):  # 32 * 15s = 8 min
                                     await asyncio.sleep(15)
-                                    await main_page.reload(wait_until="domcontentloaded")
-                                    if not await page_looks_like_captcha(main_page):
+                                    reload_response = await main_page.reload(wait_until="domcontentloaded")
+                                    still_blocked_by_status = reload_response is not None and reload_response.status in CAPTCHA_STATUS_CODES
+                                    if not still_blocked_by_status and not await page_looks_like_captcha(main_page):
                                         cleared = True
                                         break
                                 if not cleared:

@@ -48,7 +48,15 @@ async function ensureColumn(table, column, definition) {
     const info = await db.execute(`PRAGMA table_info(${table})`);
     const exists = info.rows.some(r => r.name === column);
     if (!exists) {
-        await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        try {
+            await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        } catch (e) {
+            // The check-then-ALTER above isn't atomic across processes - if two
+            // instances cold-start at once against the same DB, both can see
+            // the column missing and race to add it. The loser just needs to
+            // not crash; the column is there either way.
+            if (!/duplicate column name/i.test(e.message)) throw e;
+        }
     }
 }
 
