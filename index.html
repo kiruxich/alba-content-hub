@@ -302,7 +302,7 @@
             </div>
             <div class="clients-container">
                 <div class="controls-row">
-                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Каталог уже размещённых картинок/видео по URL (S3 alba-creation.ru и т.п.) — файлы сюда не загружаются, только ссылки</p>
+                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Каталог обложек и роликов — вставьте ссылку на уже размещённый файл (S3 alba-creation.ru и т.п.) или загрузите файл напрямую</p>
                     <div style="display:flex; gap:8px;">
                         <button class="schedule-btn" onclick="openAddMediaAssetForm()">+ Добавить медиа</button>
                         <button class="schedule-btn" style="background:var(--accent-purple);" onclick="openGenerateMediaAssetForm()">✨ Сгенерировать обложку</button>
@@ -312,7 +312,11 @@
 
                 <div id="media-asset-form" class="info-box" style="display:none; margin-bottom:16px;">
                     <label class="form-label">URL изображения/видео:</label>
-                    <input type="text" id="ma-url-input" class="form-input" placeholder="https://alba-creation.ru/assets/cover.jpg">
+                    <input type="text" id="ma-url-input" class="form-input" placeholder="https://alba-creation.ru/assets/cover.jpg" oninput="onMediaAssetUrlInput()">
+
+                    <label class="form-label">или загрузите файл напрямую:</label>
+                    <input type="file" id="ma-file-input" class="form-input" accept="image/*,video/*" onchange="onMediaAssetFileInput()">
+                    <p id="ma-file-hint" style="color:var(--text-secondary); font-size:12px; margin:-8px 0 12px;">Заполните либо ссылку, либо файл — не оба сразу</p>
 
                     <label class="form-label">Тип:</label>
                     <select id="ma-type-input" class="form-select">
