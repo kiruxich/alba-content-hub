@@ -72,6 +72,9 @@
     - name: "VM-уровень для parser-worker/LibreTranslate: htpasswd + ufw"
       include_tasks: tasks/setup_parser_worker.yml
 
+    - name: "ufw для Piper TTS / SeaweedFS / video-worker"
+      include_tasks: tasks/setup_selfhosted_ufw.yml
+
     - name: Настроить nginx-vhost + SSL для каждого сайта
       include_tasks: tasks/setup_site.yml
       loop: "{{ sites }}"

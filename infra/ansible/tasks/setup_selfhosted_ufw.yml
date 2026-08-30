@@ -1,0 +1,45 @@
+# ufw rules for the self-hosted Coolify resources added after
+# setup_parser_worker.yml was written (Piper TTS, SeaweedFS, video-worker).
+# All three were provisioned manually in the Coolify UI the same way
+# parser-worker/LibreTranslate were (see the comment at the top of
+# setup_parser_worker.yml) and their ufw rules were applied directly over SSH
+# at the time - this file only backfills them into the playbook so a fresh
+# VM provisioned from scratch doesn't silently miss them.
+#
+# Coolify UI setup, for reference:
+#   - piper-tts: "Git Repository" -> this repo -> Build pack: Dockerfile,
+#     Base directory: /piper-tts, Ports exposes 8789, Port mappings 8789:8789,
+#     env var PIPER_WORKER_TOKEN.
+#   - seaweedfs: "Git Repository" -> this repo -> Build pack: Dockerfile,
+#     Base directory: /seaweedfs, Ports exposes 8333, Port mappings 8333:8333,
+#     env vars for the S3 admin/anonymous identity (see seaweedfs/entrypoint.sh).
+#   - video-worker: "Git Repository" -> this repo -> Build pack: Dockerfile,
+#     Base directory: /video-worker, Ports exposes 8788, Port mappings 8788:8788,
+#     env var VIDEO_WORKER_TOKEN.
+#   - hub's own env vars: PIPER_WORKER_URL=http://10.0.1.1:8789,
+#     S3_ENDPOINT=http://10.0.1.1:8333 (+ S3_BUCKET/S3_ACCESS_KEY_ID/
+#     S3_SECRET_ACCESS_KEY/S3_PUBLIC_URL_BASE), VIDEO_WORKER_URL=http://10.0.1.1:8788.
+
+- name: Разрешить порт Piper TTS только из docker-подсети Coolify (не из интернета)
+  community.general.ufw:
+    rule: allow
+    port: "8789"
+    proto: tcp
+    from_ip: 10.0.1.0/24
+    comment: "piper-tts from coolify docker net"
+
+- name: Разрешить порт SeaweedFS (S3) только из docker-подсети Coolify (не из интернета)
+  community.general.ufw:
+    rule: allow
+    port: "8333"
+    proto: tcp
+    from_ip: 10.0.1.0/24
+    comment: "seaweedfs from coolify docker net"
+
+- name: Разрешить порт video-worker только из docker-подсети Coolify (не из интернета)
+  community.general.ufw:
+    rule: allow
+    port: "8788"
+    proto: tcp
+    from_ip: 10.0.1.0/24
+    comment: "video-worker from coolify docker net"

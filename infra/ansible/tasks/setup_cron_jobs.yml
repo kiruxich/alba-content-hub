@@ -20,6 +20,20 @@
       CRON_TZ=Europe/Amsterdam
       30 8 * * * root curl -s -X POST https://hub.alba-creation.ru/api/agent-researcher/run >> /var/log/alba-researcher.log 2>&1
 
+- name: "Cron: Metrics Sync (pull VK/Instagram/YouTube view/engagement counts)"
+  copy:
+    dest: /etc/cron.d/alba-metrics-sync
+    mode: "0644"
+    content: |
+      # Alba Content Hub - Metrics Sync
+      #
+      # Pulls views/likes back from VK/Instagram/YouTube for published
+      # scheduled_events rows with an external_post_id (Telegram is a
+      # documented no-op - see server/lib/metricsSync.js). Deterministic
+      # endpoint, no LLM/routine involved - see server/routes/metricsSync.js.
+      CRON_TZ=Europe/Amsterdam
+      0 */6 * * * root curl -s -X POST https://hub.alba-creation.ru/api/metrics-sync/run >> /var/log/alba-metrics-sync.log 2>&1
+
 - name: "Cron: automatic Docker disk cleanup"
   copy:
     dest: /etc/cron.d/docker-cleanup
