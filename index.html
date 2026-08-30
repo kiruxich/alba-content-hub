@@ -367,10 +367,16 @@
                      error toast, same as the Telegram integration elsewhere in this app. -->
                 <div id="voiceover-form" class="info-box" style="display:none; margin-bottom:16px;">
                     <label class="form-label">Текст для озвучки:</label>
-                    <textarea id="vo-text-input" class="form-textarea" placeholder="Текст, который нужно озвучить голосом ElevenLabs..."></textarea>
+                    <textarea id="vo-text-input" class="form-textarea" placeholder="Текст, который нужно озвучить..."></textarea>
+
+                    <label class="form-label">Провайдер:</label>
+                    <select id="vo-provider-input" class="form-select">
+                        <option value="elevenlabs">ElevenLabs (платно, выше качество)</option>
+                        <option value="piper">Piper (бесплатно, self-hosted)</option>
+                    </select>
 
                     <label class="form-label">Voice ID (необязательно):</label>
-                    <input type="text" id="vo-voiceid-input" class="form-input" placeholder="по умолчанию — стандартный голос ElevenLabs">
+                    <input type="text" id="vo-voiceid-input" class="form-input" placeholder="по умолчанию — стандартный голос выбранного провайдера">
 
                     <label class="form-label">Продукт (необязательно):</label>
                     <select id="vo-product-input" class="form-select">

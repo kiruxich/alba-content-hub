@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { isKieConfigured, generateImage, generateVideo } from '../lib/kieClient.js';
 import { generateVoiceover, isElevenLabsConfigured } from '../lib/elevenLabsClient.js';
+import { generatePiperVoiceover, isPiperConfigured } from '../lib/piperTtsClient.js';
 
 const router = Router();
 
@@ -180,11 +181,14 @@ router.post('/generate-video', async (req, res) => {
     }
 });
 
-// POST /api/media-assets/generate-voiceover { text, voiceId?, productId?, rubricId?, tags? }
-// Generates a voice-over MP3 from `text` via ElevenLabs TTS (see
-// server/lib/elevenLabsClient.js - gated behind ELEVENLABS_API_KEY), stores
-// it as a new media_assets row (type='audio'), and logs the estimated spend
-// into agent_expenses so it shows up in the Cost Tracker.
+// POST /api/media-assets/generate-voiceover { text, provider?, voiceId?, productId?, rubricId?, tags? }
+// Generates a voice-over from `text` via either ElevenLabs (paid, gated
+// behind ELEVENLABS_API_KEY - server/lib/elevenLabsClient.js) or Piper
+// (free, self-hosted - server/lib/piperTtsClient.js). `provider` is
+// 'elevenlabs' (default, for backwards compatibility with existing callers)
+// or 'piper'. Stores the result as a new media_assets row (type='audio') and
+// logs the spend into agent_expenses (0 for Piper) so it shows up in the
+// Cost Tracker either way.
 //
 // STORAGE NOTE: this project has no S3/object-storage client yet - the
 // Медиатека today only catalogs externally-hosted URLs (see its own
@@ -201,15 +205,30 @@ router.post('/generate-voiceover', async (req, res) => {
     const text = (b.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Текст для озвучки не указан' });
 
-    if (!isElevenLabsConfigured()) {
-        return res.status(400).json({ error: 'ElevenLabs не настроен: добавьте ELEVENLABS_API_KEY в переменные окружения' });
-    }
-
+    const provider = (b.provider || 'elevenlabs').trim();
     let voiceover;
-    try {
-        voiceover = await generateVoiceover({ text, voiceId: b.voiceId });
-    } catch (e) {
-        return res.status(502).json({ error: e.message });
+    let modelUsed;
+
+    if (provider === 'piper') {
+        if (!isPiperConfigured()) {
+            return res.status(400).json({ error: 'Piper не настроен: добавьте PIPER_WORKER_TOKEN в переменные окружения' });
+        }
+        try {
+            voiceover = await generatePiperVoiceover({ text, voice: b.voiceId });
+        } catch (e) {
+            return res.status(502).json({ error: e.message });
+        }
+        modelUsed = 'piper:ru_RU-dmitri-medium';
+    } else {
+        if (!isElevenLabsConfigured()) {
+            return res.status(400).json({ error: 'ElevenLabs не настроен: добавьте ELEVENLABS_API_KEY в переменные окружения' });
+        }
+        try {
+            voiceover = await generateVoiceover({ text, voiceId: b.voiceId });
+        } catch (e) {
+            return res.status(502).json({ error: e.message });
+        }
+        modelUsed = 'elevenlabs:eleven_multilingual_v2';
     }
 
     const dataUrl = `data:${voiceover.contentType};base64,${voiceover.audioBuffer.toString('base64')}`;
@@ -227,8 +246,8 @@ router.post('/generate-voiceover', async (req, res) => {
 
     await db.execute({
         sql: `INSERT INTO agent_expenses (agent_name, model_used, total_usd)
-              VALUES ('generator', 'elevenlabs:eleven_multilingual_v2', ?)`,
-        args: [voiceover.estimatedCostUsd],
+              VALUES ('generator', ?, ?)`,
+        args: [modelUsed, voiceover.estimatedCostUsd],
     });
 
     const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [id] });

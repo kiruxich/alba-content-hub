@@ -2333,6 +2333,7 @@ async function submitNewMediaAsset() {
 function openVoiceoverForm() {
     document.getElementById('voiceover-form').style.display = 'block';
     document.getElementById('vo-text-input').value = '';
+    document.getElementById('vo-provider-input').value = 'elevenlabs';
     document.getElementById('vo-voiceid-input').value = '';
     document.getElementById('vo-product-input').value = '';
 }
@@ -2341,14 +2342,17 @@ function closeVoiceoverForm() {
     document.getElementById('voiceover-form').style.display = 'none';
 }
 
-// Calls POST /api/media-assets/generate-voiceover (ElevenLabs TTS, see
-// server/lib/elevenLabsClient.js). If ELEVENLABS_API_KEY isn't set on the
-// server, the endpoint responds with a normal error JSON ({ error }) which
-// the shared api() helper turns into a thrown Error - handled here the same
-// way every other optional integration in this app surfaces a "not
-// configured" failure: an error toast, no hardcoded assumption about why it failed.
+// Calls POST /api/media-assets/generate-voiceover, choosing between
+// ElevenLabs (server/lib/elevenLabsClient.js) and Piper
+// (server/lib/piperTtsClient.js) via the provider dropdown. If the chosen
+// provider isn't configured on the server, the endpoint responds with a
+// normal error JSON ({ error }) which the shared api() helper turns into a
+// thrown Error - handled here the same way every other optional integration
+// in this app surfaces a "not configured" failure: an error toast, no
+// hardcoded assumption about why it failed.
 async function submitVoiceoverGeneration() {
     const text = document.getElementById('vo-text-input').value.trim();
+    const provider = document.getElementById('vo-provider-input').value;
     const voiceId = document.getElementById('vo-voiceid-input').value.trim();
     const productId = document.getElementById('vo-product-input').value;
 
@@ -2362,7 +2366,7 @@ async function submitVoiceoverGeneration() {
     try {
         const created = await api('/api/media-assets/generate-voiceover', {
             method: 'POST',
-            body: JSON.stringify({ text, voiceId: voiceId || undefined, productId: productId || null }),
+            body: JSON.stringify({ text, provider, voiceId: voiceId || undefined, productId: productId || null }),
         });
         mediaAssets.unshift(created);
         drawMediaAssetsGrid();
