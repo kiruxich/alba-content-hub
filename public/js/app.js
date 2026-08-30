@@ -12,6 +12,9 @@ const productsData = [
 let ideasBank = [];
 let scheduledEvents = [];
 let tgMeta = { chatId: '', hasToken: false, tokenPreview: '' };
+let vkMeta = { groupId: '', hasToken: false, tokenPreview: '' };
+let igMeta = { businessAccountId: '', hasToken: false, tokenPreview: '' };
+let ytMeta = { clientId: '', channelTitle: '', hasClientSecret: false, hasRefreshToken: false, configured: false };
 let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
@@ -51,11 +54,14 @@ async function api(path, options = {}) {
 // ИНИЦИАЛИЗАЦИЯ: подтягиваем состояние с бэкенда вместо localStorage
 async function initApp() {
     try {
-        const [ideas, events, plan, telegram, contentPlan, nichesList, projectInfoMap, agentSettingsData, rubrics] = await Promise.all([
+        const [ideas, events, plan, telegram, vk, instagram, youtube, contentPlan, nichesList, projectInfoMap, agentSettingsData, rubrics] = await Promise.all([
             api('/api/ideas'),
             api('/api/events'),
             api('/api/settings/plan'),
             api('/api/settings/telegram'),
+            api('/api/settings/vk'),
+            api('/api/settings/instagram'),
+            api('/api/settings/youtube'),
             api('/api/content-plan'),
             api('/api/niches'),
             api('/api/project-info'),
@@ -66,6 +72,9 @@ async function initApp() {
         scheduledEvents = events;
         planSettings = plan;
         tgMeta = telegram;
+        vkMeta = vk;
+        igMeta = instagram;
+        ytMeta = youtube;
         contentPlanBlocks = contentPlan.blocks;
         niches = nichesList;
         projectInfo = projectInfoMap;
@@ -267,6 +276,9 @@ async function renderBankView() {
                 <button class="edit-btn" onclick="generateAIPrompt('${idea.id}')">🤖 AI Промпт</button>
                 <button class="tg-btn" onclick="copyTelegramFormatted('${idea.id}')">📋 Скопировать</button>
                 <button class="tg-btn" style="background:#0088cc;" onclick="postToTelegram('${idea.id}')">✈️ В TG Bot</button>
+                <button class="tg-btn" style="background:#0077FF;${vkMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToVk('${idea.id}')">${vkMeta.hasToken ? '🔵 В VK' : '🔵 VK (не настроено)'}</button>
+                <button class="tg-btn" style="background:#E1306C;${igMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToInstagram('${idea.id}')">${igMeta.hasToken ? '📸 В Instagram' : '📸 Instagram (не настроено)'}</button>
+                <button class="tg-btn" style="background:#FF0000;${ytMeta.configured ? '' : 'opacity:0.5;'}" onclick="postToYoutube('${idea.id}')">${ytMeta.configured ? '▶️ На YouTube' : '▶️ YouTube (не настроено)'}</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
                 <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
@@ -815,6 +827,151 @@ async function postToTelegram(ideaId) {
         showToast('Опубликовано в Telegram!');
     } catch (e) {
         alert('Ошибка отправки: ' + e.message);
+    }
+}
+
+// VK (community wall.post)
+async function openVkSettings() {
+    try {
+        vkMeta = await api('/api/settings/vk');
+    } catch (e) {
+        showToast('Не удалось получить настройки VK: ' + e.message);
+    }
+    const tokenInput = document.getElementById('vk-token-input');
+    const groupInput = document.getElementById('vk-group-input');
+    if (tokenInput) {
+        tokenInput.value = '';
+        tokenInput.placeholder = vkMeta.hasToken
+            ? `Сохранён токен ${vkMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'vk1.a.xxxxxxxx...';
+    }
+    if (groupInput) groupInput.value = vkMeta.groupId || '';
+    openOverlay('vk-config-overlay');
+}
+
+async function saveVkSettings() {
+    const accessToken = document.getElementById('vk-token-input').value.trim();
+    const groupId = document.getElementById('vk-group-input').value.trim();
+    try {
+        vkMeta = await api('/api/settings/vk', { method: 'PUT', body: JSON.stringify({ accessToken, groupId }) });
+        closeOverlay('vk-config-overlay');
+        showToast('Настройки VK сохранены');
+        renderBankView();
+    } catch (e) {
+        showToast('Не удалось сохранить настройки VK: ' + e.message);
+    }
+}
+
+async function postToVk(ideaId) {
+    if (!vkMeta.hasToken || !vkMeta.groupId) {
+        alert('Укажите Access Token и ID сообщества в настройках VK!');
+        openVkSettings();
+        return;
+    }
+    try {
+        await api('/api/publish/vk', { method: 'POST', body: JSON.stringify({ ideaId }) });
+        showToast('Опубликовано в VK!');
+    } catch (e) {
+        alert('Ошибка отправки в VK: ' + e.message);
+    }
+}
+
+// Instagram (Content Publishing API: create media container, then publish)
+async function openIgSettings() {
+    try {
+        igMeta = await api('/api/settings/instagram');
+    } catch (e) {
+        showToast('Не удалось получить настройки Instagram: ' + e.message);
+    }
+    const tokenInput = document.getElementById('ig-token-input');
+    const accountInput = document.getElementById('ig-account-input');
+    if (tokenInput) {
+        tokenInput.value = '';
+        tokenInput.placeholder = igMeta.hasToken
+            ? `Сохранён токен ${igMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'EAAxxxxxxxx...';
+    }
+    if (accountInput) accountInput.value = igMeta.businessAccountId || '';
+    openOverlay('ig-config-overlay');
+}
+
+async function saveIgSettings() {
+    const accessToken = document.getElementById('ig-token-input').value.trim();
+    const businessAccountId = document.getElementById('ig-account-input').value.trim();
+    try {
+        igMeta = await api('/api/settings/instagram', { method: 'PUT', body: JSON.stringify({ accessToken, businessAccountId }) });
+        closeOverlay('ig-config-overlay');
+        showToast('Настройки Instagram сохранены');
+        renderBankView();
+    } catch (e) {
+        showToast('Не удалось сохранить настройки Instagram: ' + e.message);
+    }
+}
+
+async function postToInstagram(ideaId) {
+    if (!igMeta.hasToken || !igMeta.businessAccountId) {
+        alert('Укажите Page Access Token и Business Account ID в настройках Instagram!');
+        openIgSettings();
+        return;
+    }
+    try {
+        await api('/api/publish/instagram', { method: 'POST', body: JSON.stringify({ ideaId }) });
+        showToast('Опубликовано в Instagram!');
+    } catch (e) {
+        alert('Ошибка отправки в Instagram: ' + e.message);
+    }
+}
+
+// YouTube (Data API v3 videos.insert via OAuth2 refresh token)
+async function openYtSettings() {
+    try {
+        ytMeta = await api('/api/settings/youtube');
+    } catch (e) {
+        showToast('Не удалось получить настройки YouTube: ' + e.message);
+    }
+    const clientIdInput = document.getElementById('yt-client-id-input');
+    const clientSecretInput = document.getElementById('yt-client-secret-input');
+    const refreshTokenInput = document.getElementById('yt-refresh-token-input');
+    const channelTitleInput = document.getElementById('yt-channel-title-input');
+    if (clientIdInput) clientIdInput.value = ytMeta.clientId || '';
+    if (clientSecretInput) {
+        clientSecretInput.value = '';
+        clientSecretInput.placeholder = ytMeta.hasClientSecret ? 'Сохранён — введите новый, чтобы заменить' : 'GOCSPX-xxxxxxxx...';
+    }
+    if (refreshTokenInput) {
+        refreshTokenInput.value = '';
+        refreshTokenInput.placeholder = ytMeta.hasRefreshToken ? 'Сохранён — введите новый, чтобы заменить' : '1//0gxxxxxxxx...';
+    }
+    if (channelTitleInput) channelTitleInput.value = ytMeta.channelTitle || '';
+    openOverlay('yt-config-overlay');
+}
+
+async function saveYtSettings() {
+    const clientId = document.getElementById('yt-client-id-input').value.trim();
+    const clientSecret = document.getElementById('yt-client-secret-input').value.trim();
+    const refreshToken = document.getElementById('yt-refresh-token-input').value.trim();
+    const channelTitle = document.getElementById('yt-channel-title-input').value.trim();
+    try {
+        ytMeta = await api('/api/settings/youtube', { method: 'PUT', body: JSON.stringify({ clientId, clientSecret, refreshToken, channelTitle }) });
+        closeOverlay('yt-config-overlay');
+        showToast('Настройки YouTube сохранены');
+        renderBankView();
+    } catch (e) {
+        showToast('Не удалось сохранить настройки YouTube: ' + e.message);
+    }
+}
+
+async function postToYoutube(ideaId) {
+    if (!ytMeta.configured) {
+        alert('Укажите Client ID, Client Secret и Refresh Token в настройках YouTube!');
+        openYtSettings();
+        return;
+    }
+    try {
+        await api('/api/publish/youtube', { method: 'POST', body: JSON.stringify({ ideaId }) });
+        showToast('Опубликовано на YouTube!');
+    } catch (e) {
+        alert('Ошибка отправки на YouTube: ' + e.message);
     }
 }
 

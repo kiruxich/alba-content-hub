@@ -23,6 +23,7 @@ import contentRubricsRouter from './routes/contentRubrics.js';
 import metricsSyncRouter from './routes/metricsSync.js';
 import videoAssemblyRouter from './routes/videoAssembly.js';
 import insightsRouter from './routes/insights.js';
+import socialPublishRouter from './routes/socialPublish.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -49,6 +50,7 @@ app.use('/api/content-rubrics', contentRubricsRouter);
 app.use('/api/video-assembly', videoAssemblyRouter);
 app.use('/api/insights', insightsRouter);
 app.use('/api/metrics-sync', metricsSyncRouter);
+app.use('/api/publish', socialPublishRouter);
 
 // Traditional Node hosting (pnpm start): serve the Vite-built frontend from the
 // same process. On Vercel this branch is never hit - static files are served
