@@ -545,3 +545,16 @@ html, body {
 .media-lightbox-content { max-width: 820px; }
 .media-lightbox-preview { width: 100%; max-height: 60vh; object-fit: contain; border-radius: 14px; background: #000; display: block; }
 .media-lightbox-meta { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+
+.generation-status {
+    margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;
+}
+.generation-status .gs-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent-blue); flex-shrink: 0;
+    animation: gs-pulse 1s ease-in-out infinite;
+}
+.generation-status.error .gs-dot { background: var(--accent-red); animation: none; }
+.generation-status.success .gs-dot { background: var(--accent-green); animation: none; }
+@keyframes gs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }

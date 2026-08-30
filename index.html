@@ -359,6 +359,7 @@
                         <button class="submit-btn" style="margin-top:0;" id="ma-gen-submit-btn" onclick="submitGenerateMediaAsset()">Сгенерировать</button>
                         <button class="edit-btn" onclick="closeGenerateMediaAssetForm()">Отмена</button>
                     </div>
+                    <div id="ma-gen-status" class="generation-status" style="display:none;"></div>
                 </div>
 
                 <!-- Voice-over generation via ElevenLabs TTS (server/lib/elevenLabsClient.js) -
@@ -387,6 +388,7 @@
                         <button class="submit-btn" style="margin-top:0;" id="vo-generate-btn" onclick="submitVoiceoverGeneration()">Сгенерировать</button>
                         <button class="edit-btn" onclick="closeVoiceoverForm()">Отмена</button>
                     </div>
+                    <div id="vo-gen-status" class="generation-status" style="display:none;"></div>
                 </div>
 
                 <div class="controls-row" id="media-asset-filters" style="margin-bottom:4px;"></div>

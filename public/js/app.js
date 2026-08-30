@@ -147,6 +147,38 @@ function showToast(text) {
     setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
+// Visible progress ticker for slow AI-generation requests (kie.ai covers/video
+// can take up to ~3-7 minutes, ElevenLabs/Piper voiceovers a few seconds) -
+// without this the UI was just a disabled button with a static "Генерируем…"
+// label for the whole duration, which reads as broken/frozen on anything
+// slower than a couple seconds. `stages` is [{afterSeconds, text}, ...],
+// sorted ascending; the message shown is the last stage whose afterSeconds
+// has elapsed. Returns a `finish(ok, message)` callback to stop the ticker
+// and show a final success/error line - callers must call it exactly once.
+function startGenerationTicker(statusElId, stages) {
+    const el = document.getElementById(statusElId);
+    if (!el) return () => {};
+    const startedAt = Date.now();
+    el.style.display = 'flex';
+    el.classList.remove('error', 'success');
+
+    function render() {
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        const stage = [...stages].reverse().find(s => elapsed >= s.afterSeconds) || stages[0];
+        el.innerHTML = `<span class="gs-dot"></span><span>${escapeHtml(stage.text)} (${elapsed}с)</span>`;
+    }
+    render();
+    const intervalId = setInterval(render, 1000);
+
+    return function finish(ok, message) {
+        clearInterval(intervalId);
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        el.classList.add(ok ? 'success' : 'error');
+        el.innerHTML = `<span class="gs-dot"></span><span>${escapeHtml(message)} (${elapsed}с)</span>`;
+        setTimeout(() => { el.style.display = 'none'; }, ok ? 3000 : 6000);
+    };
+}
+
 // НАСТРОЙКА ПЛАНА ПУБЛИКАЦИЙ И ПРОГРЕСС
 async function savePlanSettings() {
     const dailyInput = document.getElementById('plan-daily-input');
@@ -2362,6 +2394,11 @@ async function submitVoiceoverGeneration() {
     const originalLabel = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Генерируем…';
+    const finishTicker = startGenerationTicker('vo-gen-status', [
+        { afterSeconds: 0, text: 'Отправляем текст провайдеру озвучки…' },
+        { afterSeconds: 4, text: 'Синтезируем голос…' },
+        { afterSeconds: 20, text: 'Дольше обычного, но ещё может сработать…' },
+    ]);
 
     try {
         const created = await api('/api/media-assets/generate-voiceover', {
@@ -2370,9 +2407,11 @@ async function submitVoiceoverGeneration() {
         });
         mediaAssets.unshift(created);
         drawMediaAssetsGrid();
+        finishTicker(true, 'Готово');
         closeVoiceoverForm();
         showToast('Озвучка сгенерирована!');
     } catch (e) {
+        finishTicker(false, 'Ошибка: ' + e.message);
         showToast('Не удалось сгенерировать озвучку: ' + e.message);
     } finally {
         btn.disabled = false;
@@ -2420,6 +2459,22 @@ async function submitGenerateMediaAsset() {
     btn.textContent = 'Генерируем...';
 
     const endpoint = type === 'video' ? '/api/media-assets/generate-video' : '/api/media-assets/generate-cover';
+    // kie.ai generation is job-based and genuinely slow (Flux images up to
+    // ~3 min, Kling video up to ~7 min - see server/lib/kieClient.js's poll
+    // timeouts), so the stage thresholds here are much longer than the
+    // voiceover ticker's.
+    const stages = type === 'video' ? [
+        { afterSeconds: 0, text: 'Отправляем запрос в kie.ai (Kling)…' },
+        { afterSeconds: 10, text: 'Видео генерируется, обычно 1-7 минут…' },
+        { afterSeconds: 120, text: 'Всё ещё генерируется — это нормально для видео…' },
+        { afterSeconds: 300, text: 'Уже дольше обычного, ждём ответ до 7 минут…' },
+    ] : [
+        { afterSeconds: 0, text: 'Отправляем запрос в kie.ai (Flux)…' },
+        { afterSeconds: 5, text: 'Изображение генерируется, обычно до 3 минут…' },
+        { afterSeconds: 60, text: 'Всё ещё генерируется — Flux иногда медленнее обычного…' },
+    ];
+    const finishTicker = startGenerationTicker('ma-gen-status', stages);
+
     try {
         const created = await api(endpoint, {
             method: 'POST',
@@ -2427,9 +2482,11 @@ async function submitGenerateMediaAsset() {
         });
         mediaAssets.unshift(created);
         drawMediaAssetsGrid();
+        finishTicker(true, 'Готово');
         closeGenerateMediaAssetForm();
         showToast('Обложка сгенерирована!');
     } catch (e) {
+        finishTicker(false, 'Ошибка: ' + e.message);
         showToast(e.message);
     } finally {
         btn.disabled = false;
