@@ -379,6 +379,42 @@
                 <div class="p-section-title" style="margin-top:20px;">ПРОМПТ GENERATOR'А</div>
                 <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Плейсхолдеры: <code>{{product}}</code>, <code>{{topic}}</code>, <code>{{snippet}}</code>, <code>{{tone_of_voice}}</code>, <code>{{format}}</code>, <code>{{post_formula}}</code></p>
                 <textarea id="as-generator-prompt-input" class="form-textarea" style="min-height:220px; font-family:'SF Mono', Menlo, monospace; font-size:12px;"></textarea>
+
+                <div class="controls-row" style="margin-top:28px;">
+                    <div class="p-section-title" style="margin:0;">РУБРИКИ КОНТЕНТА</div>
+                    <button class="schedule-btn" onclick="openAddRubricForm()">+ Добавить рубрику</button>
+                </div>
+                <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Готовые структуры постов ("Кейс недели" и т.п.) - Generator заполняет проверенный каркас вместо изобретения формы поста заново. В выборе при создании идеи доступны только активные рубрики.</p>
+
+                <div id="rubric-form" class="info-box" style="display:none; margin-bottom:16px;">
+                    <input type="hidden" id="rb-id-input">
+                    <label class="form-label">Название:</label>
+                    <input type="text" id="rb-name-input" class="form-input" placeholder="Кейс недели">
+
+                    <label class="form-label">Описание:</label>
+                    <textarea id="rb-description-input" class="form-textarea" style="min-height:60px;" placeholder="Когда и зачем использовать эту рубрику"></textarea>
+
+                    <label class="form-label">Структура (по одному пункту на строку):</label>
+                    <textarea id="rb-structure-input" class="form-textarea" style="min-height:80px;" placeholder="Проблема клиента&#10;Что сделали&#10;Результат с цифрами"></textarea>
+
+                    <label class="form-label">Этап воронки:</label>
+                    <select id="rb-funnel-input" class="form-select">
+                        <option value="TOFU">TOFU (Охват & Привлечение)</option>
+                        <option value="MOFU">MOFU (Доверие & Экспертность)</option>
+                        <option value="BOFU">BOFU (Продажа & Кейс)</option>
+                    </select>
+
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:14px; font-size:13px; color:var(--text-secondary);">
+                        <input type="checkbox" id="rb-active-input" checked style="width:auto;"> Активна (доступна для выбора в идее)
+                    </label>
+
+                    <div style="display:flex; gap:8px; margin-top:14px;">
+                        <button class="submit-btn" style="margin-top:0;" onclick="submitRubric()">Сохранить</button>
+                        <button class="edit-btn" onclick="closeRubricForm()">Отмена</button>
+                    </div>
+                </div>
+
+                <div class="parser-niches-grid" id="rubrics-grid"></div>
             </div>
         </div>
 
@@ -588,6 +624,11 @@
 
                 <label class="form-label">Призыв к действию (CTA):</label>
                 <input type="text" id="edit-idea-cta-input" class="form-input" placeholder="Укажите оффер или ссылку...">
+
+                <label class="form-label">Рубрика (опционально):</label>
+                <select id="edit-idea-rubric-input" class="form-select">
+                    <option value="">— без рубрики —</option>
+                </select>
 
                 <label class="form-label">Обложка (из Медиатеки):</label>
                 <input type="hidden" id="edit-idea-cover-asset-id">
