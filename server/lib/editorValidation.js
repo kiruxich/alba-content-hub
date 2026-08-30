@@ -6,7 +6,7 @@
 const FORMAT_LIMITS = {
     'TG Пост': 4096,
     'Reels / Shorts': 1000,
-    'Тред X/Threads': 280,
+    'Threads': 500,
     'Лонгрид Habr/VC': Infinity,
 };
 
