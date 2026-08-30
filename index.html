@@ -306,6 +306,7 @@
                     <div style="display:flex; gap:8px;">
                         <button class="schedule-btn" onclick="openAddMediaAssetForm()">+ Добавить медиа</button>
                         <button class="schedule-btn" style="background:var(--accent-purple);" onclick="openGenerateMediaAssetForm()">✨ Сгенерировать обложку</button>
+                        <button class="schedule-btn" onclick="openVoiceoverForm()">🎙️ Сгенерировать озвучку</button>
                     </div>
                 </div>
 
@@ -354,6 +355,28 @@
                     <div style="display:flex; gap:8px;">
                         <button class="submit-btn" style="margin-top:0;" id="ma-gen-submit-btn" onclick="submitGenerateMediaAsset()">Сгенерировать</button>
                         <button class="edit-btn" onclick="closeGenerateMediaAssetForm()">Отмена</button>
+                    </div>
+                </div>
+
+                <!-- Voice-over generation via ElevenLabs TTS (server/lib/elevenLabsClient.js) -
+                     text in, ai-generated media_assets row (type=audio) out. Gated server-side
+                     behind ELEVENLABS_API_KEY; the "not configured" case surfaces as a normal
+                     error toast, same as the Telegram integration elsewhere in this app. -->
+                <div id="voiceover-form" class="info-box" style="display:none; margin-bottom:16px;">
+                    <label class="form-label">Текст для озвучки:</label>
+                    <textarea id="vo-text-input" class="form-textarea" placeholder="Текст, который нужно озвучить голосом ElevenLabs..."></textarea>
+
+                    <label class="form-label">Voice ID (необязательно):</label>
+                    <input type="text" id="vo-voiceid-input" class="form-input" placeholder="по умолчанию — стандартный голос ElevenLabs">
+
+                    <label class="form-label">Продукт (необязательно):</label>
+                    <select id="vo-product-input" class="form-select">
+                        <option value="">— без привязки —</option>
+                    </select>
+
+                    <div style="display:flex; gap:8px;">
+                        <button class="submit-btn" style="margin-top:0;" id="vo-generate-btn" onclick="submitVoiceoverGeneration()">Сгенерировать</button>
+                        <button class="edit-btn" onclick="closeVoiceoverForm()">Отмена</button>
                     </div>
                 </div>
 

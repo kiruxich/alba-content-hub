@@ -2006,8 +2006,12 @@ async function renderMediaAssets() {
     const grid = document.getElementById('media-assets-grid');
     if (!grid) return;
 
-    // Product selects in the add-form and generate-form only need populating once per session.
-    [document.getElementById('ma-product-input'), document.getElementById('ma-gen-product-input')].forEach(productSelect => {
+    // Product selects in the add/generate/voiceover forms only need populating once per session.
+    [
+        document.getElementById('ma-product-input'),
+        document.getElementById('ma-gen-product-input'),
+        document.getElementById('vo-product-input'),
+    ].forEach(productSelect => {
         if (productSelect && productSelect.options.length <= 1) {
             productsData.forEach(p => {
                 const opt = document.createElement('option');
@@ -2041,6 +2045,7 @@ function drawMediaAssetFilters() {
         { value: 'image', label: 'Изображения' },
         { value: 'video', label: 'Видео' },
         { value: 'gif', label: 'GIF' },
+        { value: 'audio', label: 'Аудио' },
     ];
     const productOptions = [`<option value="">Все продукты</option>`]
         .concat(productsData.map(p => `<option value="${escapeHtml(p.id)}" ${mediaAssetFilterProduct === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`));
@@ -2073,6 +2078,12 @@ function mediaAssetPreviewHtml(asset) {
     if (asset.type === 'video') {
         return `<video class="media-asset-preview" src="${escapeHtml(asset.url)}" muted preload="metadata"
                     onerror="this.outerHTML='${placeholder}'"></video>`;
+    }
+    if (asset.type === 'audio') {
+        return `<div class="media-asset-preview" style="display:flex; align-items:center; justify-content:center; background:var(--bg-grouped);">
+                    <audio controls preload="metadata" style="width:calc(100% - 24px);" src="${escapeHtml(asset.url)}"
+                        onerror="this.parentElement.outerHTML='${placeholder}'"></audio>
+                </div>`;
     }
     return `<img class="media-asset-preview" src="${escapeHtml(asset.url)}" loading="lazy" alt=""
                 onerror="this.outerHTML='${placeholder}'">`;
@@ -2138,6 +2149,52 @@ async function submitNewMediaAsset() {
         showToast('Медиа добавлено!');
     } catch (e) {
         showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+function openVoiceoverForm() {
+    document.getElementById('voiceover-form').style.display = 'block';
+    document.getElementById('vo-text-input').value = '';
+    document.getElementById('vo-voiceid-input').value = '';
+    document.getElementById('vo-product-input').value = '';
+}
+
+function closeVoiceoverForm() {
+    document.getElementById('voiceover-form').style.display = 'none';
+}
+
+// Calls POST /api/media-assets/generate-voiceover (ElevenLabs TTS, see
+// server/lib/elevenLabsClient.js). If ELEVENLABS_API_KEY isn't set on the
+// server, the endpoint responds with a normal error JSON ({ error }) which
+// the shared api() helper turns into a thrown Error - handled here the same
+// way every other optional integration in this app surfaces a "not
+// configured" failure: an error toast, no hardcoded assumption about why it failed.
+async function submitVoiceoverGeneration() {
+    const text = document.getElementById('vo-text-input').value.trim();
+    const voiceId = document.getElementById('vo-voiceid-input').value.trim();
+    const productId = document.getElementById('vo-product-input').value;
+
+    if (!text) return alert('Введите текст для озвучки');
+
+    const btn = document.getElementById('vo-generate-btn');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Генерируем…';
+
+    try {
+        const created = await api('/api/media-assets/generate-voiceover', {
+            method: 'POST',
+            body: JSON.stringify({ text, voiceId: voiceId || undefined, productId: productId || null }),
+        });
+        mediaAssets.unshift(created);
+        drawMediaAssetsGrid();
+        closeVoiceoverForm();
+        showToast('Озвучка сгенерирована!');
+    } catch (e) {
+        showToast('Не удалось сгенерировать озвучку: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
     }
 }
 

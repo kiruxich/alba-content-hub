@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { isKieConfigured, generateImage, generateVideo } from '../lib/kieClient.js';
+import { generateVoiceover, isElevenLabsConfigured } from '../lib/elevenLabsClient.js';
 
 const router = Router();
 
@@ -177,6 +178,61 @@ router.post('/generate-video', async (req, res) => {
         console.error('generate-video: kie.ai request failed:', e.message);
         res.status(502).json({ error: `Не удалось сгенерировать видео через kie.ai: ${e.message}` });
     }
+});
+
+// POST /api/media-assets/generate-voiceover { text, voiceId?, productId?, rubricId?, tags? }
+// Generates a voice-over MP3 from `text` via ElevenLabs TTS (see
+// server/lib/elevenLabsClient.js - gated behind ELEVENLABS_API_KEY), stores
+// it as a new media_assets row (type='audio'), and logs the estimated spend
+// into agent_expenses so it shows up in the Cost Tracker.
+//
+// STORAGE NOTE: this project has no S3/object-storage client yet - the
+// Медиатека today only catalogs externally-hosted URLs (see its own
+// placeholder text mentioning "S3 alba-creation.ru"), and Vercel's
+// filesystem is read-only/ephemeral so a local static file wouldn't
+// survive between invocations either (see server/routes/parserNiches.js's
+// multer memoryStorage comment). Until real object storage exists, the
+// generated audio is stored inline as a base64 `data:` URL in
+// media_assets.url. That's fine for short Shorts voice-overs but bloats
+// the row and isn't shareable outside this app - swap this for a real
+// upload once an S3-compatible client is wired up.
+router.post('/generate-voiceover', async (req, res) => {
+    const b = req.body || {};
+    const text = (b.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'Текст для озвучки не указан' });
+
+    if (!isElevenLabsConfigured()) {
+        return res.status(400).json({ error: 'ElevenLabs не настроен: добавьте ELEVENLABS_API_KEY в переменные окружения' });
+    }
+
+    let voiceover;
+    try {
+        voiceover = await generateVoiceover({ text, voiceId: b.voiceId });
+    } catch (e) {
+        return res.status(502).json({ error: e.message });
+    }
+
+    const dataUrl = `data:${voiceover.contentType};base64,${voiceover.audioBuffer.toString('base64')}`;
+    const id = String(Date.now());
+    await db.execute({
+        sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
+              VALUES (?, ?, 'audio', ?, ?, ?, 'ai-generated')`,
+        args: [
+            id, dataUrl,
+            b.productId || null,
+            b.rubricId || null,
+            JSON.stringify(b.tags || []),
+        ],
+    });
+
+    await db.execute({
+        sql: `INSERT INTO agent_expenses (agent_name, model_used, total_usd)
+              VALUES ('generator', 'elevenlabs:eleven_multilingual_v2', ?)`,
+        args: [voiceover.estimatedCostUsd],
+    });
+
+    const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [id] });
+    res.status(201).json(serialize(result.rows[0]));
 });
 
 export default router;
