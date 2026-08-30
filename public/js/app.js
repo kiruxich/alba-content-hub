@@ -109,7 +109,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'mediaassets': 9, 'urlchecker': 10, 'agentsettings': 11, 'systeminfo': 12, 'agentcenter': 13 };
+    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'mediaassets': 9, 'urlchecker': 10, 'systeminfo': 11, 'agentcenter': 12 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -125,8 +125,7 @@ function switchTab(tabName) {
     if (tabName === 'clients') renderClientsView();
     if (tabName === 'customers') renderParserNiches();
     if (tabName === 'mediaassets') renderMediaAssets();
-    if (tabName === 'agentsettings') renderAgentSettingsForm();
-    if (tabName === 'agentcenter') renderAgentCenter();
+    if (tabName === 'agentcenter') { renderAgentSettingsForm(); renderAgentCenter(); }
 }
 
 function openOverlay(id) {
