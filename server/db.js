@@ -182,6 +182,9 @@ CREATE TABLE IF NOT EXISTS project_info (
     product_id TEXT PRIMARY KEY,
     about TEXT DEFAULT ''
 );
+-- roadmap_json: JSON array of {id, title, description, status}, status one of
+-- planned/in_progress/done. Replaces the old hardcoded single-entry roadmap
+-- that used to live in frontend productsData.
 
 -- AI Agent pipeline (Phase 1 schema - see planning discussion). Ideas and
 -- scheduled_events (conceptually "publications", one row per idea per
@@ -386,6 +389,21 @@ await ensureColumn('telegram_settings', 'webhook_secret', 'TEXT');
 await ensureColumn('parser_niches', 'raw_upload_data', 'TEXT');
 await ensureColumn('parser_niches', 'raw_upload_name', 'TEXT');
 
+// project_info: moves what used to be hardcoded frontend productsData fields
+// (target audience, value proposition) into the DB and adds new fields the
+// frontend never had - all six of these feed getProductVectors() in
+// server/routes/agentResearcher.js, so richer text here directly improves
+// Researcher's trend-to-product matching, not just the product detail page UI.
+await ensureColumn('project_info', 'target_audience', "TEXT DEFAULT ''");
+await ensureColumn('project_info', 'value_proposition', "TEXT DEFAULT ''");
+await ensureColumn('project_info', 'key_differentiators', "TEXT DEFAULT ''");
+await ensureColumn('project_info', 'common_objections', "TEXT DEFAULT ''");
+await ensureColumn('project_info', 'keywords', "TEXT DEFAULT ''");
+// roadmap_json: JSON array of {id, title, description, status}, replacing the
+// single hardcoded {step, desc} roadmap entry that used to live in
+// productsData in public/js/app.js.
+await ensureColumn('project_info', 'roadmap_json', "TEXT DEFAULT '[]'");
+
 // Seed content_plan once with the studio's actual annual plan, shaped for the
 // quarterly-timeline UI: 'note' blocks are global strategy cards, 'quarter'
 // blocks render as a horizontal roadmap ordered by array position.
@@ -444,6 +462,41 @@ for (const [productId, about] of Object.entries(defaultProjectInfo)) {
     await db.execute({
         sql: 'INSERT OR IGNORE INTO project_info (product_id, about) VALUES (?, ?)',
         args: [productId, about],
+    });
+}
+
+// Seed target_audience/value_proposition/roadmap_json once from the values
+// that used to be hardcoded in productsData (public/js/app.js `target`,
+// `value`, `roadmap`) - now that those fields live in the DB and feed the
+// Researcher embedding, the frontend's hardcoded copies are the seed source,
+// not the ongoing source of truth. key_differentiators/common_objections/
+// keywords are new fields with no prior frontend equivalent, so they seed
+// empty for the founder to fill in. Guarded per-row on target_audience still
+// being at its column default, same "own guard" pattern as generator_prompt
+// above - never overwrites a row the founder already edited.
+const productSeedFields = {
+    'insights': { target: 'B2B, Маркетологи', value: 'Поиск блогеров и AI-скоринг', roadmapStep: 'MVP', roadmapDesc: 'Релиз базового поиска' },
+    'hranitel': { target: 'Enterprise, Госсектор', value: 'Поиск по сканам в закрытом контуре', roadmapStep: 'Пилот', roadmapDesc: 'Внедрение в первую корпорацию' },
+    'duet': { target: 'Школы, B2G', value: 'Автоматизация расписаний', roadmapStep: 'Серт.', roadmapDesc: 'Получение лицензий' },
+    'crista': { target: 'Рестораны, Отели', value: 'Автоматизация бронирований', roadmapStep: 'Бета', roadmapDesc: 'Тест на 3 ресторанах' },
+    'fantaziya': { target: 'Ритейл', value: 'Умные витрины', roadmapStep: 'Релиз', roadmapDesc: 'Запуск интеграции с CMS' },
+    'legitagent': { target: 'Разработчики', value: 'NPM пакеты и CLI инструменты', roadmapStep: 'v1.0', roadmapDesc: 'Стабильный релиз ядра' },
+    'alba-creation': { target: 'Все клиенты', value: 'Full-stack разработка', roadmapStep: 'Масштаб', roadmapDesc: 'Выход на международный рынок' },
+};
+for (const [productId, f] of Object.entries(productSeedFields)) {
+    const roadmapSeed = JSON.stringify([
+        { id: `${productId}-seed-1`, title: f.roadmapStep, description: f.roadmapDesc, status: 'planned' },
+    ]);
+    await db.execute({
+        sql: `
+            INSERT INTO project_info (product_id, target_audience, value_proposition, roadmap_json)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(product_id) DO UPDATE SET
+                target_audience = CASE WHEN project_info.target_audience = '' THEN excluded.target_audience ELSE project_info.target_audience END,
+                value_proposition = CASE WHEN project_info.value_proposition = '' THEN excluded.value_proposition ELSE project_info.value_proposition END,
+                roadmap_json = CASE WHEN project_info.roadmap_json = '[]' THEN excluded.roadmap_json ELSE project_info.roadmap_json END
+        `,
+        args: [productId, f.target, f.value, roadmapSeed],
     });
 }
 

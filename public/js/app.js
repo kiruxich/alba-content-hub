@@ -1,12 +1,16 @@
 // --- ВСТРОЕННЫЕ ДАННЫЕ ПРОДУКТОВ (статическая конфигурация студии, не хранится в БД) ---
+// target/value остаются здесь только как fallback на случай, если DB-запись
+// (project_info.target_audience / value_proposition) ещё не загрузилась или
+// для продукта нет строки в БД - см. projectInfoField() в этом файле. Основной
+// источник правды для ЦА/посыла (и roadmap) теперь БД, см. server/db.js.
 const productsData = [
-    { id: 'insights', title: 'InSights', badge: 'Аналитика', badgeBg: 'rgba(10,132,255,0.15)', badgeColor: '#0a84ff', target: 'B2B, Маркетологи', value: 'Поиск блогеров и AI-скоринг', desc: 'SaaS платформа для анализа соцсетей с ИИ', roadmap: [{ step: 'MVP', desc: 'Релиз базового поиска' }], synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'B2B-клиенты InSights, которым нужна кастомная доработка платформы, ведутся на full-stack услуги студии' }] },
-    { id: 'hranitel', title: 'Хранитель', badge: 'Документооборот', badgeBg: 'rgba(48,209,88,0.15)', badgeColor: '#30d158', target: 'Enterprise, Госсектор', value: 'Поиск по сканам в закрытом контуре', desc: 'RAG-система для работы с архивами', roadmap: [{ step: 'Пилот', desc: 'Внедрение в первую корпорацию' }], synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'Enterprise-клиенты Хранителя конвертируются в контракты на доп. интеграции и поддержку от студии' }] },
-    { id: 'duet', title: 'ДУЭТ', badge: 'Образование', badgeBg: 'rgba(191,90,242,0.15)', badgeColor: '#bf5af2', target: 'Школы, B2G', value: 'Автоматизация расписаний', desc: 'Управление образовательным процессом', roadmap: [{ step: 'Серт.', desc: 'Получение лицензий' }], synergies: [{ target: 'legitAgent', type: 'Кросс-промо', text: 'Разработчики образовательных модулей ДУЭТ используют open-source инструментарий legitAgent' }] },
-    { id: 'crista', title: 'Crista', badge: 'HoReCa', badgeBg: 'rgba(255,159,10,0.15)', badgeColor: '#ff9f0a', target: 'Рестораны, Отели', value: 'Автоматизация бронирований', desc: 'CRM для сегмента гостеприимства', roadmap: [{ step: 'Бета', desc: 'Тест на 3 ресторанах' }], synergies: [{ target: 'Фантазия', type: 'Кросс-промо', text: 'HoReCa-клиенты Crista с розничными точками переводятся на умные витрины Фантазии' }] },
-    { id: 'fantaziya', title: 'Фантазия', badge: 'E-commerce', badgeBg: 'rgba(255,55,95,0.15)', badgeColor: '#ff375f', target: 'Ритейл', value: 'Умные витрины', desc: 'AI-рекомендации для интернет-магазинов', roadmap: [{ step: 'Релиз', desc: 'Запуск интеграции с CMS' }], synergies: [{ target: 'InSights', type: 'Апсейл', text: 'Ритейлеры Фантазии, которым нужна аналитика инфлюенсеров, ведутся в InSights' }] },
-    { id: 'legitagent', title: 'legitAgent', badge: 'Open Source', badgeBg: 'rgba(100,210,255,0.15)', badgeColor: '#64d2ff', target: 'Разработчики', value: 'NPM пакеты и CLI инструменты', desc: 'Инструментарий для фронтенд разработчиков', roadmap: [{ step: 'v1.0', desc: 'Стабильный релиз ядра' }], synergies: [{ target: 'Alba Creation', type: 'Лид-магнит', text: 'Разработчики, познакомившиеся с open-source инструментами, заказывают кастомную разработку у студии' }] },
-    { id: 'alba-creation', title: 'Alba Creation', badge: 'Студия', badgeBg: 'rgba(94,92,230,0.15)', badgeColor: '#5e5ce6', target: 'Все клиенты', value: 'Full-stack разработка', desc: 'Цифровая веб-студия полного цикла', roadmap: [{ step: 'Масштаб', desc: 'Выход на международный рынок' }], synergies: [] }
+    { id: 'insights', title: 'InSights', badge: 'Аналитика', badgeBg: 'rgba(10,132,255,0.15)', badgeColor: '#0a84ff', target: 'B2B, Маркетологи', value: 'Поиск блогеров и AI-скоринг', desc: 'SaaS платформа для анализа соцсетей с ИИ', synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'B2B-клиенты InSights, которым нужна кастомная доработка платформы, ведутся на full-stack услуги студии' }] },
+    { id: 'hranitel', title: 'Хранитель', badge: 'Документооборот', badgeBg: 'rgba(48,209,88,0.15)', badgeColor: '#30d158', target: 'Enterprise, Госсектор', value: 'Поиск по сканам в закрытом контуре', desc: 'RAG-система для работы с архивами', synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'Enterprise-клиенты Хранителя конвертируются в контракты на доп. интеграции и поддержку от студии' }] },
+    { id: 'duet', title: 'ДУЭТ', badge: 'Образование', badgeBg: 'rgba(191,90,242,0.15)', badgeColor: '#bf5af2', target: 'Школы, B2G', value: 'Автоматизация расписаний', desc: 'Управление образовательным процессом', synergies: [{ target: 'legitAgent', type: 'Кросс-промо', text: 'Разработчики образовательных модулей ДУЭТ используют open-source инструментарий legitAgent' }] },
+    { id: 'crista', title: 'Crista', badge: 'HoReCa', badgeBg: 'rgba(255,159,10,0.15)', badgeColor: '#ff9f0a', target: 'Рестораны, Отели', value: 'Автоматизация бронирований', desc: 'CRM для сегмента гостеприимства', synergies: [{ target: 'Фантазия', type: 'Кросс-промо', text: 'HoReCa-клиенты Crista с розничными точками переводятся на умные витрины Фантазии' }] },
+    { id: 'fantaziya', title: 'Фантазия', badge: 'E-commerce', badgeBg: 'rgba(255,55,95,0.15)', badgeColor: '#ff375f', target: 'Ритейл', value: 'Умные витрины', desc: 'AI-рекомендации для интернет-магазинов', synergies: [{ target: 'InSights', type: 'Апсейл', text: 'Ритейлеры Фантазии, которым нужна аналитика инфлюенсеров, ведутся в InSights' }] },
+    { id: 'legitagent', title: 'legitAgent', badge: 'Open Source', badgeBg: 'rgba(100,210,255,0.15)', badgeColor: '#64d2ff', target: 'Разработчики', value: 'NPM пакеты и CLI инструменты', desc: 'Инструментарий для фронтенд разработчиков', synergies: [{ target: 'Alba Creation', type: 'Лид-магнит', text: 'Разработчики, познакомившиеся с open-source инструментами, заказывают кастомную разработку у студии' }] },
+    { id: 'alba-creation', title: 'Alba Creation', badge: 'Студия', badgeBg: 'rgba(94,92,230,0.15)', badgeColor: '#5e5ce6', target: 'Все клиенты', value: 'Full-stack разработка', desc: 'Цифровая веб-студия полного цикла', synergies: [] }
 ];
 
 let ideasBank = [];
@@ -1092,16 +1096,115 @@ function renderMatrixView() {
     container.innerHTML = html;
 }
 
-async function saveProjectAbout(productId) {
-    const textarea = document.getElementById('project-about-textarea');
-    if (!textarea) return;
-    const about = textarea.value;
+// Reads one project_info field for a product, preferring the DB-backed value
+// once it's loaded and falling back to the hardcoded productsData value only
+// when there's no DB row yet (or the initial fetch hasn't completed) - see
+// initApp(), which populates `projectInfo` from GET /api/project-info before
+// any product detail page can be opened.
+function projectInfoField(productId, key, fallback) {
+    const info = projectInfo[productId];
+    if (!info) return fallback;
+    return info[key] !== undefined ? info[key] : fallback;
+}
+
+async function saveProjectInfo(productId) {
+    const about = document.getElementById('pi-about-input')?.value ?? '';
+    const targetAudience = document.getElementById('pi-target-audience-input')?.value ?? '';
+    const valueProposition = document.getElementById('pi-value-proposition-input')?.value ?? '';
+    const keyDifferentiators = document.getElementById('pi-key-differentiators-input')?.value ?? '';
+    const commonObjections = document.getElementById('pi-common-objections-input')?.value ?? '';
+    const keywords = document.getElementById('pi-keywords-input')?.value ?? '';
+
     try {
-        await api(`/api/project-info/${productId}`, { method: 'PUT', body: JSON.stringify({ about }) });
-        projectInfo[productId] = about;
-        showToast('Описание проекта сохранено!');
+        const updated = await api(`/api/project-info/${productId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ about, targetAudience, valueProposition, keyDifferentiators, commonObjections, keywords }),
+        });
+        projectInfo[productId] = updated;
+        showToast('Информация о проекте сохранена!');
     } catch (e) {
-        showToast('Не удалось сохранить описание: ' + e.message);
+        showToast('Не удалось сохранить информацию: ' + e.message);
+    }
+}
+
+// РОАДМАП ПРОДУКТА (редактируемый список этапов, хранится в project_info.roadmap_json)
+const ROADMAP_STATUS_LABELS = { planned: 'Запланировано', in_progress: 'В работе', done: 'Готово' };
+
+function currentRoadmap(productId) {
+    return (projectInfo[productId]?.roadmap) || [];
+}
+
+async function persistRoadmap(productId, roadmap) {
+    const updated = await api(`/api/project-info/${productId}/roadmap`, {
+        method: 'PUT',
+        body: JSON.stringify({ roadmap }),
+    });
+    if (!projectInfo[productId]) projectInfo[productId] = { productId };
+    projectInfo[productId].roadmap = updated.roadmap;
+}
+
+function openAddRoadmapItemForm() {
+    const form = document.getElementById('roadmap-item-form');
+    if (!form) return;
+    form.style.display = 'block';
+    document.getElementById('ri-id-input').value = '';
+    document.getElementById('ri-title-input').value = '';
+    document.getElementById('ri-description-input').value = '';
+    document.getElementById('ri-status-input').value = 'planned';
+}
+
+function closeRoadmapItemForm() {
+    const form = document.getElementById('roadmap-item-form');
+    if (form) form.style.display = 'none';
+}
+
+function editRoadmapItem(productId, itemId) {
+    const item = currentRoadmap(productId).find(r => r.id === itemId);
+    if (!item) return;
+    const form = document.getElementById('roadmap-item-form');
+    if (!form) return;
+    form.style.display = 'block';
+    document.getElementById('ri-id-input').value = item.id;
+    document.getElementById('ri-title-input').value = item.title;
+    document.getElementById('ri-description-input').value = item.description || '';
+    document.getElementById('ri-status-input').value = item.status || 'planned';
+}
+
+async function submitRoadmapItem(productId) {
+    const id = document.getElementById('ri-id-input').value;
+    const title = document.getElementById('ri-title-input').value.trim();
+    const description = document.getElementById('ri-description-input').value.trim();
+    const status = document.getElementById('ri-status-input').value;
+
+    if (!title) return alert('Укажите название этапа');
+
+    const roadmap = currentRoadmap(productId);
+    let nextRoadmap;
+    if (id) {
+        nextRoadmap = roadmap.map(r => r.id === id ? { ...r, title, description, status } : r);
+    } else {
+        const newItem = { id: `${productId}-${Date.now()}`, title, description, status };
+        nextRoadmap = [...roadmap, newItem];
+    }
+
+    try {
+        await persistRoadmap(productId, nextRoadmap);
+        showToast(id ? 'Этап роадмапа обновлён!' : 'Этап роадмапа добавлен!');
+        closeRoadmapItemForm();
+        renderProductDetailContent(productId);
+    } catch (e) {
+        showToast('Не удалось сохранить этап: ' + e.message);
+    }
+}
+
+async function deleteRoadmapItem(productId, itemId) {
+    if (!confirm('Удалить этот этап роадмапа?')) return;
+    const nextRoadmap = currentRoadmap(productId).filter(r => r.id !== itemId);
+    try {
+        await persistRoadmap(productId, nextRoadmap);
+        renderProductDetailContent(productId);
+    } catch (e) {
+        showToast('Не удалось удалить этап: ' + e.message);
     }
 }
 
@@ -1150,57 +1253,85 @@ function renderProductDetailContent(productId) {
     const navTitle = document.getElementById('product-detail-title');
     if (navTitle) navTitle.innerText = product.title;
 
-    const favoritedIdeas = ideasBank.filter(i => i.targetGroups && i.targetGroups.includes(productId));
+    const about = projectInfoField(productId, 'about', '');
+    const targetAudience = projectInfoField(productId, 'targetAudience', product.target);
+    const valueProposition = projectInfoField(productId, 'valueProposition', product.value);
+    const keyDifferentiators = projectInfoField(productId, 'keyDifferentiators', '');
+    const commonObjections = projectInfoField(productId, 'commonObjections', '');
+    const keywords = projectInfoField(productId, 'keywords', '');
+    const roadmap = currentRoadmap(productId);
 
     let html = `
         <h2 style="font-size:26px; font-weight:700; margin:0 0 6px 0;">${product.title}</h2>
         <div style="font-size:14px; color:var(--text-secondary); margin-bottom:20px;">${product.desc}</div>
 
-        <div class="p-section-title">ЦЕЛЕВАЯ АУДИТОРИЯ & ЦЕННОСТЬ</div>
-        <div class="info-box">
-            <strong>ЦА:</strong> ${product.target}<br><br>
-            <strong>Главный посыл:</strong> ${product.value}
+        <div class="p-section-title">О ПРОЕКТЕ</div>
+
+        <label class="form-label">Описание проекта:</label>
+        <textarea id="pi-about-input" class="form-textarea" style="min-height:140px;" placeholder="Расскажите про проект: что это, для кого, как устроено...">${escapeHtml(about)}</textarea>
+
+        <label class="form-label">Целевая аудитория (ЦА):</label>
+        <input type="text" id="pi-target-audience-input" class="form-input" placeholder="Кто клиент этого продукта" value="${escapeHtml(targetAudience)}">
+
+        <label class="form-label">Главный посыл (value proposition):</label>
+        <input type="text" id="pi-value-proposition-input" class="form-input" placeholder="Какую ценность продукт даёт клиенту" value="${escapeHtml(valueProposition)}">
+
+        <label class="form-label">Что отличает от конкурентов:</label>
+        <textarea id="pi-key-differentiators-input" class="form-textarea" style="min-height:80px;" placeholder="Чем продукт объективно лучше или отличается от альтернатив">${escapeHtml(keyDifferentiators)}</textarea>
+
+        <label class="form-label">Частые возражения клиентов:</label>
+        <textarea id="pi-common-objections-input" class="form-textarea" style="min-height:80px;" placeholder="С какими сомнениями чаще всего сталкиваетесь на продажах">${escapeHtml(commonObjections)}</textarea>
+
+        <label class="form-label">Ключевые слова (через запятую):</label>
+        <input type="text" id="pi-keywords-input" class="form-input" placeholder="ключевое слово 1, ключевое слово 2, ..." value="${escapeHtml(keywords)}">
+
+        <button class="submit-btn" style="margin-top:4px;" onclick="saveProjectInfo('${productId}')">💾 Сохранить</button>
+
+        <div class="controls-row" style="margin-top:28px;">
+            <div class="p-section-title" style="margin:0;">ROADMAP ПРОДВИЖЕНИЯ</div>
+            <button class="schedule-btn" onclick="openAddRoadmapItemForm()">+ Добавить этап</button>
         </div>
 
-        <div class="p-section-title">О ПРОЕКТЕ</div>
-        <textarea id="project-about-textarea" class="form-textarea" style="min-height:160px;" placeholder="Расскажите про проект: что это, для кого, как устроено...">${escapeHtml(projectInfo[productId] || '')}</textarea>
-        <button class="edit-btn" onclick="saveProjectAbout('${productId}')">💾 Сохранить описание проекта</button>
+        <div id="roadmap-item-form" class="info-box" style="display:none; margin-bottom:16px;">
+            <input type="hidden" id="ri-id-input">
+            <label class="form-label">Название этапа:</label>
+            <input type="text" id="ri-title-input" class="form-input" placeholder="MVP">
 
-        <div class="p-section-title" style="margin-top:24px;">ROADMAP ПРОДВИЖЕНИЯ</div>
+            <label class="form-label">Описание:</label>
+            <textarea id="ri-description-input" class="form-textarea" style="min-height:60px;" placeholder="Что входит в этот этап"></textarea>
+
+            <label class="form-label">Статус:</label>
+            <select id="ri-status-input" class="form-select">
+                <option value="planned">Запланировано</option>
+                <option value="in_progress">В работе</option>
+                <option value="done">Готово</option>
+            </select>
+
+            <div style="display:flex; gap:8px; margin-top:14px;">
+                <button class="submit-btn" style="margin-top:0;" onclick="submitRoadmapItem('${productId}')">Сохранить</button>
+                <button class="edit-btn" onclick="closeRoadmapItemForm()">Отмена</button>
+            </div>
+        </div>
+
         <div class="roadmap-list">`;
 
-    product.roadmap.forEach(r => {
-        html += `
-            <div class="roadmap-step" style="border-left-color:${product.badgeColor}">
-                <div class="step-title">${r.step}</div>
-                <div class="step-desc">${r.desc}</div>
-            </div>`;
-    });
-
-    html += `</div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin:24px 0 10px 4px;">
-            <span class="p-section-title" style="margin:0;">ИЗБРАННЫЕ ИДЕИ (${favoritedIdeas.length})</span>
-            <button onclick="switchTab('bank');" style="background:none; border:none; color:var(--accent-blue); font-size:12px; font-weight:600; cursor:pointer;">+ Из Банка</button>
-        </div>
-        <div>`;
-
-    if (favoritedIdeas.length === 0) {
-        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Нет идей для этого проекта.</div>`;
+    if (roadmap.length === 0) {
+        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Этапов роадмапа пока нет — добавьте первый кнопкой выше.</div>`;
     } else {
-        favoritedIdeas.forEach((idea) => {
+        roadmap.forEach(r => {
+            const status = r.status || 'planned';
             html += `
-                <div class="idea-card">
-                    <div class="idea-header">
-                        <div class="idea-title">${idea.title}</div>
-                        <span class="format-tag">${idea.format}</span>
-                    </div>
-                    ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
-                    <div class="idea-cta">CTA: ${idea.cta}</div>
-                    <div class="action-btn-row">
-                        <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
-                        <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">Запланировать</button>
-                    </div>
-                </div>`;
+            <div class="roadmap-step" style="border-left-color:${product.badgeColor}">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                    <div class="step-title">${escapeHtml(r.title)}</div>
+                    <span class="roadmap-status ${status}">${escapeHtml(ROADMAP_STATUS_LABELS[status] || status)}</span>
+                </div>
+                ${r.description ? `<div class="step-desc">${escapeHtml(r.description)}</div>` : ''}
+                <div class="action-btn-row" style="margin-top:10px;">
+                    <button class="edit-btn" onclick="editRoadmapItem('${productId}', '${r.id}')">✏️ Изменить</button>
+                    <button class="delete-btn" onclick="deleteRoadmapItem('${productId}', '${r.id}')">Удалить</button>
+                </div>
+            </div>`;
         });
     }
 

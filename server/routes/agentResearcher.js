@@ -33,14 +33,44 @@ function simpleHash(str) {
     return String(hash);
 }
 
+// Builds the text that gets embedded per product. Pulls in all five
+// project_info fields (not just `about`) - target audience, value prop, key
+// differentiators, common objections and keywords all carry signal about
+// what makes a trend relevant to a given product, and folding them into the
+// embedding input directly improves how well incoming RSS candidates get
+// matched to the right product below.
+function buildEmbeddingText(row, fallbackTitle) {
+    const about = row?.about || '';
+    const targetAudience = row?.target_audience || '';
+    const valueProposition = row?.value_proposition || '';
+    const keyDifferentiators = row?.key_differentiators || '';
+    const commonObjections = row?.common_objections || '';
+    const keywords = row?.keywords || '';
+
+    if (!about && !targetAudience && !valueProposition && !keyDifferentiators && !commonObjections && !keywords) {
+        return fallbackTitle;
+    }
+
+    return [
+        `О продукте: ${about}`,
+        `Целевая аудитория: ${targetAudience}`,
+        `Главный посыл: ${valueProposition}`,
+        `Отличия от конкурентов: ${keyDifferentiators}`,
+        `Частые возражения: ${commonObjections}`,
+        `Ключевые слова: ${keywords}`,
+    ].join('\n');
+}
+
 async function getProductVectors() {
-    const infoResult = await db.execute('SELECT product_id, about FROM project_info');
-    const aboutById = {};
-    infoResult.rows.forEach(r => { aboutById[r.product_id] = r.about || ''; });
+    const infoResult = await db.execute(
+        'SELECT product_id, about, target_audience, value_proposition, key_differentiators, common_objections, keywords FROM project_info'
+    );
+    const infoById = {};
+    infoResult.rows.forEach(r => { infoById[r.product_id] = r; });
 
     const vectors = {};
     for (const product of PRODUCTS) {
-        const aboutText = aboutById[product.id] || product.title;
+        const aboutText = buildEmbeddingText(infoById[product.id], product.title);
         const hash = simpleHash(aboutText);
 
         const cached = await db.execute({
