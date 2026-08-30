@@ -540,3 +540,8 @@ html, body {
 .media-asset-meta-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .media-asset-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .media-asset-url { font-size: 11px; color: var(--text-secondary); word-break: break-all; }
+
+/* MEDIA LIGHTBOX - wider variant of the standard .drawer-content slide-in, for full-size previews */
+.media-lightbox-content { max-width: 820px; }
+.media-lightbox-preview { width: 100%; max-height: 60vh; object-fit: contain; border-radius: 14px; background: #000; display: block; }
+.media-lightbox-meta { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }

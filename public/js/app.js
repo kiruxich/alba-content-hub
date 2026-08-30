@@ -2267,11 +2267,32 @@ function drawMediaAssetsGrid() {
                 ${asset.tags.length ? `<div class="media-asset-tags">${asset.tags.map(t => `<span class="group-chip" style="cursor:default;">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
                 <div class="media-asset-url" title="${escapeHtml(asset.url)}">${escapeHtml(asset.url)}</div>
                 <div class="parser-niche-actions">
+                    <button class="edit-btn" onclick="openMediaLightbox('${asset.id}')">Открыть</button>
                     <button class="delete-btn" onclick="deleteMediaAsset('${asset.id}')">Удалить</button>
                 </div>
             </div>
         </div>
     `).join('');
+}
+
+function openMediaLightbox(assetId) {
+    const asset = mediaAssets.find(a => a.id === assetId);
+    if (!asset) return;
+    const body = document.getElementById('media-lightbox-body');
+    const previewHtml = mediaAssetPreviewHtml(asset).replace('media-asset-preview', 'media-asset-preview media-lightbox-preview');
+    body.innerHTML = `
+        ${previewHtml}
+        <div class="media-lightbox-meta">
+            <div class="media-asset-meta-row">
+                <span class="format-tag">${escapeHtml(asset.type)}</span>
+                ${asset.productId ? `<span class="format-tag" style="color:var(--accent-blue);">${escapeHtml(mediaAssetProductLabel(asset.productId))}</span>` : ''}
+                <span style="font-size:12px; color:var(--text-secondary); margin-left:auto;">использовано: ${asset.usedCount}</span>
+            </div>
+            ${asset.tags.length ? `<div class="media-asset-tags">${asset.tags.map(t => `<span class="group-chip" style="cursor:default;">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+            <div class="media-asset-url">${escapeHtml(asset.url)}</div>
+        </div>
+    `;
+    openOverlay('media-lightbox-overlay');
 }
 
 function openAddMediaAssetForm() {

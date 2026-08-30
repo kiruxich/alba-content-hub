@@ -724,6 +724,17 @@
         </div>
     </div>
 
+    <!-- MEDIA ASSET LIGHTBOX (full-size preview, opened from Медиатека card) -->
+    <div id="media-lightbox-overlay" class="overlay">
+        <div class="drawer-content media-lightbox-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Просмотр медиа</span>
+                <button class="back-btn" onclick="closeOverlay('media-lightbox-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body" id="media-lightbox-body"></div>
+        </div>
+    </div>
+
     <!-- POST ANALYTICS MODAL -->
     <div id="metrics-overlay" class="overlay">
         <div class="drawer-content">
