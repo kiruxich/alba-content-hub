@@ -23,6 +23,7 @@ async function loadCoverAsset(idea) {
 
 router.post('/vk', async (req, res) => {
     const { ideaId } = req.body || {};
+    if (!ideaId) return res.status(400).json({ error: 'ideaId is required' });
     const idea = await loadIdea(ideaId);
     if (!idea) return res.status(404).json({ error: 'idea not found' });
 
@@ -40,6 +41,7 @@ router.post('/vk', async (req, res) => {
 
 router.post('/instagram', async (req, res) => {
     const { ideaId } = req.body || {};
+    if (!ideaId) return res.status(400).json({ error: 'ideaId is required' });
     const idea = await loadIdea(ideaId);
     if (!idea) return res.status(404).json({ error: 'idea not found' });
 
@@ -57,6 +59,7 @@ router.post('/instagram', async (req, res) => {
 
 router.post('/youtube', async (req, res) => {
     const { ideaId } = req.body || {};
+    if (!ideaId) return res.status(400).json({ error: 'ideaId is required' });
     const idea = await loadIdea(ideaId);
     if (!idea) return res.status(404).json({ error: 'idea not found' });
 
