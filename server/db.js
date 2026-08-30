@@ -450,3 +450,33 @@ await db.execute({
     sql: `UPDATE agent_settings SET generator_prompt = ? WHERE id = 1 AND generator_prompt = ''`,
     args: [defaultGeneratorPrompt],
 });
+
+// Seed a few starter content_rubrics so the feature isn't empty on first
+// load. Fixed ids + INSERT OR IGNORE keep this idempotent across restarts,
+// same pattern as the niches/project_info seeds above. Each structure
+// mirrors the "Золотая середина" shape validateDraft() checks for
+// (businessProblem/technicalSolution/businessResult), just phrased per rubric.
+const defaultContentRubrics = [
+    {
+        id: 'rubric-case-of-week', name: 'Кейс недели', target_funnel: 'BOFU',
+        description: 'Разбор реального кейса клиента с измеримым результатом - закрывает воронку конкретным доказательством, а не обещаниями.',
+        structure_template: ['Проблема клиента', 'Что сделали', 'Результат с цифрами'],
+    },
+    {
+        id: 'rubric-client-mistake', name: 'Разбор ошибки клиента', target_funnel: 'MOFU',
+        description: 'Частая ошибка бизнеса до работы с нами и как её избежать - строит экспертность и доверие на конкретном примере.',
+        structure_template: ['Типичная ошибка', 'Почему это не работает', 'Как сделать правильно'],
+    },
+    {
+        id: 'rubric-tech-lifehack', name: 'Технический лайфхак', target_funnel: 'TOFU',
+        description: 'Короткий практичный приём из нашей разработки, переведённый на язык бизнес-выгоды - на охват и вовлечение.',
+        structure_template: ['Задача', 'Техническое решение', 'Что это даёт бизнесу'],
+    },
+];
+for (const r of defaultContentRubrics) {
+    await db.execute({
+        sql: `INSERT OR IGNORE INTO content_rubrics (id, name, description, structure_template, target_funnel)
+              VALUES (?, ?, ?, ?, ?)`,
+        args: [r.id, r.name, r.description, JSON.stringify(r.structure_template), r.target_funnel],
+    });
+}

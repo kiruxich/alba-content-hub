@@ -21,6 +21,7 @@ let currentOpenNicheId = null;
 let projectInfo = {};
 let currentOpenDay = null;
 let agentSettings = { weeklySchedule: [], postFormula: '' };
+let contentRubrics = [];
 
 function escapeHtml(str) {
     return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -50,7 +51,7 @@ async function api(path, options = {}) {
 // ИНИЦИАЛИЗАЦИЯ: подтягиваем состояние с бэкенда вместо localStorage
 async function initApp() {
     try {
-        const [ideas, events, plan, telegram, contentPlan, nichesList, projectInfoMap, agentSettingsData] = await Promise.all([
+        const [ideas, events, plan, telegram, contentPlan, nichesList, projectInfoMap, agentSettingsData, rubrics] = await Promise.all([
             api('/api/ideas'),
             api('/api/events'),
             api('/api/settings/plan'),
@@ -59,6 +60,7 @@ async function initApp() {
             api('/api/niches'),
             api('/api/project-info'),
             api('/api/agent-settings'),
+            api('/api/content-rubrics?all=1'),
         ]);
         ideasBank = ideas;
         scheduledEvents = events;
@@ -68,6 +70,7 @@ async function initApp() {
         niches = nichesList;
         projectInfo = projectInfoMap;
         agentSettings = agentSettingsData;
+        contentRubrics = rubrics;
 
         const dailyInput = document.getElementById('plan-daily-input');
         const weeklyInput = document.getElementById('plan-weekly-input');
@@ -565,6 +568,7 @@ function openEditIdeaModal(ideaId) {
     document.getElementById('edit-idea-funnel-input').value = idea.funnel || 'TOFU';
     document.getElementById('edit-idea-status-input').value = idea.status || 'idea';
     document.getElementById('edit-idea-cta-input').value = idea.cta || '';
+    populateRubricPickerSelect(idea.rubricId || '');
 
     document.getElementById('edit-idea-en-section').style.display = 'block';
     document.getElementById('edit-idea-title-en-input').value = idea.titleEn || '';
@@ -586,6 +590,7 @@ function openNewIdeaModal() {
     document.getElementById('edit-idea-funnel-input').value = "TOFU";
     document.getElementById('edit-idea-status-input').value = "idea";
     document.getElementById('edit-idea-cta-input').value = "Консультация Alba Creation";
+    populateRubricPickerSelect('');
 
     document.getElementById('edit-idea-en-section').style.display = 'none';
 
@@ -658,6 +663,7 @@ async function saveIdeaChanges() {
     const funnel = document.getElementById('edit-idea-funnel-input').value;
     const status = document.getElementById('edit-idea-status-input').value;
     const cta = document.getElementById('edit-idea-cta-input').value.trim();
+    const rubricId = document.getElementById('edit-idea-rubric-input').value || null;
     const coverAssetId = document.getElementById('edit-idea-cover-asset-id').value || null;
 
     if (!title) return alert('Укажите название идеи');
@@ -670,11 +676,11 @@ async function saveIdeaChanges() {
             const titleEn = document.getElementById('edit-idea-title-en-input').value.trim();
             const descEn = document.getElementById('edit-idea-desc-en-input').value.trim();
             const ctaEn = document.getElementById('edit-idea-cta-en-input').value.trim();
-            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta, titleEn, descEn, ctaEn, coverAssetId }) });
+            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta, titleEn, descEn, ctaEn, rubricId, coverAssetId }) });
             ideasBank = ideasBank.map(item => item.id === id ? updated : item);
             showToast('Идея обновлена!');
         } else {
-            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ title, desc, format, funnel, status, cta, coverAssetId }) });
+            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ title, desc, format, funnel, status, cta, rubricId, coverAssetId }) });
             ideasBank.unshift(created);
             showToast('Новая идея создана!');
         }
@@ -2112,12 +2118,163 @@ async function deleteMediaAsset(id) {
 }
 
 // НАСТРОЙКИ АГЕНТОВ (источники, тон голоса, промпты Researcher/Generator)
-function renderAgentSettingsForm() {
+async function renderAgentSettingsForm() {
     document.getElementById('as-sources-input').value = (agentSettings.sources || []).join('\n');
     document.getElementById('as-keywords-input').value = (agentSettings.keywords || []).join(', ');
     document.getElementById('as-tone-input').value = agentSettings.toneOfVoice || '';
     document.getElementById('as-formula-input').value = agentSettings.postFormula || '';
     document.getElementById('as-generator-prompt-input').value = agentSettings.generatorPrompt || '';
+    await loadContentRubrics();
+}
+
+// РУБРИКИ КОНТЕНТА (реиспользуемые структуры постов, живут в этой же вкладке -
+// это конфигурация контент-производства, как тон голоса и промпты выше)
+async function loadContentRubrics() {
+    const grid = document.getElementById('rubrics-grid');
+    if (grid) grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
+    try {
+        contentRubrics = await api('/api/content-rubrics?all=1');
+    } catch (e) {
+        if (grid) grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    drawRubricsGrid();
+    populateRubricPickerSelect();
+}
+
+function drawRubricsGrid() {
+    const grid = document.getElementById('rubrics-grid');
+    if (!grid) return;
+
+    if (contentRubrics.length === 0) {
+        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Рубрик пока нет — добавьте первую кнопкой выше.</div>`;
+        return;
+    }
+
+    grid.innerHTML = contentRubrics.map(r => `
+        <div class="parser-niche-card">
+            <div class="parser-niche-head">
+                <b>${escapeHtml(r.name)}</b>
+                <span class="parser-niche-status ${r.isActive ? 'done' : 'idle'}">${r.isActive ? 'Активна' : 'Отключена'}</span>
+            </div>
+            ${r.description ? `<p class="idea-desc-text" style="margin:0;">${escapeHtml(r.description)}</p>` : ''}
+            <div class="media-asset-meta-row"><span class="format-tag">${escapeHtml(r.targetFunnel)}</span></div>
+            ${r.structureTemplate.length ? `<div class="media-asset-tags">${r.structureTemplate.map(s => `<span class="group-chip" style="cursor:default;">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
+            <div class="parser-niche-actions">
+                <button class="edit-btn" onclick="editRubric('${r.id}')">✏️ Изменить</button>
+                <button class="edit-btn" onclick="toggleRubricActive('${r.id}')">${r.isActive ? '🚫 Отключить' : '✅ Включить'}</button>
+                <button class="delete-btn" onclick="deleteRubric('${r.id}')">Удалить</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openAddRubricForm() {
+    document.getElementById('rubric-form').style.display = 'block';
+    document.getElementById('rb-id-input').value = '';
+    document.getElementById('rb-name-input').value = '';
+    document.getElementById('rb-description-input').value = '';
+    document.getElementById('rb-structure-input').value = '';
+    document.getElementById('rb-funnel-input').value = 'TOFU';
+    document.getElementById('rb-active-input').checked = true;
+}
+
+function closeRubricForm() {
+    document.getElementById('rubric-form').style.display = 'none';
+}
+
+function editRubric(id) {
+    const r = contentRubrics.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('rubric-form').style.display = 'block';
+    document.getElementById('rb-id-input').value = r.id;
+    document.getElementById('rb-name-input').value = r.name;
+    document.getElementById('rb-description-input').value = r.description || '';
+    document.getElementById('rb-structure-input').value = (r.structureTemplate || []).join('\n');
+    document.getElementById('rb-funnel-input').value = r.targetFunnel || 'TOFU';
+    document.getElementById('rb-active-input').checked = !!r.isActive;
+}
+
+async function submitRubric() {
+    const id = document.getElementById('rb-id-input').value;
+    const name = document.getElementById('rb-name-input').value.trim();
+    const description = document.getElementById('rb-description-input').value.trim();
+    const structureTemplate = document.getElementById('rb-structure-input').value
+        .split('\n').map(s => s.trim()).filter(Boolean);
+    const targetFunnel = document.getElementById('rb-funnel-input').value;
+    const isActive = document.getElementById('rb-active-input').checked;
+
+    if (!name) return alert('Укажите название рубрики');
+
+    try {
+        if (id) {
+            const updated = await api(`/api/content-rubrics/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, description, structureTemplate, targetFunnel, isActive }),
+            });
+            contentRubrics = contentRubrics.map(r => r.id === id ? updated : r);
+            showToast('Рубрика обновлена!');
+        } else {
+            const created = await api('/api/content-rubrics', {
+                method: 'POST',
+                body: JSON.stringify({ name, description, structureTemplate, targetFunnel, isActive }),
+            });
+            contentRubrics.unshift(created);
+            showToast('Рубрика добавлена!');
+        }
+        drawRubricsGrid();
+        populateRubricPickerSelect();
+        closeRubricForm();
+    } catch (e) {
+        showToast('Не удалось сохранить рубрику: ' + e.message);
+    }
+}
+
+async function toggleRubricActive(id) {
+    const r = contentRubrics.find(x => x.id === id);
+    if (!r) return;
+    try {
+        const updated = await api(`/api/content-rubrics/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ isActive: !r.isActive }),
+        });
+        contentRubrics = contentRubrics.map(x => x.id === id ? updated : x);
+        drawRubricsGrid();
+        populateRubricPickerSelect();
+    } catch (e) {
+        showToast('Не удалось обновить рубрику: ' + e.message);
+    }
+}
+
+async function deleteRubric(id) {
+    if (!confirm('Удалить эту рубрику? Идеи, уже привязанные к ней, сохранят ссылку, но рубрика перестанет быть выбираемой.')) return;
+    try {
+        await api(`/api/content-rubrics/${id}`, { method: 'DELETE' });
+        contentRubrics = contentRubrics.filter(r => r.id !== id);
+        drawRubricsGrid();
+        populateRubricPickerSelect();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+// Rubric picker in the idea edit modal - only active rubrics are offered as
+// choices, but if the idea already carries a now-inactive/deleted rubric id
+// it's still shown (labelled accordingly) so the selection isn't silently
+// dropped out from under the user.
+function populateRubricPickerSelect(selectedId) {
+    const select = document.getElementById('edit-idea-rubric-input');
+    if (!select) return;
+    const value = selectedId !== undefined ? selectedId : select.value;
+    const active = contentRubrics.filter(r => r.isActive);
+    let options = `<option value="">— без рубрики —</option>` +
+        active.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join('');
+    if (value && !active.some(r => r.id === value)) {
+        const inactive = contentRubrics.find(r => r.id === value);
+        options += `<option value="${escapeHtml(value)}">${inactive ? escapeHtml(inactive.name) + ' (неактивна)' : 'рубрика удалена'}</option>`;
+    }
+    select.innerHTML = options;
+    select.value = value || '';
 }
 
 async function saveAgentSettingsForm() {
