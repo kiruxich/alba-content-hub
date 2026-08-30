@@ -851,15 +851,13 @@
         </div>
     </div>
 
-    <!-- MEDIA ASSET LIGHTBOX (full-size preview, opened from Медиатека card) -->
-    <div id="media-lightbox-overlay" class="overlay">
-        <div class="drawer-content media-lightbox-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Просмотр медиа</span>
-                <button class="back-btn" onclick="closeOverlay('media-lightbox-overlay')">Закрыть ✕</button>
-            </div>
-            <div class="modal-body" id="media-lightbox-body"></div>
+    <!-- MEDIA ASSET LIGHTBOX (large borderless preview, opened from Медиатека card) -->
+    <div id="media-lightbox-overlay" class="overlay media-lightbox-overlay" onclick="if (event.target === this) closeOverlay('media-lightbox-overlay')">
+        <div class="media-lightbox-controls">
+            <button class="media-lightbox-icon-btn" onclick="closeOverlay('media-lightbox-overlay')" aria-label="Свернуть" title="Свернуть">﹘</button>
+            <button class="media-lightbox-icon-btn" onclick="closeOverlay('media-lightbox-overlay')" aria-label="Закрыть" title="Закрыть">✕</button>
         </div>
+        <div id="media-lightbox-body"></div>
     </div>
 
     <!-- POST ANALYTICS MODAL -->
