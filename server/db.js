@@ -253,6 +253,26 @@ CREATE TABLE IF NOT EXISTS parser_niches (
     created_at INTEGER DEFAULT (strftime('%s','now')),
     updated_at INTEGER DEFAULT (strftime('%s','now'))
 );
+
+-- One row per Shorts-assembly request handed to video-worker (Phase 2) - the
+-- same "hub DB row tracks a remote worker's job_id" shape as parser_niches
+-- above, just without the persistent-card lifecycle (this is a one-shot job,
+-- not a reusable niche). asset_id is filled in once the job finishes and its
+-- output has been saved as a media_assets row, and doubles as the "already
+-- saved, don't insert a duplicate media_assets row on the next poll" guard.
+CREATE TABLE IF NOT EXISTS video_assembly_jobs (
+    id TEXT PRIMARY KEY,
+    job_id TEXT,
+    video_url TEXT NOT NULL,
+    audio_url TEXT NOT NULL,
+    caption_text TEXT DEFAULT '',
+    status TEXT DEFAULT 'queued',
+    log TEXT DEFAULT '',
+    error TEXT,
+    asset_id TEXT,
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
 `);
 
 // Additive columns on existing tables - safe to run on every startup.
