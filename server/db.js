@@ -99,12 +99,31 @@ CREATE TABLE IF NOT EXISTS plan_settings (
 );
 INSERT OR IGNORE INTO plan_settings (id, daily, weekly) VALUES (1, 1, 7);
 
+-- token: the one bot token used for everything Telegram (both the publish
+-- channels below and admin notifications). chat_id: NOT a publish target -
+-- it's the single admin/notifications chat used by the idea-approval
+-- workflow (server/lib/telegramApproval.js), agent researcher summaries and
+-- parser job alerts (agentResearcher.js, parserNiches.js), and reply
+-- correlation (telegramWebhook.js). Left untouched by the multi-channel
+-- publish feature below on purpose - those flows are unrelated to the Bank
+-- of Ideas "Опубликовать" modal and must keep working unchanged.
 CREATE TABLE IF NOT EXISTS telegram_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     token TEXT DEFAULT '',
     chat_id TEXT DEFAULT ''
 );
 INSERT OR IGNORE INTO telegram_settings (id, token, chat_id) VALUES (1, '', '');
+
+-- Channels the bot (telegram_settings.token) can publish ideas to from the
+-- Bank of Ideas "Опубликовать" modal - one bot, many channels it's admin of.
+-- See server/routes/telegram.js's /post route (takes a channelId, resolves
+-- chat_id here server-side) and server/routes/settings.js for CRUD.
+CREATE TABLE IF NOT EXISTS telegram_channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,
+    chat_id TEXT NOT NULL,
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
 
 -- VK: a community (group) access token with wall permission, plus the group
 -- id it posts to. See server/lib/socialPublishers/vk.js.
