@@ -137,6 +137,17 @@ CREATE TABLE IF NOT EXISTS youtube_settings (
 );
 INSERT OR IGNORE INTO youtube_settings (id, client_id, client_secret, refresh_token, channel_title) VALUES (1, '', '', '', '');
 
+-- Threads: a Threads user access token (threads_basic + threads_content_publish
+-- scopes, from a Meta app with the "Threads use case" - a separate app type
+-- from Instagram's Graph API) plus the Threads user id it publishes to. See
+-- server/lib/socialPublishers/threads.js.
+CREATE TABLE IF NOT EXISTS threads_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    access_token TEXT DEFAULT '',
+    user_id TEXT DEFAULT ''
+);
+INSERT OR IGNORE INTO threads_settings (id, access_token, user_id) VALUES (1, '', '');
+
 -- Two-way approval workflow: one row per idea sent to Telegram for review,
 -- keyed by the sendMessage-returned message_id so an incoming reply (whose
 -- reply_to_message.message_id points back at it) can be correlated to the

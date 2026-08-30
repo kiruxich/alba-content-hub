@@ -135,4 +135,32 @@ router.put('/youtube', async (req, res) => {
     });
 });
 
+// Threads follows the same write-mostly pattern as VK/Instagram above: the
+// access token never round-trips back to the browser in full, only a masked
+// preview + whether it's configured. See server/lib/socialPublishers/threads.js.
+router.get('/threads', async (req, res) => {
+    const result = await db.execute('SELECT access_token, user_id FROM threads_settings WHERE id = 1');
+    const row = result.rows[0];
+    const hasToken = Boolean(row.access_token);
+    res.json({
+        userId: row.user_id || '',
+        hasToken,
+        tokenPreview: hasToken ? `••••${row.access_token.slice(-4)}` : '',
+    });
+});
+
+router.put('/threads', async (req, res) => {
+    const { accessToken, userId } = req.body || {};
+    const currentRes = await db.execute('SELECT access_token, user_id FROM threads_settings WHERE id = 1');
+    const current = currentRes.rows[0];
+    const nextToken = accessToken !== undefined && accessToken !== '' ? accessToken.trim() : current.access_token;
+    const nextUserId = userId !== undefined ? userId.trim() : current.user_id;
+    await db.execute({ sql: 'UPDATE threads_settings SET access_token = ?, user_id = ? WHERE id = 1', args: [nextToken, nextUserId] });
+    res.json({
+        userId: nextUserId,
+        hasToken: Boolean(nextToken),
+        tokenPreview: nextToken ? `••••${nextToken.slice(-4)}` : '',
+    });
+});
+
 export default router;

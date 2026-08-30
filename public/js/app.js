@@ -15,6 +15,7 @@ let tgMeta = { chatId: '', hasToken: false, tokenPreview: '' };
 let vkMeta = { groupId: '', hasToken: false, tokenPreview: '' };
 let igMeta = { businessAccountId: '', hasToken: false, tokenPreview: '' };
 let ytMeta = { clientId: '', channelTitle: '', hasClientSecret: false, hasRefreshToken: false, configured: false };
+let thMeta = { userId: '', hasToken: false, tokenPreview: '' };
 let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
@@ -54,7 +55,7 @@ async function api(path, options = {}) {
 // ИНИЦИАЛИЗАЦИЯ: подтягиваем состояние с бэкенда вместо localStorage
 async function initApp() {
     try {
-        const [ideas, events, plan, telegram, vk, instagram, youtube, contentPlan, nichesList, projectInfoMap, agentSettingsData, rubrics] = await Promise.all([
+        const [ideas, events, plan, telegram, vk, instagram, youtube, threads, contentPlan, nichesList, projectInfoMap, agentSettingsData, rubrics] = await Promise.all([
             api('/api/ideas'),
             api('/api/events'),
             api('/api/settings/plan'),
@@ -62,6 +63,7 @@ async function initApp() {
             api('/api/settings/vk'),
             api('/api/settings/instagram'),
             api('/api/settings/youtube'),
+            api('/api/settings/threads'),
             api('/api/content-plan'),
             api('/api/niches'),
             api('/api/project-info'),
@@ -75,6 +77,7 @@ async function initApp() {
         vkMeta = vk;
         igMeta = instagram;
         ytMeta = youtube;
+        thMeta = threads;
         contentPlanBlocks = contentPlan.blocks;
         niches = nichesList;
         projectInfo = projectInfoMap;
@@ -310,6 +313,7 @@ async function renderBankView() {
                 <button class="tg-btn" style="background:#0077FF;${vkMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToVk('${idea.id}')">${vkMeta.hasToken ? '🔵 В VK' : '🔵 VK (не настроено)'}</button>
                 <button class="tg-btn" style="background:#E1306C;${igMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToInstagram('${idea.id}')">${igMeta.hasToken ? '📸 В Instagram' : '📸 Instagram (не настроено)'}</button>
                 <button class="tg-btn" style="background:#FF0000;${ytMeta.configured ? '' : 'opacity:0.5;'}" onclick="postToYoutube('${idea.id}')">${ytMeta.configured ? '▶️ На YouTube' : '▶️ YouTube (не настроено)'}</button>
+                <button class="tg-btn" style="background:#000000;${thMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToThreads('${idea.id}')">${thMeta.hasToken ? '🧵 В Threads' : '🧵 Threads (не настроено)'}</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
                 <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
@@ -1003,6 +1007,52 @@ async function postToYoutube(ideaId) {
         showToast('Опубликовано на YouTube!');
     } catch (e) {
         alert('Ошибка отправки на YouTube: ' + e.message);
+    }
+}
+
+// Threads (Publishing API: create media container, then publish - text-only allowed)
+async function openThSettings() {
+    try {
+        thMeta = await api('/api/settings/threads');
+    } catch (e) {
+        showToast('Не удалось получить настройки Threads: ' + e.message);
+    }
+    const tokenInput = document.getElementById('th-token-input');
+    const userInput = document.getElementById('th-user-input');
+    if (tokenInput) {
+        tokenInput.value = '';
+        tokenInput.placeholder = thMeta.hasToken
+            ? `Сохранён токен ${thMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'THQVJ...xxxxxxxx...';
+    }
+    if (userInput) userInput.value = thMeta.userId || '';
+    openOverlay('th-config-overlay');
+}
+
+async function saveThSettings() {
+    const accessToken = document.getElementById('th-token-input').value.trim();
+    const userId = document.getElementById('th-user-input').value.trim();
+    try {
+        thMeta = await api('/api/settings/threads', { method: 'PUT', body: JSON.stringify({ accessToken, userId }) });
+        closeOverlay('th-config-overlay');
+        showToast('Настройки Threads сохранены');
+        renderBankView();
+    } catch (e) {
+        showToast('Не удалось сохранить настройки Threads: ' + e.message);
+    }
+}
+
+async function postToThreads(ideaId) {
+    if (!thMeta.hasToken || !thMeta.userId) {
+        alert('Укажите Access Token и Threads User ID в настройках Threads!');
+        openThSettings();
+        return;
+    }
+    try {
+        await api('/api/publish/threads', { method: 'POST', body: JSON.stringify({ ideaId }) });
+        showToast('Опубликовано в Threads!');
+    } catch (e) {
+        alert('Ошибка отправки в Threads: ' + e.message);
     }
 }
 

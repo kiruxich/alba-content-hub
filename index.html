@@ -111,6 +111,7 @@
                         <button class="edit-btn" onclick="openVkSettings()">⚙️ VK</button>
                         <button class="edit-btn" onclick="openIgSettings()">⚙️ Instagram</button>
                         <button class="edit-btn" onclick="openYtSettings()">⚙️ YouTube</button>
+                        <button class="edit-btn" onclick="openThSettings()">⚙️ Threads</button>
                         <button class="edit-btn" onclick="document.getElementById('import-file-input').click()">📂 Импорт</button>
                         <button class="edit-btn" onclick="exportIdeasJSON()">💾 Экспорт</button>
                         <button class="schedule-btn" onclick="openNewIdeaModal()">+ Новая идея</button>
@@ -900,6 +901,26 @@
                 <input type="text" id="yt-channel-title-input" class="form-input" placeholder="Alba Creation">
 
                 <button class="submit-btn" onclick="saveYtSettings()">Сохранить настройки</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- THREADS CONFIG MODAL -->
+    <div id="th-config-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Настройки Threads</span>
+                <button class="back-btn" onclick="closeOverlay('th-config-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Threads user access token из приложения Meta с use case "Threads" (не Facebook Graph API) — нужны разрешения threads_basic и threads_content_publish, аккаунт должен пройти App Review.</p>
+                <label class="form-label">Threads Access Token:</label>
+                <input type="text" id="th-token-input" class="form-input" placeholder="THQVJ...xxxxxxxx...">
+
+                <label class="form-label">Threads User ID:</label>
+                <input type="text" id="th-user-input" class="form-input" placeholder="17841400000000000">
+
+                <button class="submit-btn" onclick="saveThSettings()">Сохранить настройки</button>
             </div>
         </div>
     </div>
