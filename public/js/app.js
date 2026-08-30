@@ -2330,6 +2330,7 @@ function openAddMediaAssetForm() {
     document.getElementById('media-asset-generate-form').style.display = 'none';
     document.getElementById('media-asset-form').style.display = 'block';
     document.getElementById('ma-url-input').value = '';
+    document.getElementById('ma-file-input').value = '';
     document.getElementById('ma-tags-input').value = '';
     document.getElementById('ma-type-input').value = 'image';
     document.getElementById('ma-product-input').value = '';
@@ -2339,19 +2340,57 @@ function closeAddMediaAssetForm() {
     document.getElementById('media-asset-form').style.display = 'none';
 }
 
+// URL и файл — взаимоисключающие способы задать медиа: заполнение одного
+// поля сбрасывает другое, чтобы не было неоднозначности при сабмите.
+function onMediaAssetUrlInput() {
+    if (document.getElementById('ma-url-input').value.trim()) {
+        document.getElementById('ma-file-input').value = '';
+    }
+}
+
+function onMediaAssetFileInput() {
+    const fileInput = document.getElementById('ma-file-input');
+    if (fileInput.files && fileInput.files.length) {
+        document.getElementById('ma-url-input').value = '';
+    }
+}
+
+// Прямая загрузка файла идёт через POST /api/media-assets/upload
+// (multipart/form-data) — доступность определяется сервером (S3_* env vars,
+// см. server/lib/objectStorage.js): если хранилище не настроено, сервер
+// вернёт понятную ошибку 503, которая просто всплывает тостом, как и для
+// остальных опциональных интеграций (kie.ai, ElevenLabs, Piper).
 async function submitNewMediaAsset() {
     const url = document.getElementById('ma-url-input').value.trim();
+    const fileInput = document.getElementById('ma-file-input');
+    const file = fileInput.files && fileInput.files[0];
     const type = document.getElementById('ma-type-input').value;
     const productId = document.getElementById('ma-product-input').value;
     const tags = document.getElementById('ma-tags-input').value.split(',').map(t => t.trim()).filter(Boolean);
 
-    if (!url) return alert('Укажите URL медиа');
+    if (!url && !file) return alert('Укажите URL медиа или выберите файл для загрузки');
 
     try {
-        const created = await api('/api/media-assets', {
-            method: 'POST',
-            body: JSON.stringify({ url, type, productId: productId || null, tags }),
-        });
+        let created;
+        if (file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', type);
+            if (productId) formData.append('productId', productId);
+            formData.append('tags', JSON.stringify(tags));
+            const res = await fetch('/api/media-assets/upload', { method: 'POST', body: formData });
+            if (!res.ok) {
+                let message = res.statusText;
+                try { message = (await res.json()).error || message; } catch (_) {}
+                throw new Error(message);
+            }
+            created = await res.json();
+        } else {
+            created = await api('/api/media-assets', {
+                method: 'POST',
+                body: JSON.stringify({ url, type, productId: productId || null, tags }),
+            });
+        }
         mediaAssets.unshift(created);
         drawMediaAssetsGrid();
         closeAddMediaAssetForm();

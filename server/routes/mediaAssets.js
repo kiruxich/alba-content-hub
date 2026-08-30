@@ -1,15 +1,43 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { db } from '../db.js';
 import { isKieConfigured, generateImage, generateVideo } from '../lib/kieClient.js';
 import { generateVoiceover, isElevenLabsConfigured } from '../lib/elevenLabsClient.js';
 import { generatePiperVoiceover, isPiperConfigured } from '../lib/piperTtsClient.js';
+import { isObjectStorageConfigured, uploadBuffer, uploadFromUrl } from '../lib/objectStorage.js';
 
 const router = Router();
+
+// Memory storage, not disk - same reasoning as parserNiches.js's upload
+// endpoint: the file only needs to live as a buffer long enough to hand off
+// to objectStorage.uploadBuffer(), and Vercel's filesystem is read-only/
+// ephemeral anyway.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 // Agent identity used for kie.ai-driven spend rows in agent_expenses -
 // distinguishes AI-generated-cover spend from Researcher/Generator LLM
 // token spend, which use their own agent_name values.
 const KIE_AGENT_NAME = 'generator';
+
+// kie.ai's returned URLs point at its own temp storage
+// (tempfile.aiquickdraw.com as of writing) which is NOT permanent - if
+// object storage is configured, download the result and re-upload it so the
+// media_assets row keeps working after the temp link expires. Best-effort:
+// a failure here (network hiccup downloading from kie.ai, bucket unreachable,
+// etc.) falls back to the original kie.ai URL rather than failing a
+// generation that otherwise succeeded - kie.ai credits were already spent by
+// this point, so surfacing an error to the user would be worse than serving
+// a link that works today but may expire later.
+async function rehostIfConfigured(kieUrl, keyPrefix) {
+    if (!isObjectStorageConfigured()) return kieUrl;
+    try {
+        const { url } = await uploadFromUrl(kieUrl, { keyPrefix });
+        return url;
+    } catch (e) {
+        console.error(`rehostIfConfigured: failed to re-upload ${kieUrl} to object storage, falling back to kie.ai URL:`, e.message);
+        return kieUrl;
+    }
+}
 
 async function insertGeneratedAsset({ url, type, productId, modelUsed, creditsConsumed }) {
     const id = String(Date.now());
@@ -139,7 +167,8 @@ router.post('/generate-cover', async (req, res) => {
     if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
     try {
-        const { url, creditsConsumed } = await generateImage(prompt);
+        const { url: kieUrl, creditsConsumed } = await generateImage(prompt);
+        const url = await rehostIfConfigured(kieUrl, 'covers');
         const row = await insertGeneratedAsset({
             url,
             type: 'image',
@@ -166,7 +195,8 @@ router.post('/generate-video', async (req, res) => {
     if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
     try {
-        const { url, creditsConsumed } = await generateVideo(prompt);
+        const { url: kieUrl, creditsConsumed } = await generateVideo(prompt);
+        const url = await rehostIfConfigured(kieUrl, 'covers');
         const row = await insertGeneratedAsset({
             url,
             type: 'video',
@@ -190,16 +220,13 @@ router.post('/generate-video', async (req, res) => {
 // logs the spend into agent_expenses (0 for Piper) so it shows up in the
 // Cost Tracker either way.
 //
-// STORAGE NOTE: this project has no S3/object-storage client yet - the
-// Медиатека today only catalogs externally-hosted URLs (see its own
-// placeholder text mentioning "S3 alba-creation.ru"), and Vercel's
-// filesystem is read-only/ephemeral so a local static file wouldn't
-// survive between invocations either (see server/routes/parserNiches.js's
-// multer memoryStorage comment). Until real object storage exists, the
-// generated audio is stored inline as a base64 `data:` URL in
-// media_assets.url. That's fine for short Shorts voice-overs but bloats
-// the row and isn't shareable outside this app - swap this for a real
-// upload once an S3-compatible client is wired up.
+// STORAGE NOTE: if object storage is configured (server/lib/objectStorage.js
+// - S3_* env vars), the generated audio is uploaded there and media_assets.url
+// gets the real public URL. If it's NOT configured, this falls back to the
+// original behavior: the audio is stored inline as a base64 `data:` URL in
+// media_assets.url. That's fine for short Shorts voice-overs but bloats the
+// row and isn't shareable outside this app - it's a deliberate fallback for
+// deployments that haven't set up S3-compatible storage, not a bug.
 router.post('/generate-voiceover', async (req, res) => {
     const b = req.body || {};
     const text = (b.text || '').trim();
@@ -231,13 +258,23 @@ router.post('/generate-voiceover', async (req, res) => {
         modelUsed = 'elevenlabs:eleven_multilingual_v2';
     }
 
-    const dataUrl = `data:${voiceover.contentType};base64,${voiceover.audioBuffer.toString('base64')}`;
+    let url;
+    if (isObjectStorageConfigured()) {
+        try {
+            ({ url } = await uploadBuffer(voiceover.audioBuffer, { contentType: voiceover.contentType, keyPrefix: 'voiceovers' }));
+        } catch (e) {
+            console.error('generate-voiceover: object storage upload failed, falling back to base64 data URL:', e.message);
+        }
+    }
+    if (!url) {
+        url = `data:${voiceover.contentType};base64,${voiceover.audioBuffer.toString('base64')}`;
+    }
     const id = String(Date.now());
     await db.execute({
         sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
               VALUES (?, ?, 'audio', ?, ?, ?, 'ai-generated')`,
         args: [
-            id, dataUrl,
+            id, url,
             b.productId || null,
             b.rubricId || null,
             JSON.stringify(b.tags || []),
@@ -252,6 +289,62 @@ router.post('/generate-voiceover', async (req, res) => {
 
     const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [id] });
     res.status(201).json(serialize(result.rows[0]));
+});
+
+// POST /api/media-assets/upload - direct file upload as an alternative to
+// pasting an already-hosted URL (multipart/form-data, field name 'file' -
+// same multer/memoryStorage pattern as parserNiches.js's Excel upload).
+// Gated behind object storage being configured: with no S3_* env vars set,
+// there's nowhere to put the file (no local disk to keep it on either - see
+// objectStorage.js/parserNiches.js's memoryStorage comments), so this
+// returns a clear 503 instead of silently failing or hard-requiring S3 for
+// the app to run. Server-driven like every other optional integration here
+// - the "Загрузить файл" UI option stays visible regardless and just
+// surfaces this message if clicked, rather than the frontend guessing
+// whether S3 is set up.
+router.post('/upload', (req, res, next) => {
+    if (!isObjectStorageConfigured()) {
+        return res.status(503).json({ error: 'Загрузка файлов недоступна — настройте S3-совместимое хранилище' });
+    }
+    upload.single('file')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: 'Не удалось загрузить файл: ' + err.message });
+        next();
+    });
+}, async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Файл не выбран' });
+
+    const b = req.body || {};
+    const type = (b.type || '').trim();
+    if (!type) return res.status(400).json({ error: 'type is required' });
+
+    let tags = [];
+    if (b.tags) {
+        try { tags = JSON.parse(b.tags); } catch (_) { tags = []; }
+        if (!Array.isArray(tags)) tags = [];
+    }
+
+    try {
+        const { url } = await uploadBuffer(req.file.buffer, {
+            contentType: req.file.mimetype,
+            keyPrefix: 'manual',
+        });
+        const id = String(Date.now());
+        await db.execute({
+            sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
+                  VALUES (?, ?, ?, ?, ?, ?, 'manual')`,
+            args: [
+                id, url, type,
+                b.productId || null,
+                b.rubricId || null,
+                JSON.stringify(tags),
+            ],
+        });
+        const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [id] });
+        res.status(201).json(serialize(result.rows[0]));
+    } catch (e) {
+        console.error('media-assets/upload: object storage upload failed:', e.message);
+        res.status(502).json({ error: 'Не удалось загрузить файл в хранилище: ' + e.message });
+    }
 });
 
 export default router;
