@@ -3,6 +3,7 @@ import { db } from '../db.js';
 import { publish as publishToVk } from '../lib/socialPublishers/vk.js';
 import { publish as publishToInstagram } from '../lib/socialPublishers/instagram.js';
 import { publish as publishToYoutube } from '../lib/socialPublishers/youtube.js';
+import { publish as publishToThreads } from '../lib/socialPublishers/threads.js';
 
 const router = Router();
 
@@ -76,6 +77,24 @@ router.post('/youtube', async (req, res) => {
         refreshToken: settings.refresh_token,
     }, coverAsset);
     if (!result.success) return res.status(502).json({ error: result.error || 'YouTube publish failed' });
+    res.json({ ok: true, externalPostId: result.externalPostId });
+});
+
+router.post('/threads', async (req, res) => {
+    const { ideaId } = req.body || {};
+    if (!ideaId) return res.status(400).json({ error: 'ideaId is required' });
+    const idea = await loadIdea(ideaId);
+    if (!idea) return res.status(404).json({ error: 'idea not found' });
+
+    const settingsRes = await db.execute('SELECT access_token, user_id FROM threads_settings WHERE id = 1');
+    const settings = settingsRes.rows[0];
+    if (!settings.access_token || !settings.user_id) {
+        return res.status(400).json({ error: 'Threads не настроен' });
+    }
+
+    const coverAsset = await loadCoverAsset(idea);
+    const result = await publishToThreads(idea, { accessToken: settings.access_token, userId: settings.user_id }, coverAsset);
+    if (!result.success) return res.status(502).json({ error: result.error || 'Threads publish failed' });
     res.json({ ok: true, externalPostId: result.externalPostId });
 });
 
