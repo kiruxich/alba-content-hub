@@ -24,12 +24,19 @@ import metricsSyncRouter from './routes/metricsSync.js';
 import videoAssemblyRouter from './routes/videoAssembly.js';
 import insightsRouter from './routes/insights.js';
 import socialPublishRouter from './routes/socialPublish.js';
+import authRouter from './routes/auth.js';
+import { requireAuth } from './middleware/requireAuth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Gates everything below - single-admin login, see server/lib/auth.js. A
+// no-op until ADMIN_EMAIL/ADMIN_PASSWORD_HASH/SESSION_SECRET are set.
+app.use('/api/auth', authRouter);
+app.use(requireAuth);
 
 app.use('/api/ideas', ideasRouter);
 app.use('/api/events', eventsRouter);
