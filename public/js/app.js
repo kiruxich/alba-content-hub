@@ -1830,8 +1830,12 @@ function drawParserNiches() {
                 <button class="schedule-btn" onclick="runParserNiche('${n.id}')" ${isActive(n.status) ? 'disabled' : ''}>▶ Обновить парсер</button>
                 ${isActive(n.status) ? `<button class="delete-btn" onclick="cancelParserNiche('${n.id}')">⏹ Стоп</button>` : ''}
                 ${n.status === 'captcha' ? `<a class="edit-btn" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
-                ${n.files.raw && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
-                ${n.files.raw ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
+                <label class="edit-btn parser-upload-btn" ${isActive(n.status) ? 'style="opacity:.5; pointer-events:none;"' : ''}>
+                    📤 Загрузить Excel
+                    <input type="file" accept=".xlsx" style="display:none;" onchange="uploadParserNicheFile('${n.id}', this)">
+                </label>
+                ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
+                ${n.files.raw && n.jobId ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
                 <button class="delete-btn" onclick="removeParserNiche('${n.id}')">Удалить</button>
             </div>
         </div>
@@ -1939,6 +1943,35 @@ async function archiveParserNiche(id) {
 
 function downloadParserFile(id, kind) {
     window.open(`/api/parser-niches/${id}/download/${kind}`, '_blank');
+}
+
+// "Загрузить Excel" - alternative to running the live 2GIS scraper: upload an
+// already-prepared .xlsx of leads straight into this niche's raw_file slot.
+async function uploadParserNicheFile(id, inputEl) {
+    const file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+    const label = inputEl.closest('.parser-upload-btn');
+    if (label) label.style.pointerEvents = 'none';
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(`/api/parser-niches/${id}/upload`, { method: 'POST', body: formData });
+        if (!res.ok) {
+            let message = res.statusText;
+            try { message = (await res.json()).error || message; } catch (_) {}
+            throw new Error(message);
+        }
+        const updated = await res.json();
+        const idx = parserNiches.findIndex(n => n.id === id);
+        if (idx !== -1) parserNiches[idx] = updated;
+        drawParserNiches();
+        showToast('Файл загружен');
+    } catch (e) {
+        showToast('Не удалось загрузить файл: ' + e.message);
+    } finally {
+        inputEl.value = '';
+        if (label) label.style.pointerEvents = '';
+    }
 }
 
 async function removeParserNiche(id) {
