@@ -6,6 +6,38 @@ import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiv
 const router = Router();
 const WORKER_TOKEN = process.env.PARSER_WORKER_TOKEN || '';
 
+// Shared by every Telegram notification this file sends (captcha alert, job
+// done, job failed) - reads the bot token/chat set in Settings and swallows
+// failures, same as agentResearcher.js's notifyTelegram: a broken/unset
+// Telegram config should never fail the parent request.
+async function notifyTelegram(text) {
+    const settingsRes = await db.execute('SELECT token, chat_id FROM telegram_settings WHERE id = 1');
+    const settings = settingsRes.rows[0];
+    if (!settings?.token || !settings?.chat_id) return;
+    try {
+        await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: settings.chat_id, text, parse_mode: 'Markdown' }),
+        });
+    } catch (e) {
+        console.error('parserNiches: failed to notify Telegram:', e.message);
+    }
+}
+
+// job.stats' exact shape comes from the Python parser-worker (not part of
+// this repo) and isn't documented anywhere in the hub codebase, so this
+// checks the field names that would plausibly hold a result count instead of
+// assuming one - falls back to null (omitted from the message) if none match.
+function extractResultCount(stats) {
+    if (!stats || typeof stats !== 'object') return null;
+    const candidates = ['total', 'count', 'results', 'found', 'companies', 'rows', 'total_found', 'unique_count', 'raw_count'];
+    for (const key of candidates) {
+        if (typeof stats[key] === 'number') return stats[key];
+    }
+    return null;
+}
+
 function serialize(row) {
     return {
         id: row.id,
@@ -95,6 +127,24 @@ router.get('/:id/status', async (req, res) => {
 
     try {
         const job = await getParserJob(row.job_id);
+        // row.status is what this niche's status was *before* this poll -
+        // compared against job.status (the worker's answer for *this* poll)
+        // to detect a fresh transition into a terminal state. Once the DB
+        // row itself reads 'done'/'error', the next poll's row.status ===
+        // job.status and this is skipped, so the alert fires exactly once
+        // per completion no matter how often the frontend polls afterward.
+        if (row.status !== job.status && (job.status === 'done' || job.status === 'error')) {
+            const count = extractResultCount(job.stats);
+            if (job.status === 'done') {
+                const foundLine = count !== null ? `Найдено записей: ${count}\n` : '';
+                await notifyTelegram(`✅ *Парсер 2ГИС завершил нишу «${row.category}»*\n\n${foundLine}Подробности — в приложении.`);
+            } else {
+                const logTail = (job.log || '').trim().split('\n').filter(Boolean).slice(-1)[0];
+                const errorLine = logTail ? `Последняя строка лога: ${logTail}\n` : '';
+                await notifyTelegram(`❌ *Парсер 2ГИС завершился с ошибкой на нише «${row.category}»*\n\n${errorLine}Подробности — в приложении.`);
+            }
+        }
+
         await db.execute({
             sql: `UPDATE parser_niches SET status = ?, log = ?, stats_json = ?,
                   raw_file = ?, dedup_file = ?, archive_file = ?, updated_at = strftime('%s','now') WHERE id = ?`,
@@ -181,21 +231,7 @@ router.post('/:id/captcha-alert', async (req, res) => {
         return res.status(401).json({ error: 'bad worker token' });
     }
     const { novncUrl, category } = req.body || {};
-
-    const settingsRes = await db.execute('SELECT token, chat_id FROM telegram_settings WHERE id = 1');
-    const settings = settingsRes.rows[0];
-    if (settings?.token && settings?.chat_id) {
-        const text = `🤖 Парсер 2ГИС встретил капчу на нише «${category}».\nРешите её вручную здесь: ${novncUrl}`;
-        try {
-            await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: settings.chat_id, text }),
-            });
-        } catch (e) {
-            console.error('captcha-alert: failed to notify Telegram:', e.message);
-        }
-    }
+    await notifyTelegram(`🤖 *Парсер 2ГИС встретил капчу на нише «${category}»*\n\nРешите её вручную здесь: ${novncUrl}`);
     res.json({ ok: true });
 });
 

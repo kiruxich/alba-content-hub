@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { checkBudgetCap } from '../lib/checkBudgetCap.js';
 
 const router = Router();
 
@@ -33,6 +34,17 @@ router.get('/summary', async (req, res) => {
         WHERE strftime('%Y-%m', timestamp, 'unixepoch') = strftime('%Y-%m', 'now')
     `);
     res.json({ todayUsd: today.rows[0].total, monthUsd: month.rows[0].total });
+});
+
+// Consumed by external cloud routines (e.g. the Generator agent) that want
+// to self-check spend before doing paid work, the same way
+// GET /api/agent-researcher/latest-brief is consumed by the Generator agent
+// to pick up trends without re-scanning RSS itself. Returns the configured
+// daily cap, today's spend, and whether the cap is currently exceeded, so a
+// caller can decide to skip a run before it spends anything.
+router.get('/budget-status', async (req, res) => {
+    const status = await checkBudgetCap();
+    res.json(status);
 });
 
 router.post('/', async (req, res) => {

@@ -85,6 +85,48 @@ router.get('/', async (req, res) => {
     res.json(result.rows.map(serialize));
 });
 
+// GET /api/ideas/needs-regeneration
+//
+// Agent-authored drafts a Telegram reviewer sent back for rework instead of
+// approving/rejecting outright: see the free-text reply branch in
+// server/routes/telegramWebhook.js, which appends { text, at } entries to
+// agentMeta.regenerateNotes on the idea (and separately logs the same note
+// on the telegram_approvals row for audit purposes only - this endpoint
+// reads the idea, not that row). An idea shows up here only while it is
+// still in 'idea' status (not yet approved/published) and has at least one
+// pending note - once a fresh draftText is PUT back to /api/ideas/:id, the
+// PUT handler clears agentMeta.regenerateNotes and the idea drops off this
+// list on its own.
+//
+// Response: 200 { items: Idea[] }
+//   Each Idea is the normal serialized shape returned by GET /api/ideas
+//   (id, title, desc, format, funnel, status, cta, targetGroups, metrics,
+//   source, agentMeta, draftText, contentType, expiresAt, rubricId,
+//   qualityFlags, coverAssetId, ...) plus a convenience top-level
+//   `regenerateNotes` field mirroring agentMeta.regenerateNotes - an array
+//   of { text: string, at: number } entries (at = ms epoch of the Telegram
+//   reply). draftText carries the current businessProblem/technicalSolution/
+//   businessResult/cta fields to revise; agentMeta may also carry other
+//   agent-set context (e.g. sourceUrl) worth preserving in the rewrite.
+//
+// Full integration contract for a caller (the Generator agent) lives in
+// docs/generator-regeneration.md.
+router.get('/needs-regeneration', async (req, res) => {
+    // agent_meta is opaque JSON - filter broadly in SQL (LIKE is a cheap
+    // pre-filter, same pattern as the free-text search above) then confirm
+    // precisely in JS, since libSQL here isn't queried with json_extract
+    // anywhere else in this codebase.
+    const result = await db.execute({
+        sql: "SELECT * FROM ideas WHERE status = 'idea' AND agent_meta IS NOT NULL AND agent_meta LIKE '%regenerateNotes%' ORDER BY created_at DESC",
+        args: [],
+    });
+    const items = result.rows
+        .map(serialize)
+        .filter((idea) => Array.isArray(idea.agentMeta?.regenerateNotes) && idea.agentMeta.regenerateNotes.length > 0)
+        .map((idea) => ({ ...idea, regenerateNotes: idea.agentMeta.regenerateNotes }));
+    res.json({ items });
+});
+
 router.post('/', async (req, res) => {
     const b = req.body || {};
     if (!b.title || !String(b.title).trim()) {
@@ -153,11 +195,47 @@ router.put('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'idea not found' });
 
     const b = req.body || {};
+    const resolvedSource = b.source !== undefined ? b.source : existing.source;
+    const resolvedFormat = b.format !== undefined ? b.format : existing.format;
+
+    // Regeneration: agentMeta isn't in the request body on a typical
+    // "here's the revised draft" PUT (only draftText is), so the base object
+    // to carry forward is whatever agentMeta the caller sent, or failing
+    // that the idea's existing agentMeta - never dropped just because this
+    // PUT didn't mention it. If that base has a non-empty regenerateNotes
+    // array (set by the Telegram webhook's free-text reply branch, see
+    // server/routes/telegramWebhook.js) and this PUT is delivering an actual
+    // new draftText, the notes have now been addressed: clear the array so
+    // the idea drops off GET /api/ideas/needs-regeneration, but leave every
+    // other agentMeta key untouched.
+    let agentMetaObj = b.agentMeta !== undefined
+        ? (b.agentMeta ? { ...b.agentMeta } : null)
+        : (existing.agent_meta ? JSON.parse(existing.agent_meta) : null);
+    if (b.draftText && agentMetaObj && Array.isArray(agentMetaObj.regenerateNotes) && agentMetaObj.regenerateNotes.length > 0) {
+        agentMetaObj = { ...agentMetaObj, regenerateNotes: [] };
+    }
+
+    // Same editor/quality-gate recompute as POST (see validateDraft above):
+    // when an agent-sourced idea's draftText is (re)written, desc and
+    // quality_flags must be rebuilt from it too, or the assembled post text
+    // shown everywhere else in the app would stay frozen at the pre-rework
+    // version even though draftText itself changed underneath it. Only
+    // triggers when draftText is actually present in this PUT - a normal
+    // edit that doesn't touch draftText leaves desc/quality_flags exactly as
+    // before.
+    let desc = b.desc !== undefined ? b.desc : existing.desc;
+    let qualityFlags = b.qualityFlags !== undefined ? b.qualityFlags : JSON.parse(existing.quality_flags || '[]');
+    if (resolvedSource === 'agent' && b.draftText) {
+        const { flags, assembledText } = validateDraft({ ...b.draftText, format: resolvedFormat });
+        qualityFlags = flags;
+        desc = assembledText;
+    }
+
     const merged = {
         id: existing.id,
         title: b.title !== undefined ? String(b.title).trim() : existing.title,
-        desc: b.desc !== undefined ? b.desc : existing.desc,
-        format: b.format !== undefined ? b.format : existing.format,
+        desc,
+        format: resolvedFormat,
         funnel: b.funnel !== undefined ? b.funnel : existing.funnel,
         status: b.status !== undefined ? b.status : existing.status,
         cta: b.cta !== undefined ? b.cta : existing.cta,
@@ -166,13 +244,13 @@ router.put('/:id', async (req, res) => {
         metrics_saves: b.metrics?.saves !== undefined ? b.metrics.saves : existing.metrics_saves,
         metrics_clicks: b.metrics?.clicks !== undefined ? b.metrics.clicks : existing.metrics_clicks,
         metrics_leads: b.metrics?.leads !== undefined ? b.metrics.leads : existing.metrics_leads,
-        source: b.source !== undefined ? b.source : existing.source,
-        agent_meta: b.agentMeta !== undefined ? (b.agentMeta ? JSON.stringify(b.agentMeta) : null) : existing.agent_meta,
+        source: resolvedSource,
+        agent_meta: agentMetaObj ? JSON.stringify(agentMetaObj) : null,
         draft_text: b.draftText !== undefined ? (b.draftText ? JSON.stringify(b.draftText) : null) : existing.draft_text,
         content_type: b.contentType !== undefined ? b.contentType : existing.content_type,
         expires_at: b.expiresAt !== undefined ? b.expiresAt : existing.expires_at,
         rubric_id: b.rubricId !== undefined ? b.rubricId : existing.rubric_id,
-        quality_flags: b.qualityFlags !== undefined ? JSON.stringify(b.qualityFlags) : existing.quality_flags,
+        quality_flags: JSON.stringify(qualityFlags),
         cover_asset_id: b.coverAssetId !== undefined ? b.coverAssetId : existing.cover_asset_id,
         title_en: b.titleEn !== undefined ? b.titleEn : existing.title_en,
         desc_en: b.descEn !== undefined ? b.descEn : existing.desc_en,

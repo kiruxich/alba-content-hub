@@ -3,6 +3,7 @@ import Parser from 'rss-parser';
 import { db } from '../db.js';
 import { embed, cosineSimilarity } from '../lib/embeddings.js';
 import { PRODUCTS } from '../lib/products.js';
+import { checkBudgetCap } from '../lib/checkBudgetCap.js';
 
 const router = Router();
 const rssParser = new Parser({ timeout: 10000 });
@@ -130,6 +131,16 @@ async function runResearcher(req, res) {
     const runDate = new Date().toISOString().slice(0, 10);
 
     try {
+        const budgetStatus = await checkBudgetCap();
+        if (budgetStatus.exceeded) {
+            await logRun(
+                runDate, 'skipped',
+                `Daily budget cap of $${budgetStatus.capUsd} reached (spent $${budgetStatus.spentTodayUsd} today).`,
+                0, 0
+            );
+            return res.json({ status: 'skipped', reason: 'budget_exceeded' });
+        }
+
         const settingsResult = await db.execute('SELECT sources FROM agent_settings WHERE id = 1');
         const sources = JSON.parse(settingsResult.rows[0]?.sources || '[]');
 
