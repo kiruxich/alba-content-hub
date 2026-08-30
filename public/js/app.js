@@ -2006,16 +2006,17 @@ async function renderMediaAssets() {
     const grid = document.getElementById('media-assets-grid');
     if (!grid) return;
 
-    // Product select in the add-form only needs populating once per session.
-    const productSelect = document.getElementById('ma-product-input');
-    if (productSelect && productSelect.options.length <= 1) {
-        productsData.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = p.title;
-            productSelect.appendChild(opt);
-        });
-    }
+    // Product selects in the add-form and generate-form only need populating once per session.
+    [document.getElementById('ma-product-input'), document.getElementById('ma-gen-product-input')].forEach(productSelect => {
+        if (productSelect && productSelect.options.length <= 1) {
+            productsData.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.title;
+                productSelect.appendChild(opt);
+            });
+        }
+    });
 
     try {
         const params = new URLSearchParams();
@@ -2106,6 +2107,7 @@ function drawMediaAssetsGrid() {
 }
 
 function openAddMediaAssetForm() {
+    document.getElementById('media-asset-generate-form').style.display = 'none';
     document.getElementById('media-asset-form').style.display = 'block';
     document.getElementById('ma-url-input').value = '';
     document.getElementById('ma-tags-input').value = '';
@@ -2147,6 +2149,52 @@ async function deleteMediaAsset(id) {
         drawMediaAssetsGrid();
     } catch (e) {
         showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+// AI-ГЕНЕРАЦИЯ ОБЛОЖЕК ЧЕРЕЗ kie.ai (Flux/Kling) - см. server/routes/mediaAssets.js.
+// Кнопка всегда видна: доступность kie.ai определяется сервером (KIE_API_KEY),
+// а не каким-то заранее известным фронтенду флагом - если ключ не настроен,
+// сервер вернёт 503 с понятным текстом, который просто показывается в тосте.
+function openGenerateMediaAssetForm() {
+    document.getElementById('media-asset-form').style.display = 'none';
+    document.getElementById('media-asset-generate-form').style.display = 'block';
+    document.getElementById('ma-gen-prompt-input').value = '';
+    document.getElementById('ma-gen-type-input').value = 'image';
+    document.getElementById('ma-gen-product-input').value = '';
+}
+
+function closeGenerateMediaAssetForm() {
+    document.getElementById('media-asset-generate-form').style.display = 'none';
+}
+
+async function submitGenerateMediaAsset() {
+    const prompt = document.getElementById('ma-gen-prompt-input').value.trim();
+    const type = document.getElementById('ma-gen-type-input').value;
+    const productId = document.getElementById('ma-gen-product-input').value;
+
+    if (!prompt) return alert('Опишите, что должно быть на обложке');
+
+    const btn = document.getElementById('ma-gen-submit-btn');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Генерируем...';
+
+    const endpoint = type === 'video' ? '/api/media-assets/generate-video' : '/api/media-assets/generate-cover';
+    try {
+        const created = await api(endpoint, {
+            method: 'POST',
+            body: JSON.stringify({ prompt, productId: productId || null }),
+        });
+        mediaAssets.unshift(created);
+        drawMediaAssetsGrid();
+        closeGenerateMediaAssetForm();
+        showToast('Обложка сгенерирована!');
+    } catch (e) {
+        showToast(e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
     }
 }
 

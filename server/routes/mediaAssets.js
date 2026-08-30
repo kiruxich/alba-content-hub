@@ -1,7 +1,31 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { isKieConfigured, generateImage, generateVideo } from '../lib/kieClient.js';
 
 const router = Router();
+
+// Agent identity used for kie.ai-driven spend rows in agent_expenses -
+// distinguishes AI-generated-cover spend from Researcher/Generator LLM
+// token spend, which use their own agent_name values.
+const KIE_AGENT_NAME = 'generator';
+
+async function insertGeneratedAsset({ url, type, productId, modelUsed, creditsConsumed }) {
+    const id = String(Date.now());
+    await db.execute({
+        sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
+              VALUES (?, ?, ?, ?, NULL, '[]', 'ai_generated')`,
+        args: [id, url, type, productId || null],
+    });
+    // Cost is only logged once generation has already succeeded (the asset
+    // row above is inserted first) - a failed/timed-out generation never
+    // reaches this point, so agent_expenses only ever reflects confirmed spend.
+    await db.execute({
+        sql: `INSERT INTO agent_expenses (agent_name, model_used, kie_credits_spent) VALUES (?, ?, ?)`,
+        args: [KIE_AGENT_NAME, modelUsed, creditsConsumed || 0],
+    });
+    const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [id] });
+    return result.rows[0];
+}
 
 function serialize(row) {
     return {
@@ -98,6 +122,61 @@ router.post('/:id/use', async (req, res) => {
     await db.execute({ sql: 'UPDATE media_assets SET used_count = used_count + 1 WHERE id = ?', args: [row.id] });
     const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [row.id] });
     res.json(serialize(result.rows[0]));
+});
+
+// POST /api/media-assets/generate-cover - AI-generate an image cover via
+// kie.ai's Flux model and store it as a new media_assets row. Gated behind
+// KIE_API_KEY: with no key set, this returns 503 with a Russian message the
+// UI surfaces directly (see kieClient.js's isKieConfigured()).
+router.post('/generate-cover', async (req, res) => {
+    if (!isKieConfigured()) {
+        return res.status(503).json({ error: 'kie.ai не настроен — добавьте KIE_API_KEY в переменные окружения' });
+    }
+    const b = req.body || {};
+    const prompt = (b.prompt || '').trim();
+    if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+
+    try {
+        const { url, creditsConsumed } = await generateImage(prompt);
+        const row = await insertGeneratedAsset({
+            url,
+            type: 'image',
+            productId: b.productId,
+            modelUsed: 'flux-2/pro-text-to-image',
+            creditsConsumed,
+        });
+        res.status(201).json(serialize(row));
+    } catch (e) {
+        console.error('generate-cover: kie.ai request failed:', e.message);
+        res.status(502).json({ error: `Не удалось сгенерировать изображение через kie.ai: ${e.message}` });
+    }
+});
+
+// POST /api/media-assets/generate-video - same idea, but a short video cover
+// via kie.ai's Kling model. Generation takes noticeably longer than an image
+// (kieClient.js gives it a longer poll timeout).
+router.post('/generate-video', async (req, res) => {
+    if (!isKieConfigured()) {
+        return res.status(503).json({ error: 'kie.ai не настроен — добавьте KIE_API_KEY в переменные окружения' });
+    }
+    const b = req.body || {};
+    const prompt = (b.prompt || '').trim();
+    if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+
+    try {
+        const { url, creditsConsumed } = await generateVideo(prompt);
+        const row = await insertGeneratedAsset({
+            url,
+            type: 'video',
+            productId: b.productId,
+            modelUsed: 'kling-2.6/text-to-video',
+            creditsConsumed,
+        });
+        res.status(201).json(serialize(row));
+    } catch (e) {
+        console.error('generate-video: kie.ai request failed:', e.message);
+        res.status(502).json({ error: `Не удалось сгенерировать видео через kie.ai: ${e.message}` });
+    }
 });
 
 export default router;

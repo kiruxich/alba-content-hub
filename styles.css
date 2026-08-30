@@ -171,6 +171,7 @@ html, body {
 
 .action-btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .schedule-btn { background: var(--accent-blue); color: white; border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.schedule-btn:disabled, .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .tg-btn { background: #229ED9; color: white; border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .edit-btn { background: rgba(255,255,255,0.1); color: var(--text-primary); border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .delete-btn { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }

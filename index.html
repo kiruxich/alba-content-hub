@@ -303,7 +303,10 @@
             <div class="clients-container">
                 <div class="controls-row">
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Каталог уже размещённых картинок/видео по URL (S3 alba-creation.ru и т.п.) — файлы сюда не загружаются, только ссылки</p>
-                    <button class="schedule-btn" onclick="openAddMediaAssetForm()">+ Добавить медиа</button>
+                    <div style="display:flex; gap:8px;">
+                        <button class="schedule-btn" onclick="openAddMediaAssetForm()">+ Добавить медиа</button>
+                        <button class="schedule-btn" style="background:var(--accent-purple);" onclick="openGenerateMediaAssetForm()">✨ Сгенерировать обложку</button>
+                    </div>
                 </div>
 
                 <div id="media-asset-form" class="info-box" style="display:none; margin-bottom:16px;">
@@ -328,6 +331,29 @@
                     <div style="display:flex; gap:8px;">
                         <button class="submit-btn" style="margin-top:0;" onclick="submitNewMediaAsset()">Добавить</button>
                         <button class="edit-btn" onclick="closeAddMediaAssetForm()">Отмена</button>
+                    </div>
+                </div>
+
+                <div id="media-asset-generate-form" class="info-box" style="display:none; margin-bottom:16px;">
+                    <label class="form-label">Опишите, что должно быть на обложке:</label>
+                    <textarea id="ma-gen-prompt-input" class="form-textarea" style="min-height:70px;" placeholder="Например: минималистичная обложка для поста про AI-аналитику, тёмный фон, синие акценты"></textarea>
+
+                    <label class="form-label">Тип генерации:</label>
+                    <select id="ma-gen-type-input" class="form-select">
+                        <option value="image">Изображение (Flux)</option>
+                        <option value="video">Видео (Kling, дольше и дороже)</option>
+                    </select>
+
+                    <label class="form-label">Продукт (необязательно):</label>
+                    <select id="ma-gen-product-input" class="form-select">
+                        <option value="">— без привязки —</option>
+                    </select>
+
+                    <p style="color:var(--text-secondary); font-size:12px; margin:4px 0 0;">Генерация может занять до нескольких минут — окно можно не закрывать, кнопка заблокируется на время запроса.</p>
+
+                    <div style="display:flex; gap:8px;">
+                        <button class="submit-btn" style="margin-top:0;" id="ma-gen-submit-btn" onclick="submitGenerateMediaAsset()">Сгенерировать</button>
+                        <button class="edit-btn" onclick="closeGenerateMediaAssetForm()">Отмена</button>
                     </div>
                 </div>
 
