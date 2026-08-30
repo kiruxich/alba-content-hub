@@ -107,11 +107,7 @@
                 <div class="controls-row">
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Управление гипотезами и связи с продуктами</p>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="edit-btn" onclick="openTgSettings()">⚙️ TG Бот</button>
-                        <button class="edit-btn" onclick="openVkSettings()">⚙️ VK</button>
-                        <button class="edit-btn" onclick="openIgSettings()">⚙️ Instagram</button>
-                        <button class="edit-btn" onclick="openYtSettings()">⚙️ YouTube</button>
-                        <button class="edit-btn" onclick="openThSettings()">⚙️ Threads</button>
+                        <button class="edit-btn" onclick="openPublishSettingsModal()">⚙️ Настройки публикаций</button>
                         <button class="edit-btn" onclick="document.getElementById('import-file-input').click()">📂 Импорт</button>
                         <button class="edit-btn" onclick="exportIdeasJSON()">💾 Экспорт</button>
                         <button class="schedule-btn" onclick="openNewIdeaModal()">+ Новая идея</button>
@@ -949,107 +945,142 @@
         </div>
     </div>
 
-    <!-- TELEGRAM CONFIG MODAL -->
-    <div id="tg-config-overlay" class="overlay">
+    <!-- CONSOLIDATED PUBLISH SETTINGS MODAL (Task 4: one modal, one tab per platform,
+         replacing the previous 5 separate ⚙️ buttons/overlays. Telegram's tab also hosts
+         channel management (add/rename/delete) - see server/routes/settings.js
+         /telegram-channels CRUD. -->
+    <div id="publish-settings-overlay" class="overlay">
         <div class="drawer-content">
             <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Настройки Telegram Bot</span>
-                <button class="back-btn" onclick="closeOverlay('tg-config-overlay')">Закрыть ✕</button>
+                <span style="font-weight:600; font-size:16px;">Настройки публикаций</span>
+                <button class="back-btn" onclick="closeOverlay('publish-settings-overlay')">Закрыть ✕</button>
             </div>
             <div class="modal-body">
-                <label class="form-label">Bot API Token:</label>
-                <input type="text" id="tg-token-input" class="form-input" placeholder="123456789:ABCdefGHI...">
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px;">
+                    <button class="edit-btn ps-tab-btn" data-ps-tab="tg" onclick="switchPublishSettingsTab('tg')">✈️ Telegram</button>
+                    <button class="edit-btn ps-tab-btn" data-ps-tab="vk" onclick="switchPublishSettingsTab('vk')">🔵 VK</button>
+                    <button class="edit-btn ps-tab-btn" data-ps-tab="ig" onclick="switchPublishSettingsTab('ig')">📸 Instagram</button>
+                    <button class="edit-btn ps-tab-btn" data-ps-tab="yt" onclick="switchPublishSettingsTab('yt')">▶️ YouTube</button>
+                    <button class="edit-btn ps-tab-btn" data-ps-tab="th" onclick="switchPublishSettingsTab('th')">🧵 Threads</button>
+                </div>
 
-                <label class="form-label">Chat ID / @ChannelUsername:</label>
-                <input type="text" id="tg-chat-input" class="form-input" placeholder="@my_channel или -10012345678">
+                <!-- TELEGRAM TAB -->
+                <div id="ps-tab-tg" class="ps-tab-content">
+                    <label class="form-label" style="margin-top:0;">Bot API Token:</label>
+                    <input type="text" id="tg-token-input" class="form-input" placeholder="123456789:ABCdefGHI...">
 
-                <button class="submit-btn" onclick="saveTgSettings()">Сохранить настройки</button>
+                    <label class="form-label">Chat ID / @ChannelUsername (админ-чат для уведомлений и модерации, не публикация):</label>
+                    <input type="text" id="tg-chat-input" class="form-input" placeholder="@my_channel или -10012345678">
+
+                    <button class="submit-btn" onclick="saveTgSettings()">Сохранить токен</button>
+
+                    <div class="info-box" style="margin-top:20px;">
+                        <strong>Каналы для публикации</strong>
+                        <p style="color:var(--text-secondary); font-size:12px; margin:6px 0 12px;">Один бот (токен выше) может публиковать в несколько каналов, где он админ. Эти каналы появятся в выборе при публикации идеи из «Банка идей».</p>
+                        <div id="tg-channels-list"></div>
+                        <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-start;">
+                            <input type="text" id="tg-new-channel-label" class="form-input" style="margin:0;" placeholder="Название (например, Основной канал)">
+                            <input type="text" id="tg-new-channel-chatid" class="form-input" style="margin:0;" placeholder="Chat ID / @username">
+                            <button class="schedule-btn" style="white-space:nowrap;" onclick="addTelegramChannel()">+ Добавить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VK TAB -->
+                <div id="ps-tab-vk" class="ps-tab-content" style="display:none;">
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Токен сообщества (community access token) с правом wall — создаётся в настройках сообщества VK или через Standalone-приложение.</p>
+                    <label class="form-label">Access Token сообщества:</label>
+                    <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
+
+                    <label class="form-label">ID сообщества (group_id, без минуса):</label>
+                    <input type="text" id="vk-group-input" class="form-input" placeholder="123456789">
+
+                    <button class="submit-btn" onclick="saveVkSettings()">Сохранить настройки</button>
+                </div>
+
+                <!-- INSTAGRAM TAB -->
+                <div id="ps-tab-ig" class="ps-tab-content" style="display:none;">
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Page access token из приложения Meta Graph API, привязанного к странице Facebook с подключённым Instagram Business/Creator аккаунтом.</p>
+                    <label class="form-label">Page Access Token:</label>
+                    <input type="text" id="ig-token-input" class="form-input" placeholder="EAAxxxxxxxx...">
+
+                    <label class="form-label">Instagram Business Account ID:</label>
+                    <input type="text" id="ig-account-input" class="form-input" placeholder="17841400000000000">
+
+                    <button class="submit-btn" onclick="saveIgSettings()">Сохранить настройки</button>
+                </div>
+
+                <!-- YOUTUBE TAB -->
+                <div id="ps-tab-yt" class="ps-tab-content" style="display:none;">
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">OAuth2-приложение из Google Cloud Console + refresh token, полученный один раз через экран согласия (не просто токен, как в Telegram/VK).</p>
+                    <label class="form-label">OAuth Client ID:</label>
+                    <input type="text" id="yt-client-id-input" class="form-input" placeholder="xxxxx.apps.googleusercontent.com">
+
+                    <label class="form-label">OAuth Client Secret:</label>
+                    <input type="text" id="yt-client-secret-input" class="form-input" placeholder="GOCSPX-xxxxxxxx...">
+
+                    <label class="form-label">Refresh Token:</label>
+                    <input type="text" id="yt-refresh-token-input" class="form-input" placeholder="1//0gxxxxxxxx...">
+
+                    <label class="form-label">Название канала (опционально, для справки):</label>
+                    <input type="text" id="yt-channel-title-input" class="form-input" placeholder="Alba Creation">
+
+                    <button class="submit-btn" onclick="saveYtSettings()">Сохранить настройки</button>
+                </div>
+
+                <!-- THREADS TAB -->
+                <div id="ps-tab-th" class="ps-tab-content" style="display:none;">
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Threads user access token из приложения Meta с use case "Threads" (не Facebook Graph API) — нужны разрешения threads_basic и threads_content_publish, аккаунт должен пройти App Review.</p>
+                    <label class="form-label">Threads Access Token:</label>
+                    <input type="text" id="th-token-input" class="form-input" placeholder="THQVJ...xxxxxxxx...">
+
+                    <label class="form-label">Threads User ID:</label>
+                    <input type="text" id="th-user-input" class="form-input" placeholder="17841400000000000">
+
+                    <button class="submit-btn" onclick="saveThSettings()">Сохранить настройки</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- VK CONFIG MODAL -->
-    <div id="vk-config-overlay" class="overlay">
+    <!-- PUBLISH CONFIRMATION MODAL (Task 3: one "Опубликовать" entry point per idea card,
+         replacing the previous one-click-per-platform buttons. Nothing here fires a real
+         API call except the final "Подтвердить публикацию" button - see
+         openPublishModal/renderPublishModal/confirmPublish in public/js/app.js. -->
+    <div id="publish-overlay" class="overlay">
         <div class="drawer-content">
             <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Настройки VK</span>
-                <button class="back-btn" onclick="closeOverlay('vk-config-overlay')">Закрыть ✕</button>
+                <span style="font-weight:600; font-size:16px;">Опубликовать</span>
+                <button class="back-btn" onclick="closeOverlay('publish-overlay')">Отмена</button>
             </div>
             <div class="modal-body">
-                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Токен сообщества (community access token) с правом wall — создаётся в настройках сообщества VK или через Standalone-приложение.</p>
-                <label class="form-label">Access Token сообщества:</label>
-                <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
+                <h3 id="publish-idea-title" style="margin-top:0;">Название идеи</h3>
 
-                <label class="form-label">ID сообщества (group_id, без минуса):</label>
-                <input type="text" id="vk-group-input" class="form-input" placeholder="123456789">
+                <label class="form-label" style="margin-top:0;">Платформа:</label>
+                <div id="publish-platform-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;"></div>
 
-                <button class="submit-btn" onclick="saveVkSettings()">Сохранить настройки</button>
-            </div>
-        </div>
-    </div>
+                <div id="publish-channel-row" style="display:none;">
+                    <label class="form-label">Канал:</label>
+                    <select id="publish-channel-select" class="form-select" onchange="onPublishChannelChange()"></select>
+                </div>
 
-    <!-- INSTAGRAM CONFIG MODAL -->
-    <div id="ig-config-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Настройки Instagram</span>
-                <button class="back-btn" onclick="closeOverlay('ig-config-overlay')">Закрыть ✕</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Page access token из приложения Meta Graph API, привязанного к странице Facebook с подключённым Instagram Business/Creator аккаунтом.</p>
-                <label class="form-label">Page Access Token:</label>
-                <input type="text" id="ig-token-input" class="form-input" placeholder="EAAxxxxxxxx...">
+                <div id="publish-not-configured-box" class="info-box" style="display:none; margin-bottom:16px; border-color: rgba(255,69,58,0.35);"></div>
 
-                <label class="form-label">Instagram Business Account ID:</label>
-                <input type="text" id="ig-account-input" class="form-input" placeholder="17841400000000000">
+                <label class="form-label">Язык публикации:</label>
+                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                    <button id="publish-lang-ru-btn" class="edit-btn" onclick="setPublishLang('ru')">🇷🇺 RU</button>
+                    <button id="publish-lang-en-btn" class="edit-btn" onclick="setPublishLang('en')">🇬🇧 EN</button>
+                </div>
+                <p id="publish-lang-hint" style="color:var(--text-secondary); font-size:12px; margin:0 0 16px;"></p>
 
-                <button class="submit-btn" onclick="saveIgSettings()">Сохранить настройки</button>
-            </div>
-        </div>
-    </div>
+                <label class="form-label" style="margin-top:0;">Предпросмотр:</label>
+                <div class="info-box">
+                    <strong id="publish-preview-title"></strong>
+                    <p id="publish-preview-desc" style="margin:8px 0; white-space:pre-wrap;"></p>
+                    <p id="publish-preview-cta" style="color:var(--accent-blue); font-style:italic; margin:0;"></p>
+                </div>
 
-    <!-- YOUTUBE CONFIG MODAL -->
-    <div id="yt-config-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Настройки YouTube</span>
-                <button class="back-btn" onclick="closeOverlay('yt-config-overlay')">Закрыть ✕</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">OAuth2-приложение из Google Cloud Console + refresh token, полученный один раз через экран согласия (не просто токен, как в Telegram/VK).</p>
-                <label class="form-label">OAuth Client ID:</label>
-                <input type="text" id="yt-client-id-input" class="form-input" placeholder="xxxxx.apps.googleusercontent.com">
-
-                <label class="form-label">OAuth Client Secret:</label>
-                <input type="text" id="yt-client-secret-input" class="form-input" placeholder="GOCSPX-xxxxxxxx...">
-
-                <label class="form-label">Refresh Token:</label>
-                <input type="text" id="yt-refresh-token-input" class="form-input" placeholder="1//0gxxxxxxxx...">
-
-                <label class="form-label">Название канала (опционально, для справки):</label>
-                <input type="text" id="yt-channel-title-input" class="form-input" placeholder="Alba Creation">
-
-                <button class="submit-btn" onclick="saveYtSettings()">Сохранить настройки</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- THREADS CONFIG MODAL -->
-    <div id="th-config-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Настройки Threads</span>
-                <button class="back-btn" onclick="closeOverlay('th-config-overlay')">Закрыть ✕</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Threads user access token из приложения Meta с use case "Threads" (не Facebook Graph API) — нужны разрешения threads_basic и threads_content_publish, аккаунт должен пройти App Review.</p>
-                <label class="form-label">Threads Access Token:</label>
-                <input type="text" id="th-token-input" class="form-input" placeholder="THQVJ...xxxxxxxx...">
-
-                <label class="form-label">Threads User ID:</label>
-                <input type="text" id="th-user-input" class="form-input" placeholder="17841400000000000">
-
-                <button class="submit-btn" onclick="saveThSettings()">Сохранить настройки</button>
+                <button id="publish-confirm-btn" class="submit-btn" onclick="confirmPublish()">Подтвердить публикацию</button>
             </div>
         </div>
     </div>

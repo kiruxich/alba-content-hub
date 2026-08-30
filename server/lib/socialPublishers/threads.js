@@ -12,6 +12,8 @@
 // required. This module is self-contained: a failure here can't affect
 // Telegram/VK/Instagram/YouTube.
 
+import { pickLangFields } from '../resolveIdeaLang.js';
+
 const THREADS_API_VERSION = 'v1.0';
 const THREADS_API_BASE = `https://graph.threads.net/${THREADS_API_VERSION}`;
 
@@ -40,8 +42,9 @@ async function threadsCall(path, params, method = 'GET') {
 // Instagram/VK's captions this module doesn't hardcode hashtags into a
 // caption that could easily blow that budget, but it also doesn't enforce
 // the limit itself; Threads will reject an oversized post with a clear error.
-function buildText(idea) {
-    return `${idea.title}\n\n${idea.desc || ''}\n\n${idea.cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
+function buildText(idea, lang) {
+    const { title, desc, cta } = pickLangFields(idea, lang);
+    return `${title}\n\n${desc || ''}\n\n${cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
 }
 
 // Threads containers use a `status` field (IN_PROGRESS/FINISHED/ERROR/
@@ -63,13 +66,15 @@ async function waitForContainerReady(containerId, accessToken, { attempts = 10, 
 // and the Threads user id it publishes to (from GET /me on graph.threads.net).
 // coverAsset: { url, type } from media_assets for idea.cover_asset_id, or
 // null/undefined - Threads posts text-only when there's no cover.
-export async function publish(idea, credentials, coverAsset) {
+// lang: 'ru' (default) or 'en' - selects idea.title/desc/cta vs the _en mirror,
+// see server/lib/resolveIdeaLang.js.
+export async function publish(idea, credentials, coverAsset, lang) {
     const { accessToken, userId } = credentials || {};
     if (!accessToken || !userId) {
         return { success: false, error: 'Threads не настроен (нет access_token или user_id)' };
     }
 
-    const text = buildText(idea);
+    const text = buildText(idea, lang);
     const hasMedia = Boolean(coverAsset && coverAsset.url);
     const isVideo = hasMedia && coverAsset.type === 'video';
 

@@ -42,6 +42,32 @@ router.put('/telegram', async (req, res) => {
     });
 });
 
+// Telegram publish-target channels (see telegram_channels in server/db.js) -
+// distinct from the bot token above: one bot, many channels it's admin of,
+// picked in the Bank of Ideas "Опубликовать" modal. Full CRUD since there's
+// no secret here, just a label + chat id.
+router.get('/telegram-channels', async (req, res) => {
+    const result = await db.execute('SELECT id, label, chat_id, created_at FROM telegram_channels ORDER BY created_at ASC');
+    res.json(result.rows.map(row => ({ id: row.id, label: row.label, chatId: row.chat_id, createdAt: row.created_at })));
+});
+
+router.post('/telegram-channels', async (req, res) => {
+    const { label, chatId } = req.body || {};
+    if (!label || !String(label).trim()) return res.status(400).json({ error: 'Укажите название канала' });
+    if (!chatId || !String(chatId).trim()) return res.status(400).json({ error: 'Укажите chat_id канала' });
+    const result = await db.execute({
+        sql: 'INSERT INTO telegram_channels (label, chat_id) VALUES (?, ?)',
+        args: [String(label).trim(), String(chatId).trim()],
+    });
+    const id = Number(result.lastInsertRowid);
+    res.status(201).json({ id, label: String(label).trim(), chatId: String(chatId).trim() });
+});
+
+router.delete('/telegram-channels/:id', async (req, res) => {
+    await db.execute({ sql: 'DELETE FROM telegram_channels WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+});
+
 // VK, Instagram, and YouTube settings follow the exact same write-mostly
 // pattern as Telegram above: secrets never round-trip back to the browser in
 // full, only a masked preview + whether they're configured. See
