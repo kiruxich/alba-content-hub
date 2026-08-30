@@ -425,205 +425,136 @@
             </div>
             <div class="clients-container" style="max-width:1200px;">
                 <div class="p-section-title" style="margin-top:8px;">АРХИТЕКТУРА</div>
-                <div class="info-box" style="padding:0; overflow-x:auto;">
-                    <svg viewBox="0 0 1180 1580" style="width:100%; min-width:960px; display:block;">
-                        <defs>
-                            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                                <path d="M0,0 L10,5 L0,10 z" fill="var(--text-secondary)"/>
-                            </marker>
-                        </defs>
 
-                        <!-- LEGEND -->
-                        <rect x="40" y="14" width="1100" height="34" rx="10" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.1)"/>
-                        <line x1="60" y1="31" x2="90" y2="31" stroke="var(--text-secondary)" stroke-width="2"/>
-                        <text x="98" y="35" fill="var(--text-secondary)" font-size="11">— работает в проде</text>
-                        <line x1="290" y1="31" x2="320" y2="31" stroke="var(--accent-orange)" stroke-width="2" stroke-dasharray="5 4"/>
-                        <text x="328" y="35" fill="var(--text-secondary)" font-size="11">— код готов, ждёт ключей/деплоя</text>
-                        <line x1="620" y1="31" x2="650" y2="31" stroke="var(--accent-blue)" stroke-width="2" stroke-dasharray="2 3"/>
-                        <text x="658" y="35" fill="var(--text-secondary)" font-size="11">— код готов, ждёт активации (cron/routine)</text>
-                        <line x1="960" y1="31" x2="990" y2="31" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-dasharray="4 3"/>
-                        <text x="998" y="35" fill="var(--text-secondary)" font-size="11">— внешний сервис</text>
+                <!-- LEGEND -->
+                <div class="info-box" style="display:flex; flex-wrap:wrap; gap:8px 24px; align-items:center; margin-bottom:20px;">
+                    <span class="parser-niche-status done">● работает</span>
+                    <span style="color:var(--text-secondary); font-size:12px;">работает в проде</span>
+                    <span class="parser-niche-status captcha" style="margin-left:12px;">○ ждёт ключей</span>
+                    <span style="color:var(--text-secondary); font-size:12px;">код готов, ждёт ключей/деплоя</span>
+                    <span class="parser-niche-status running" style="margin-left:12px;">○ ждёт активации</span>
+                    <span style="color:var(--text-secondary); font-size:12px;">код готов, ждёт cron/routine</span>
+                    <span class="parser-niche-status idle" style="margin-left:12px;">◌ внешний</span>
+                    <span style="color:var(--text-secondary); font-size:12px;">сторонний сервис, не наш код</span>
+                </div>
 
-                        <!-- Row 1: user-facing -->
-                        <rect x="40" y="70" width="260" height="64" rx="14" fill="rgba(10,132,255,0.12)" stroke="var(--accent-blue)"/>
-                        <text x="170" y="96" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Браузер</text>
-                        <text x="170" y="114" text-anchor="middle" fill="var(--text-secondary)" font-size="10">админка hub.alba-creation.ru</text>
-                        <text x="170" y="128" text-anchor="middle" fill="var(--text-secondary)" font-size="10">за логином (single-admin auth)</text>
+                <!-- Layer: clients -->
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Браузер</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Админ-панель на hub.alba-creation.ru. Открывается только после входа — single-admin логин (signed cookie + bcrypt), больше никто зайти не может.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Telegram-бот</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Сводки тем от Researcher, черновики от Generator на approve/reject/regenerate, уведомления от hub — всё в одном чате.</p>
+                    </div>
+                </div>
+                <div style="text-align:center; color:var(--text-secondary); opacity:0.5; font-size:18px; margin:2px 0 18px;">↓</div>
 
-                        <rect x="880" y="70" width="260" height="64" rx="14" fill="rgba(48,209,88,0.12)" stroke="var(--accent-green)"/>
-                        <text x="1010" y="96" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Telegram-бот</text>
-                        <text x="1010" y="114" text-anchor="middle" fill="var(--text-secondary)" font-size="10">сводки, уведомления,</text>
-                        <text x="1010" y="128" text-anchor="middle" fill="var(--text-secondary)" font-size="10">approve/reject/regenerate черновиков</text>
+                <!-- Layer: nginx -->
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>nginx (VPS)</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Единая точка входа: SSL-терминация, роутинг по доменам (hub / alba-creation / …), проксирует /media/ до SeaweedFS и /vnc/ до parser-worker.</p>
+                    </div>
+                </div>
+                <div style="text-align:center; color:var(--text-secondary); opacity:0.5; font-size:18px; margin:2px 0 18px;">↓</div>
 
-                        <!-- Row 2: nginx -->
-                        <rect x="470" y="190" width="240" height="56" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.25)"/>
-                        <text x="590" y="213" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">nginx (VPS)</text>
-                        <text x="590" y="230" text-anchor="middle" fill="var(--text-secondary)" font-size="10">SSL, роутинг по доменам, /vnc/ прокси</text>
+                <!-- Layer: hub (hero) -->
+                <div class="parser-niche-card" style="background:linear-gradient(165deg, rgba(10,132,255,0.16), rgba(10,132,255,0.03) 65%); border-color:rgba(10,132,255,0.4);">
+                    <div class="parser-niche-head"><b style="font-size:15px;">hub — Express API</b><span class="parser-niche-status done">● работает</span></div>
+                    <p class="idea-desc-text" style="margin-bottom:0;">Coolify-контейнер с основной бизнес-логикой: REST API, статика фронтенда, Editor-валидация черновиков без AI, auth-гейт (signed cookie + bcrypt) перед всеми роутами. Обращается ко всем сервисам и внешним API ниже.</p>
+                </div>
+                <div style="text-align:center; color:var(--accent-blue); opacity:0.7; font-size:12px; margin:10px 0 22px;">↓ hub обращается ко всем блокам ниже (они не связаны между собой напрямую)</div>
 
-                        <!-- Row 3: hub -->
-                        <rect x="370" y="300" width="440" height="92" rx="16" fill="rgba(10,132,255,0.15)" stroke="var(--accent-blue)" stroke-width="1.5"/>
-                        <text x="590" y="328" text-anchor="middle" fill="var(--text-primary)" font-size="14" font-weight="700">hub — Express API</text>
-                        <text x="590" y="346" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Coolify-контейнер: вся бизнес-логика, статика фронтенда,</text>
-                        <text x="590" y="362" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Editor-валидация черновиков без AI, single-admin auth-гейт</text>
-                        <text x="590" y="378" text-anchor="middle" fill="var(--text-secondary)" font-size="10">(signed cookie, bcrypt) перед всеми роутами и статикой</text>
+                <!-- Layer: data & storage -->
+                <div class="p-section-title">ДАННЫЕ И ХРАНИЛИЩЕ</div>
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Turso (libSQL)</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Облачная БД со всеми бизнес-данными — продукты, идеи, медиа, настройки агентов. Отдельный сервис, не в Coolify.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>S3-хранилище (SeaweedFS)</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Self-hosted S3-совместимое хранилище на Coolify. Постоянные ссылки на обложки/видео/озвучку вместо base64 и временных URL от kie.ai. Публично раздаётся через nginx /media/.</p>
+                    </div>
+                </div>
 
-                        <!-- Row 4: data layer -->
-                        <rect x="60" y="440" width="260" height="80" rx="14" fill="rgba(255,159,10,0.12)" stroke="var(--accent-orange)"/>
-                        <text x="190" y="468" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Turso (libSQL)</text>
-                        <text x="190" y="486" text-anchor="middle" fill="var(--text-secondary)" font-size="10">облачная БД, все бизнес-данные</text>
-                        <text x="190" y="502" text-anchor="middle" fill="var(--text-secondary)" font-size="10">не в Coolify, отдельный сервис</text>
+                <!-- Layer: self-hosted workers -->
+                <div class="p-section-title">SELF-HOSTED СЕРВИСЫ (COOLIFY)</div>
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>parser-worker</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Xvfb + headed Chromium + Playwright — обходит блокировку headless-браузеров у <b>2ГИС</b> (внешний сервис). Очередь job'ов, noVNC для ручного решения капчи, + загрузка готовых Excel-списков.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>LibreTranslate</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Свои модели en/ru, переводит карточки идей на английский. Бесплатная альтернатива платным translation API.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Piper TTS</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Офлайн нейросетевая озвучка (ru_RU-dmitri). Бесплатная альтернатива ElevenLabs — выбирается в форме генерации озвучки.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>video-worker</b><span class="parser-niche-status captcha">○ ждёт деплоя</span></div>
+                        <p class="idea-desc-text">FFmpeg-сборка Shorts: видео-клип + озвучка + субтитры → готовый вертикальный ролик. Код готов, переменные добавлены, ждёт деплоя на Coolify.</p>
+                    </div>
+                </div>
 
-                        <rect x="360" y="440" width="260" height="80" rx="14" fill="rgba(255,159,10,0.06)" stroke="var(--accent-orange)" stroke-dasharray="5 4"/>
-                        <text x="490" y="468" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">S3-хранилище</text>
-                        <text x="490" y="486" text-anchor="middle" fill="var(--text-secondary)" font-size="10">R2 / self-hosted MinIO — постоянные</text>
-                        <text x="490" y="502" text-anchor="middle" fill="var(--text-secondary)" font-size="10">ссылки на медиа вместо base64/temp-URL</text>
+                <!-- Layer: generation APIs -->
+                <div class="p-section-title">ГЕНЕРАЦИЯ МЕДИА (ВНЕШНИЕ API)</div>
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>kie.ai (Flux / Kling)</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <p class="idea-desc-text">AI-обложки (Flux) и видео-клипы (Kling) по запросу. Ждёт KIE_API_KEY.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>ElevenLabs</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <p class="idea-desc-text">Платная озвучка высокого качества, несколько голосов на выбор. Ждёт ELEVENLABS_API_KEY.</p>
+                    </div>
+                </div>
 
-                        <!-- 2GIS external target -->
-                        <rect x="660" y="450" width="170" height="50" rx="20" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4 3"/>
-                        <text x="745" y="480" text-anchor="middle" fill="var(--text-secondary)" font-size="12" font-weight="600">2ГИС (внешний)</text>
+                <!-- Layer: publish platforms -->
+                <div class="p-section-title">ПУБЛИКАЦИЯ (ВНЕШНИЕ API)</div>
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>VK</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <p class="idea-desc-text">wall.post, community-токен. Ждёт токена в настройках.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Instagram</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <p class="idea-desc-text">Graph API, нужен Business-аккаунт. Ждёт токена в настройках.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>YouTube</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <p class="idea-desc-text">Data API v3, resumable upload. Ждёт OAuth — есть скрипт register-youtube-oauth.mjs.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Threads</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <p class="idea-desc-text">Отдельный API Meta (graph.threads.net), не тот же что у Instagram. Ждёт App Review от Meta.</p>
+                    </div>
+                </div>
 
-                        <!-- Row 5: self-hosted Coolify workers -->
-                        <text x="60" y="570" fill="var(--text-secondary)" font-size="11" font-weight="700" letter-spacing="0.5">SELF-HOSTED СЕРВИСЫ (COOLIFY)</text>
-                        <rect x="40" y="586" width="260" height="106" rx="14" fill="rgba(191,90,242,0.12)" stroke="var(--accent-purple)"/>
-                        <text x="170" y="612" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">parser-worker</text>
-                        <text x="170" y="630" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Xvfb + headed Chromium + Playwright</text>
-                        <text x="170" y="646" text-anchor="middle" fill="var(--text-secondary)" font-size="10">парсит 2ГИС, очередь job'ов,</text>
-                        <text x="170" y="662" text-anchor="middle" fill="var(--text-secondary)" font-size="10">noVNC — вручную решить капчу</text>
-                        <text x="170" y="680" text-anchor="middle" fill="var(--text-secondary)" font-size="10">+ загрузка готовых Excel-списков</text>
-
-                        <rect x="320" y="586" width="220" height="106" rx="14" fill="rgba(10,132,255,0.10)" stroke="var(--accent-blue)"/>
-                        <text x="430" y="612" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">LibreTranslate</text>
-                        <text x="430" y="630" text-anchor="middle" fill="var(--text-secondary)" font-size="10">свои модели en/ru,</text>
-                        <text x="430" y="646" text-anchor="middle" fill="var(--text-secondary)" font-size="10">перевод карточек идей</text>
-                        <text x="430" y="662" text-anchor="middle" fill="var(--text-secondary)" font-size="10">на английский, бесплатно</text>
-
-                        <rect x="560" y="586" width="220" height="106" rx="14" fill="rgba(48,209,88,0.10)" stroke="var(--accent-green)"/>
-                        <text x="670" y="612" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Piper TTS</text>
-                        <text x="670" y="630" text-anchor="middle" fill="var(--text-secondary)" font-size="10">офлайн нейросетевая озвучка</text>
-                        <text x="670" y="646" text-anchor="middle" fill="var(--text-secondary)" font-size="10">(ru_RU-dmitri), бесплатная</text>
-                        <text x="670" y="662" text-anchor="middle" fill="var(--text-secondary)" font-size="10">альтернатива ElevenLabs</text>
-
-                        <rect x="800" y="586" width="260" height="106" rx="14" fill="rgba(255,159,10,0.06)" stroke="var(--accent-orange)" stroke-dasharray="5 4"/>
-                        <text x="930" y="612" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">video-worker</text>
-                        <text x="930" y="630" text-anchor="middle" fill="var(--text-secondary)" font-size="10">FFmpeg-сборка Shorts: клип +</text>
-                        <text x="930" y="646" text-anchor="middle" fill="var(--text-secondary)" font-size="10">озвучка + субтитры → готовый ролик</text>
-                        <text x="930" y="662" text-anchor="middle" fill="var(--text-secondary)" font-size="10">код готов, ждёт деплоя на Coolify</text>
-
-                        <!-- Row 6: external generation APIs -->
-                        <text x="60" y="742" fill="var(--text-secondary)" font-size="11" font-weight="700" letter-spacing="0.5">ГЕНЕРАЦИЯ МЕДИА (ВНЕШНИЕ API)</text>
-                        <rect x="200" y="758" width="280" height="78" rx="14" fill="rgba(255,159,10,0.06)" stroke="var(--accent-orange)" stroke-dasharray="5 4"/>
-                        <text x="340" y="784" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">kie.ai (Flux / Kling)</text>
-                        <text x="340" y="802" text-anchor="middle" fill="var(--text-secondary)" font-size="10">AI-обложки и видео-клипы,</text>
-                        <text x="340" y="818" text-anchor="middle" fill="var(--text-secondary)" font-size="10">ждёт KIE_API_KEY</text>
-
-                        <rect x="520" y="758" width="280" height="78" rx="14" fill="rgba(255,159,10,0.06)" stroke="var(--accent-orange)" stroke-dasharray="5 4"/>
-                        <text x="660" y="784" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">ElevenLabs</text>
-                        <text x="660" y="802" text-anchor="middle" fill="var(--text-secondary)" font-size="10">платная озвучка высокого качества,</text>
-                        <text x="660" y="818" text-anchor="middle" fill="var(--text-secondary)" font-size="10">ждёт ELEVENLABS_API_KEY</text>
-
-                        <!-- Row 7: publish platforms -->
-                        <text x="60" y="892" fill="var(--text-secondary)" font-size="11" font-weight="700" letter-spacing="0.5">ПУБЛИКАЦИЯ (ВНЕШНИЕ API)</text>
-                        <rect x="40" y="908" width="260" height="72" rx="14" fill="rgba(255,69,58,0.08)" stroke="var(--accent-red)" stroke-dasharray="5 4"/>
-                        <text x="170" y="934" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">VK</text>
-                        <text x="170" y="952" text-anchor="middle" fill="var(--text-secondary)" font-size="10">wall.post, community-токен</text>
-                        <text x="170" y="968" text-anchor="middle" fill="var(--text-secondary)" font-size="10">ждёт токена в настройках</text>
-
-                        <rect x="320" y="908" width="260" height="72" rx="14" fill="rgba(255,69,58,0.08)" stroke="var(--accent-red)" stroke-dasharray="5 4"/>
-                        <text x="450" y="934" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Instagram</text>
-                        <text x="450" y="952" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Graph API, Business-аккаунт</text>
-                        <text x="450" y="968" text-anchor="middle" fill="var(--text-secondary)" font-size="10">ждёт токена в настройках</text>
-
-                        <rect x="600" y="908" width="260" height="72" rx="14" fill="rgba(255,69,58,0.08)" stroke="var(--accent-red)" stroke-dasharray="5 4"/>
-                        <text x="730" y="934" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">YouTube</text>
-                        <text x="730" y="952" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Data API v3, resumable upload</text>
-                        <text x="730" y="968" text-anchor="middle" fill="var(--text-secondary)" font-size="10">ждёт OAuth (register-youtube-oauth.mjs)</text>
-
-                        <rect x="880" y="908" width="260" height="72" rx="14" fill="rgba(255,69,58,0.08)" stroke="var(--accent-red)" stroke-dasharray="5 4"/>
-                        <text x="1010" y="934" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Threads</text>
-                        <text x="1010" y="952" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Meta Threads API (отд. от IG)</text>
-                        <text x="1010" y="968" text-anchor="middle" fill="var(--text-secondary)" font-size="10">ждёт App Review от Meta</text>
-
-                        <!-- Row 8: automation actors -->
-                        <text x="60" y="1042" fill="var(--text-secondary)" font-size="11" font-weight="700" letter-spacing="0.5">АГЕНТЫ (АВТОМАТИЗАЦИЯ)</text>
-                        <rect x="40" y="1058" width="260" height="120" rx="14" fill="rgba(48,209,88,0.10)" stroke="var(--accent-green)"/>
-                        <text x="170" y="1084" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Researcher</text>
-                        <text x="170" y="1102" text-anchor="middle" fill="var(--text-secondary)" font-size="10">system cron на VPS, каждый день 8:30</text>
-                        <text x="170" y="1118" text-anchor="middle" fill="var(--text-secondary)" font-size="10">читает RSS + считает embeddings</text>
-                        <text x="170" y="1134" text-anchor="middle" fill="var(--text-secondary)" font-size="10">локально, без LLM — cosine similarity</text>
-                        <text x="170" y="1150" text-anchor="middle" fill="var(--text-secondary)" font-size="10">к описаниям продуктов</text>
-                        <text x="170" y="1166" text-anchor="middle" fill="var(--accent-green)" font-size="10" font-weight="700">● работает</text>
-
-                        <rect x="320" y="1058" width="260" height="120" rx="14" fill="rgba(48,209,88,0.10)" stroke="var(--accent-green)"/>
-                        <text x="450" y="1084" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Generator</text>
-                        <text x="450" y="1102" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Claude Code routine (облако Anthropic),</text>
-                        <text x="450" y="1118" text-anchor="middle" fill="var(--text-secondary)" font-size="10">каждый день 9:15 (Amsterdam)</text>
-                        <text x="450" y="1134" text-anchor="middle" fill="var(--text-secondary)" font-size="10">читает бриф, пишет по формуле</text>
-                        <text x="450" y="1150" text-anchor="middle" fill="var(--text-secondary)" font-size="10">«Золотая середина», шлёт на approve</text>
-                        <text x="450" y="1166" text-anchor="middle" fill="var(--accent-green)" font-size="10" font-weight="700">● работает</text>
-
-                        <rect x="600" y="1058" width="260" height="120" rx="14" fill="rgba(10,132,255,0.06)" stroke="var(--accent-blue)" stroke-dasharray="2 3"/>
-                        <text x="730" y="1084" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Insights</text>
-                        <text x="730" y="1102" text-anchor="middle" fill="var(--text-secondary)" font-size="10">эндпоинт готов: агрегирует</text>
-                        <text x="730" y="1118" text-anchor="middle" fill="var(--text-secondary)" font-size="10">метрики публикаций, ищет</text>
-                        <text x="730" y="1134" text-anchor="middle" fill="var(--text-secondary)" font-size="10">закономерности по форматам/рубрикам</text>
-                        <text x="730" y="1150" text-anchor="middle" fill="var(--text-secondary)" font-size="10">и пишет выводы в agent_runs</text>
-                        <text x="730" y="1166" text-anchor="middle" fill="var(--accent-blue)" font-size="10" font-weight="700">○ ждёт запуска как routine</text>
-
-                        <rect x="880" y="1058" width="260" height="120" rx="14" fill="rgba(10,132,255,0.06)" stroke="var(--accent-blue)" stroke-dasharray="2 3"/>
-                        <text x="1010" y="1084" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700">Metrics Sync</text>
-                        <text x="1010" y="1102" text-anchor="middle" fill="var(--text-secondary)" font-size="10">эндпоинт готов: подтягивает</text>
-                        <text x="1010" y="1118" text-anchor="middle" fill="var(--text-secondary)" font-size="10">просмотры/лайки с VK/Instagram/</text>
-                        <text x="1010" y="1134" text-anchor="middle" fill="var(--text-secondary)" font-size="10">YouTube обратно в scheduled_events</text>
-                        <text x="1010" y="1150" text-anchor="middle" fill="var(--text-secondary)" font-size="10">по опубликованным постам</text>
-                        <text x="1010" y="1166" text-anchor="middle" fill="var(--accent-blue)" font-size="10" font-weight="700">○ ждёт cron-записи</text>
-
-                        <!-- Arrows -->
-                        <line x1="170" y1="134" x2="520" y2="190" stroke="var(--text-secondary)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                        <line x1="590" y1="246" x2="590" y2="300" stroke="var(--text-secondary)" stroke-width="1.5" marker-end="url(#arrow)"/>
-
-                        <!-- hub -> data layer -->
-                        <line x1="480" y1="392" x2="250" y2="440" stroke="var(--accent-orange)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                        <line x1="530" y1="392" x2="500" y2="440" stroke="var(--accent-orange)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
-
-                        <!-- hub -> self-hosted workers -->
-                        <path d="M 460 392 C 350 450, 220 520, 170 586" fill="none" stroke="var(--accent-purple)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                        <path d="M 520 392 C 480 460, 440 530, 430 586" fill="none" stroke="var(--accent-blue)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                        <path d="M 620 392 C 640 460, 660 530, 670 586" fill="none" stroke="var(--accent-green)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                        <path d="M 700 392 C 800 460, 900 520, 930 586" fill="none" stroke="var(--accent-orange)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-
-                        <!-- parser-worker -> 2GIS -->
-                        <line x1="300" y1="630" x2="655" y2="475" stroke="var(--text-secondary)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
-
-                        <!-- hub -> generation APIs -->
-                        <path d="M 650 392 C 500 500, 400 650, 340 758" fill="none" stroke="var(--accent-orange)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-                        <path d="M 690 392 C 660 500, 660 650, 660 758" fill="none" stroke="var(--accent-orange)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-
-                        <!-- hub -> publish platforms -->
-                        <path d="M 550 392 C 300 550, 200 750, 170 908" fill="none" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-                        <path d="M 590 392 C 500 550, 460 750, 450 908" fill="none" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-                        <path d="M 630 392 C 700 550, 720 750, 730 908" fill="none" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-                        <path d="M 660 392 C 900 550, 990 750, 1010 908" fill="none" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-
-                        <!-- Researcher -> hub -->
-                        <path d="M 220 1058 C 300 900, 400 500, 470 392" fill="none" stroke="var(--accent-green)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                        <text x="225" y="1000" fill="var(--accent-green)" font-size="10">POST /agent-researcher/run</text>
-
-                        <!-- Researcher -> Telegram -->
-                        <path d="M 300 1070 C 700 950, 950 300, 1000 134" fill="none" stroke="var(--accent-green)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-                        <text x="700" y="700" fill="var(--accent-green)" font-size="10">сводка тем в Telegram</text>
-
-                        <!-- Generator <-> hub -->
-                        <path d="M 450 1058 C 480 900, 550 500, 590 392" fill="none" stroke="var(--accent-green)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                        <text x="470" y="1000" fill="var(--accent-green)" font-size="10">читает бриф, пишет черновик,</text>
-                        <text x="470" y="1014" fill="var(--accent-green)" font-size="10">черновик → Telegram на approve</text>
-
-                        <!-- Insights/Metrics -> hub (dotted, not active yet) -->
-                        <path d="M 700 1058 C 680 900, 650 500, 630 392" fill="none" stroke="var(--accent-blue)" stroke-width="1.5" stroke-dasharray="2 3" marker-end="url(#arrow)"/>
-                        <path d="M 950 1058 C 850 900, 720 500, 660 392" fill="none" stroke="var(--accent-blue)" stroke-width="1.5" stroke-dasharray="2 3" marker-end="url(#arrow)"/>
-
-                        <!-- hub -> Telegram -->
-                        <path d="M 810 340 C 950 260, 1030 200, 1010 134" fill="none" stroke="var(--accent-green)" stroke-width="1.5" marker-end="url(#arrow)"/>
-                    </svg>
+                <!-- Layer: agents -->
+                <div class="p-section-title">АГЕНТЫ (АВТОМАТИЗАЦИЯ)</div>
+                <p class="idea-desc-text" style="margin-top:-4px;">Стрелка обратная: агенты сами дёргают REST API hub'а по расписанию (cron / routine), а не hub вызывает их.</p>
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Researcher</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">System cron на VPS, каждый день в 8:30. Читает RSS, считает embeddings локально (без LLM) и находит ближайший по смыслу продукт — cosine similarity. → POST /agent-researcher/run.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Generator</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый день в 9:15 (Amsterdam). Читает бриф от Researcher, пишет пост по формуле «Золотая середина», шлёт черновик в Telegram на approve.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Insights</b><span class="parser-niche-status running">○ ждёт активации</span></div>
+                        <p class="idea-desc-text">Эндпоинт готов: агрегирует метрики публикаций, ищет закономерности по форматам/рубрикам, пишет выводы в agent_runs. Ждёт настройки как routine.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Metrics Sync</b><span class="parser-niche-status running">○ ждёт активации</span></div>
+                        <p class="idea-desc-text">Эндпоинт готов: подтягивает просмотры/лайки с VK/Instagram/YouTube обратно в scheduled_events по опубликованным постам. Ждёт cron-записи.</p>
+                    </div>
                 </div>
 
                 <div class="p-section-title" style="margin-top:24px;">КАК РАБОТАЮТ АГЕНТЫ (ТЕХНИЧЕСКИ)</div>
@@ -663,6 +594,67 @@
                     <div class="parser-niche-card">
                         <b>Почему X (Twitter) нет в списке площадок публикации</b>
                         <p class="idea-desc-text">У X с недавнего времени платный API для постинга. Threads (отдельное приложение Meta) закрывает тот же формат «тред» бесплатно (с App Review), поэтому в качестве формата контента остался только «Threads», без привязки к X.</p>
+                    </div>
+                </div>
+
+                <div class="p-section-title" style="margin-top:24px;">КАК ПОЛЬЗОВАТЬСЯ ХАБОМ</div>
+                <p class="idea-desc-text">Типовой пользовательский сценарий — от идеи из ленты до опубликованного поста.</p>
+                <div class="usage-steps">
+                    <div class="usage-step">
+                        <div class="usage-step-num">1</div>
+                        <div class="usage-step-body">
+                            <b>Утро — проверяете Telegram</b><span class="usage-step-tab">Telegram-бот</span>
+                            <p class="idea-desc-text">В 8:30 Researcher присылает сводку найденных тем, в 9:15 Generator — уже готовый черновик поста по одному из продуктов. В чате: approve / reject / regenerate.</p>
+                        </div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="usage-step-num">2</div>
+                        <div class="usage-step-body">
+                            <b>Approved-черновик открываете в «Банк идей»</b><span class="usage-step-tab">Банк идей</span>
+                            <p class="idea-desc-text">Читаете/правите текст, при необходимости меняете формат (TG-пост / Reels / Threads / Лонгрид), рубрику и этап воронки (TOFU/MOFU/BOFU). Идеи можно создавать и вручную, без агентов — кнопкой «+ Новая идея».</p>
+                        </div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="usage-step-num">3</div>
+                        <div class="usage-step-body">
+                            <b>Генерируете обложку / видео / озвучку</b><span class="usage-step-tab">Медиатека</span>
+                            <p class="idea-desc-text">AI-обложка и видео-клип через kie.ai (Flux/Kling), озвучка — ElevenLabs (платно, лучше качество) или Piper TTS (бесплатно, офлайн). Готовые файлы также можно просто загрузить руками.</p>
+                        </div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="usage-step-num">4</div>
+                        <div class="usage-step-body">
+                            <b>Публикуете с карточки идеи</b><span class="usage-step-tab">Банк идей</span>
+                            <p class="idea-desc-text">На карточке выбираете площадку (VK / Instagram / YouTube / Threads / нужный Telegram-канал), язык RU или EN, жмёте «Опубликовать» — открывается окно подтверждения с превью, и только после него пост уходит на площадку. Ничего не публикуется по одному клику без этого шага.</p>
+                        </div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="usage-step-num">5</div>
+                        <div class="usage-step-body">
+                            <b>Планируете дату и двигаете по пайплайну</b><span class="usage-step-tab">Календарь · Канбан</span>
+                            <p class="idea-desc-text">В «Календаре» назначаете дату публикации, в «Канбане» видите все идеи по статусам: 💡 Идея → ⚙️ В работе → ✅ Готово → 🚀 Опубликовано.</p>
+                        </div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="usage-step-num">6</div>
+                        <div class="usage-step-body">
+                            <b>Смотрите, что сработало</b><span class="usage-step-tab">Дашборд & Аналитика · Матрица</span>
+                            <p class="idea-desc-text">Дашборд — общие цифры по контенту, Матрица — куда двигать контент-стратегию по форматам/рубрикам. После включения Metrics Sync сюда же подтянутся реальные просмотры/лайки с площадок.</p>
+                        </div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="usage-step-num">7</div>
+                        <div class="usage-step-body">
+                            <b>Продукт «не туда» матчится — донастраиваете описание</b><span class="usage-step-tab">Продукты</span>
+                            <p class="idea-desc-text">Если Researcher подбирает Generator'у не тот продукт под тему, откройте карточку продукта и дополните ЦА, посыл, ключевые отличия, частые возражения, ключевые слова и роадмап — именно из этих полей Researcher строит embedding для сравнения.</p>
+                        </div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="usage-step-num">8</div>
+                        <div class="usage-step-body">
+                            <b>Вспомогательные вкладки — по мере надобности</b><span class="usage-step-tab">Скрипты · Заказчики · Проверка сайта · Центр агентов</span>
+                            <p class="idea-desc-text">«Скрипты» — шаблоны для менеджеров, «Заказчики» — база лидов (в т.ч. из parser-worker), «Проверка сайта» — юридический и нагрузочный аудит alba-creation.ru, «Центр агентов» — RSS-источники, тон голоса, промпт Generator'а, рубрики и история/расходы запусков.</p>
+                        </div>
                     </div>
                 </div>
             </div>

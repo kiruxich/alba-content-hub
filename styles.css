@@ -505,6 +505,22 @@ html, body {
     color: #8ee08e; max-height: 160px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
 }
 .parser-niche-console:empty::before { content: 'Логов пока нет — запустите обновление парсера.'; color: var(--text-secondary); font-family: inherit; }
+
+/* --- USAGE SCENARIO STEPS (О системе / Как пользоваться) --- */
+.usage-steps { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.usage-step { display: flex; gap: 16px; background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 16px 20px; }
+.usage-step-num {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(10,132,255,0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue);
+    font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;
+}
+.usage-step-body { min-width: 0; }
+.usage-step-body b { font-size: 14px; color: var(--text-primary); }
+.usage-step-tab {
+    display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--accent-blue);
+    background: rgba(10,132,255,0.1); border-radius: 6px; padding: 2px 7px; margin-left: 8px; vertical-align: middle;
+}
+.usage-step-body p.idea-desc-text { margin: 6px 0 0; }
 .parser-niche-files { display: flex; gap: 10px; flex-wrap: wrap; }
 .parser-file-badge {
     display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06);
