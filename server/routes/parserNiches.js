@@ -1,10 +1,17 @@
 import { Router } from 'express';
+import multer from 'multer';
+import XLSX from 'xlsx';
 import { db } from '../db.js';
 import { generateParserQueries } from '../lib/generateParserQueries.js';
 import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
 
 const router = Router();
 const WORKER_TOKEN = process.env.PARSER_WORKER_TOKEN || '';
+
+// Memory storage, not disk - Vercel's filesystem is read-only/ephemeral (see
+// server/db.js), and the parsed workbook is small enough to hold as a buffer
+// for the one trip through XLSX.read() before it's re-encoded into the DB.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 // Shared by every Telegram notification this file sends (captcha alert, job
 // done, job failed) - reads the bot token/chat set in Settings and swallows
@@ -108,7 +115,8 @@ router.post('/:id/run', async (req, res) => {
 
         await db.execute({
             sql: `UPDATE parser_niches SET status = 'queued', queries_json = ?, job_id = ?, log = '', stats_json = NULL,
-                  raw_file = NULL, dedup_file = NULL, archive_file = NULL, updated_at = strftime('%s','now') WHERE id = ?`,
+                  raw_file = NULL, dedup_file = NULL, archive_file = NULL,
+                  raw_upload_data = NULL, raw_upload_name = NULL, updated_at = strftime('%s','now') WHERE id = ?`,
             args: [JSON.stringify(queries), job.job_id, row.id],
         });
         const result = await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [row.id] });
@@ -205,9 +213,79 @@ router.post('/:id/archive', async (req, res) => {
     }
 });
 
+// "Загрузить Excel" - alternative to running the live 2GIS scraper: accepts
+// an already-prepared .xlsx of leads and stores it straight on the row, so
+// the rest of the card (download, status badge) behaves as if a scrape had
+// produced it. Dedupe/archive still require an actual worker job_id (they
+// call out to parser-worker), so they stay unavailable for upload-only rows
+// - see isActive/jobId gating in public/js/app.js.
+router.post('/:id/upload', (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: 'Не удалось загрузить файл: ' + err.message });
+        next();
+    });
+}, async (req, res) => {
+    const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'niche not found' });
+    if (ACTIVE_STATUSES.includes(row.status)) {
+        return res.status(409).json({ error: 'Парсинг ещё идёт — дождитесь завершения перед загрузкой файла' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'Файл не выбран' });
+
+    const originalName = req.file.originalname || 'raw.xlsx';
+    if (!/\.xlsx$/i.test(originalName)) {
+        return res.status(400).json({ error: 'Поддерживаются только файлы .xlsx' });
+    }
+
+    let workbook;
+    try {
+        workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    } catch (e) {
+        return res.status(400).json({ error: 'Не удалось прочитать Excel-файл: ' + e.message });
+    }
+    const sheetName = workbook.SheetNames[0];
+    const sheet = sheetName && workbook.Sheets[sheetName];
+    const rows = sheet ? XLSX.utils.sheet_to_json(sheet, { defval: '' }) : [];
+    if (!rows.length) {
+        return res.status(400).json({ error: 'Файл пустой или не содержит строк с данными' });
+    }
+
+    // Rebuild a clean single-sheet workbook so the download endpoint always
+    // hands back a consistent shape, whatever the original file's extra
+    // sheets/formatting looked like.
+    const cleanWb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(cleanWb, XLSX.utils.json_to_sheet(rows), 'Leads');
+    const outBuf = XLSX.write(cleanWb, { type: 'buffer', bookType: 'xlsx' });
+
+    await db.execute({
+        sql: `UPDATE parser_niches SET status = 'done', raw_file = 'raw.xlsx', dedup_file = NULL, archive_file = NULL,
+              raw_upload_data = ?, raw_upload_name = ?, log = ?, updated_at = strftime('%s','now') WHERE id = ?`,
+        args: [
+            outBuf.toString('base64'),
+            originalName,
+            `Загружен файл «${originalName}» — ${rows.length} строк.`,
+            row.id,
+        ],
+    });
+    const result = await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [row.id] });
+    res.json(serialize(result.rows[0]));
+});
+
 router.get('/:id/download/:kind', async (req, res) => {
     const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
-    if (!row || !row.job_id) return res.status(404).send('not found');
+    if (!row) return res.status(404).send('not found');
+
+    // Uploaded raw data lives right on the row (no worker job backs it) -
+    // serve it directly instead of going through fetchParserFile below.
+    if (req.params.kind === 'raw' && row.raw_upload_data) {
+        const buf = Buffer.from(row.raw_upload_data, 'base64');
+        const filename = (row.raw_upload_name || 'raw.xlsx').replace(/"/g, '');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(buf);
+    }
+
+    if (!row.job_id) return res.status(404).send('not found');
     try {
         const workerRes = await fetchParserFile(row.job_id, req.params.kind);
         res.setHeader('Content-Type', workerRes.headers.get('content-type') || 'application/octet-stream');

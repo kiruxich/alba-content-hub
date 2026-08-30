@@ -316,6 +316,13 @@ await ensureColumn('agent_runs', 'brief_json', 'TEXT');
 // on each incoming request in server/routes/telegramWebhook.js so the
 // endpoint can't be driven by spoofed requests once it's public.
 await ensureColumn('telegram_settings', 'webhook_secret', 'TEXT');
+// Raw lead data uploaded directly as an .xlsx (POST /:id/upload), bypassing
+// the 2GIS scraper entirely - stored as base64 bytes right on the row since
+// there's no job_id/parser-worker backing an upload to fetch bytes from
+// later, unlike scraper-produced files (see the download route in
+// parserNiches.js, which fetches those live from the worker by job_id).
+await ensureColumn('parser_niches', 'raw_upload_data', 'TEXT');
+await ensureColumn('parser_niches', 'raw_upload_name', 'TEXT');
 
 // Seed content_plan once with the studio's actual annual plan, shaped for the
 // quarterly-timeline UI: 'note' blocks are global strategy cards, 'quarter'
