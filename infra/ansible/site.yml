@@ -78,6 +78,9 @@
       loop_control:
         loop_var: site
 
+    - name: Системные cron-задачи (Researcher, автоочистка Docker)
+      include_tasks: tasks/setup_cron_jobs.yml
+
   handlers:
     - name: reload systemd
       systemd:

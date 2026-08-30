@@ -1,0 +1,41 @@
+# System cron.d jobs that were previously set up manually over SSH and never
+# recorded here - a fresh VM provisioned from this playbook would otherwise
+# silently miss them. Both are idempotent copies (same content every run).
+
+- name: "Cron: Researcher agent daily run"
+  copy:
+    dest: /etc/cron.d/alba-researcher
+    mode: "0644"
+    content: |
+      # Alba Content Hub - Researcher agent daily run
+      #
+      # Triggers the RSS-scan + trend-scoring + Telegram-summary agent every
+      # morning. Runs POST /api/agent-researcher/run on the hub itself.
+      # Migrated from Vercel Cron (removed when the app moved to this VPS/Coolify
+      # deployment) - see https://github.com/kiruxich/alba-content-hub
+      #
+      # CRON_TZ makes cron interpret the schedule below in Europe/Amsterdam local
+      # time (handles CET/CEST DST automatically), regardless of the system clock
+      # being UTC.
+      CRON_TZ=Europe/Amsterdam
+      30 8 * * * root curl -s -X POST https://hub.alba-creation.ru/api/agent-researcher/run >> /var/log/alba-researcher.log 2>&1
+
+- name: "Cron: automatic Docker disk cleanup"
+  copy:
+    dest: /etc/cron.d/docker-cleanup
+    mode: "0644"
+    content: |
+      # Alba Content Hub infra - automatic Docker disk cleanup
+      #
+      # Coolify builds a fresh image on every deploy across several services
+      # (hub, parser-worker, piper-tts, video-worker, seaweedfs) and never
+      # reclaims old layers/build cache on its own - disk filled to 100% and
+      # broke a hub deploy on 2026-08-30 after repeated same-day redeploys.
+      # This prunes images/build-cache Docker considers unused and older than
+      # 24h, so an in-progress or very recent deploy is never touched.
+      0 4 * * * root docker image prune -a -f --filter 'until=24h' >> /var/log/docker-cleanup.log 2>&1 && docker builder prune -a -f --filter 'until=24h' >> /var/log/docker-cleanup.log 2>&1 && df -h / >> /var/log/docker-cleanup.log 2>&1
+
+- name: Перезапустить cron, чтобы подхватить новые cron.d файлы
+  systemd:
+    name: cron
+    state: restarted
