@@ -12,6 +12,8 @@
 // This module is self-contained: a failure here can't affect
 // Telegram/VK/Instagram.
 
+import { pickLangFields } from '../resolveIdeaLang.js';
+
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const UPLOAD_URL = 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status';
 
@@ -34,13 +36,15 @@ async function getAccessToken({ clientId, clientSecret, refreshToken }) {
     return data.access_token;
 }
 
-function buildDescription(idea) {
-    return `${idea.desc || ''}\n\n${idea.cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
+function buildDescription(desc, cta, idea) {
+    return `${desc || ''}\n\n${cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
 }
 
 // idea: the row from `ideas`. credentials: { clientId, clientSecret, refreshToken }.
 // coverAsset: { url, type } from media_assets for idea.cover_asset_id, or null.
-export async function publish(idea, credentials, coverAsset) {
+// lang: 'ru' (default) or 'en' - selects idea.title/desc/cta vs the _en mirror,
+// see server/lib/resolveIdeaLang.js.
+export async function publish(idea, credentials, coverAsset, lang) {
     const { clientId, clientSecret, refreshToken } = credentials || {};
     if (!clientId || !clientSecret || !refreshToken) {
         return { success: false, error: 'YouTube не настроен (нужны client_id, client_secret и refresh_token - см. OAuth-настройку)' };
@@ -62,8 +66,9 @@ export async function publish(idea, credentials, coverAsset) {
         const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
         const contentType = videoRes.headers.get('content-type') || 'video/mp4';
 
+        const { title, desc, cta } = pickLangFields(idea, lang);
         const videoResource = {
-            snippet: { title: idea.title, description: buildDescription(idea) },
+            snippet: { title, description: buildDescription(desc, cta, idea) },
             status: { privacyStatus: 'private' }, // safest default; the project owner can change it in Studio
         };
 

@@ -16,6 +16,8 @@ let vkMeta = { groupId: '', hasToken: false, tokenPreview: '' };
 let igMeta = { businessAccountId: '', hasToken: false, tokenPreview: '' };
 let ytMeta = { clientId: '', channelTitle: '', hasClientSecret: false, hasRefreshToken: false, configured: false };
 let thMeta = { userId: '', hasToken: false, tokenPreview: '' };
+let telegramChannels = []; // [{ id, label, chatId }] - see server/routes/settings.js /telegram-channels
+let publishModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null };
 let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
@@ -309,11 +311,7 @@ async function renderBankView() {
                 <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
                 <button class="edit-btn" onclick="generateAIPrompt('${idea.id}')">🤖 AI Промпт</button>
                 <button class="tg-btn" onclick="copyTelegramFormatted('${idea.id}')">📋 Скопировать</button>
-                <button class="tg-btn" style="background:#0088cc;" onclick="postToTelegram('${idea.id}')">✈️ В TG Bot</button>
-                <button class="tg-btn" style="background:#0077FF;${vkMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToVk('${idea.id}')">${vkMeta.hasToken ? '🔵 В VK' : '🔵 VK (не настроено)'}</button>
-                <button class="tg-btn" style="background:#E1306C;${igMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToInstagram('${idea.id}')">${igMeta.hasToken ? '📸 В Instagram' : '📸 Instagram (не настроено)'}</button>
-                <button class="tg-btn" style="background:#FF0000;${ytMeta.configured ? '' : 'opacity:0.5;'}" onclick="postToYoutube('${idea.id}')">${ytMeta.configured ? '▶️ На YouTube' : '▶️ YouTube (не настроено)'}</button>
-                <button class="tg-btn" style="background:#000000;${thMeta.hasToken ? '' : 'opacity:0.5;'}" onclick="postToThreads('${idea.id}')">${thMeta.hasToken ? '🧵 В Threads' : '🧵 Threads (не настроено)'}</button>
+                <button class="tg-btn" style="background:var(--accent-blue);" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
                 <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
@@ -817,12 +815,22 @@ function processImportJSON(event) {
     reader.readAsText(file);
 }
 
-// TELEGRAM BOT API (токен хранится и используется только на сервере)
-async function openTgSettings() {
+// CONSOLIDATED PUBLISH SETTINGS (Task 4 - one modal, one tab per platform, replacing the
+// previous 5 separate ⚙️ buttons/overlays). Secrets never round-trip back to the browser
+// in full, only a masked preview + whether they're configured; see server/routes/settings.js
+// for the write-mostly PUT pattern each save*Settings function below hits.
+async function openPublishSettingsModal() {
     try {
-        tgMeta = await api('/api/settings/telegram');
+        const [telegram, vk, instagram, youtube, threads] = await Promise.all([
+            api('/api/settings/telegram'),
+            api('/api/settings/vk'),
+            api('/api/settings/instagram'),
+            api('/api/settings/youtube'),
+            api('/api/settings/threads'),
+        ]);
+        tgMeta = telegram; vkMeta = vk; igMeta = instagram; ytMeta = youtube; thMeta = threads;
     } catch (e) {
-        showToast('Не удалось получить настройки Telegram: ' + e.message);
+        showToast('Не удалось получить настройки публикаций: ' + e.message);
     }
 
     const tokenInput = document.getElementById('tg-token-input');
@@ -834,62 +842,143 @@ async function openTgSettings() {
             : '123456789:ABCdefGHI...';
     }
     if (chatInput) chatInput.value = tgMeta.chatId || '';
-    openOverlay('tg-config-overlay');
+
+    const vkTokenInput = document.getElementById('vk-token-input');
+    const vkGroupInput = document.getElementById('vk-group-input');
+    if (vkTokenInput) {
+        vkTokenInput.value = '';
+        vkTokenInput.placeholder = vkMeta.hasToken
+            ? `Сохранён токен ${vkMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'vk1.a.xxxxxxxx...';
+    }
+    if (vkGroupInput) vkGroupInput.value = vkMeta.groupId || '';
+
+    const igTokenInput = document.getElementById('ig-token-input');
+    const igAccountInput = document.getElementById('ig-account-input');
+    if (igTokenInput) {
+        igTokenInput.value = '';
+        igTokenInput.placeholder = igMeta.hasToken
+            ? `Сохранён токен ${igMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'EAAxxxxxxxx...';
+    }
+    if (igAccountInput) igAccountInput.value = igMeta.businessAccountId || '';
+
+    const ytClientIdInput = document.getElementById('yt-client-id-input');
+    const ytClientSecretInput = document.getElementById('yt-client-secret-input');
+    const ytRefreshTokenInput = document.getElementById('yt-refresh-token-input');
+    const ytChannelTitleInput = document.getElementById('yt-channel-title-input');
+    if (ytClientIdInput) ytClientIdInput.value = ytMeta.clientId || '';
+    if (ytClientSecretInput) {
+        ytClientSecretInput.value = '';
+        ytClientSecretInput.placeholder = ytMeta.hasClientSecret ? 'Сохранён — введите новый, чтобы заменить' : 'GOCSPX-xxxxxxxx...';
+    }
+    if (ytRefreshTokenInput) {
+        ytRefreshTokenInput.value = '';
+        ytRefreshTokenInput.placeholder = ytMeta.hasRefreshToken ? 'Сохранён — введите новый, чтобы заменить' : '1//0gxxxxxxxx...';
+    }
+    if (ytChannelTitleInput) ytChannelTitleInput.value = ytMeta.channelTitle || '';
+
+    const thTokenInput = document.getElementById('th-token-input');
+    const thUserInput = document.getElementById('th-user-input');
+    if (thTokenInput) {
+        thTokenInput.value = '';
+        thTokenInput.placeholder = thMeta.hasToken
+            ? `Сохранён токен ${thMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'THQVJ...xxxxxxxx...';
+    }
+    if (thUserInput) thUserInput.value = thMeta.userId || '';
+
+    await loadTelegramChannels();
+    switchPublishSettingsTab('tg');
+    openOverlay('publish-settings-overlay');
 }
 
+function switchPublishSettingsTab(tab) {
+    ['tg', 'vk', 'ig', 'yt', 'th'].forEach(t => {
+        const content = document.getElementById(`ps-tab-${t}`);
+        if (content) content.style.display = t === tab ? '' : 'none';
+        const btn = document.querySelector(`.ps-tab-btn[data-ps-tab="${t}"]`);
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+}
+
+// TELEGRAM (bot token, used server-side only, see server/routes/telegram.js)
 async function saveTgSettings() {
     const token = document.getElementById('tg-token-input').value.trim();
     const chatId = document.getElementById('tg-chat-input').value.trim();
-
     try {
         tgMeta = await api('/api/settings/telegram', { method: 'PUT', body: JSON.stringify({ token, chatId }) });
-        closeOverlay('tg-config-overlay');
-        showToast('Настройки Telegram сохранены');
+        showToast('Токен Telegram сохранён');
     } catch (e) {
         showToast('Не удалось сохранить настройки Telegram: ' + e.message);
     }
 }
 
-async function postToTelegram(ideaId) {
-    if (!tgMeta.hasToken || !tgMeta.chatId) {
-        alert('Укажите Bot Token и Chat ID в настройках Telegram!');
-        openTgSettings();
+// TELEGRAM CHANNELS CRUD (publish targets the bot can post to - distinct from the bot
+// token above, see telegram_channels in server/db.js and server/routes/settings.js).
+async function loadTelegramChannels() {
+    try {
+        telegramChannels = await api('/api/settings/telegram-channels');
+    } catch (e) {
+        telegramChannels = [];
+        showToast('Не удалось получить список каналов: ' + e.message);
+    }
+    renderTelegramChannelsList();
+}
+
+function renderTelegramChannelsList() {
+    const container = document.getElementById('tg-channels-list');
+    if (!container) return;
+    if (telegramChannels.length === 0) {
+        container.innerHTML = `<p style="color:var(--text-secondary); font-size:13px; margin:0;">Каналов пока нет — добавьте первый ниже.</p>`;
         return;
     }
+    container.innerHTML = telegramChannels.map(ch => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:0.5px solid var(--separator);">
+            <div>
+                <div style="font-weight:600; font-size:13px;">${escapeHtml(ch.label)}</div>
+                <div style="font-size:12px; color:var(--text-secondary);">${escapeHtml(ch.chatId)}</div>
+            </div>
+            <button class="delete-btn" onclick="deleteTelegramChannel(${ch.id})">🗑</button>
+        </div>`).join('');
+}
 
+async function addTelegramChannel() {
+    const labelInput = document.getElementById('tg-new-channel-label');
+    const chatIdInput = document.getElementById('tg-new-channel-chatid');
+    const label = labelInput.value.trim();
+    const chatId = chatIdInput.value.trim();
+    if (!label || !chatId) {
+        showToast('Укажите название и chat_id канала');
+        return;
+    }
     try {
-        await api('/api/telegram/post', { method: 'POST', body: JSON.stringify({ ideaId }) });
-        showToast('Опубликовано в Telegram!');
+        await api('/api/settings/telegram-channels', { method: 'POST', body: JSON.stringify({ label, chatId }) });
+        labelInput.value = '';
+        chatIdInput.value = '';
+        await loadTelegramChannels();
+        showToast('Канал добавлен');
     } catch (e) {
-        alert('Ошибка отправки: ' + e.message);
+        showToast('Не удалось добавить канал: ' + e.message);
+    }
+}
+
+async function deleteTelegramChannel(id) {
+    try {
+        await api(`/api/settings/telegram-channels/${id}`, { method: 'DELETE' });
+        await loadTelegramChannels();
+        showToast('Канал удалён');
+    } catch (e) {
+        showToast('Не удалось удалить канал: ' + e.message);
     }
 }
 
 // VK (community wall.post)
-async function openVkSettings() {
-    try {
-        vkMeta = await api('/api/settings/vk');
-    } catch (e) {
-        showToast('Не удалось получить настройки VK: ' + e.message);
-    }
-    const tokenInput = document.getElementById('vk-token-input');
-    const groupInput = document.getElementById('vk-group-input');
-    if (tokenInput) {
-        tokenInput.value = '';
-        tokenInput.placeholder = vkMeta.hasToken
-            ? `Сохранён токен ${vkMeta.tokenPreview} — введите новый, чтобы заменить`
-            : 'vk1.a.xxxxxxxx...';
-    }
-    if (groupInput) groupInput.value = vkMeta.groupId || '';
-    openOverlay('vk-config-overlay');
-}
-
 async function saveVkSettings() {
     const accessToken = document.getElementById('vk-token-input').value.trim();
     const groupId = document.getElementById('vk-group-input').value.trim();
     try {
         vkMeta = await api('/api/settings/vk', { method: 'PUT', body: JSON.stringify({ accessToken, groupId }) });
-        closeOverlay('vk-config-overlay');
         showToast('Настройки VK сохранены');
         renderBankView();
     } catch (e) {
@@ -897,45 +986,12 @@ async function saveVkSettings() {
     }
 }
 
-async function postToVk(ideaId) {
-    if (!vkMeta.hasToken || !vkMeta.groupId) {
-        alert('Укажите Access Token и ID сообщества в настройках VK!');
-        openVkSettings();
-        return;
-    }
-    try {
-        await api('/api/publish/vk', { method: 'POST', body: JSON.stringify({ ideaId }) });
-        showToast('Опубликовано в VK!');
-    } catch (e) {
-        alert('Ошибка отправки в VK: ' + e.message);
-    }
-}
-
 // Instagram (Content Publishing API: create media container, then publish)
-async function openIgSettings() {
-    try {
-        igMeta = await api('/api/settings/instagram');
-    } catch (e) {
-        showToast('Не удалось получить настройки Instagram: ' + e.message);
-    }
-    const tokenInput = document.getElementById('ig-token-input');
-    const accountInput = document.getElementById('ig-account-input');
-    if (tokenInput) {
-        tokenInput.value = '';
-        tokenInput.placeholder = igMeta.hasToken
-            ? `Сохранён токен ${igMeta.tokenPreview} — введите новый, чтобы заменить`
-            : 'EAAxxxxxxxx...';
-    }
-    if (accountInput) accountInput.value = igMeta.businessAccountId || '';
-    openOverlay('ig-config-overlay');
-}
-
 async function saveIgSettings() {
     const accessToken = document.getElementById('ig-token-input').value.trim();
     const businessAccountId = document.getElementById('ig-account-input').value.trim();
     try {
         igMeta = await api('/api/settings/instagram', { method: 'PUT', body: JSON.stringify({ accessToken, businessAccountId }) });
-        closeOverlay('ig-config-overlay');
         showToast('Настройки Instagram сохранены');
         renderBankView();
     } catch (e) {
@@ -943,44 +999,7 @@ async function saveIgSettings() {
     }
 }
 
-async function postToInstagram(ideaId) {
-    if (!igMeta.hasToken || !igMeta.businessAccountId) {
-        alert('Укажите Page Access Token и Business Account ID в настройках Instagram!');
-        openIgSettings();
-        return;
-    }
-    try {
-        await api('/api/publish/instagram', { method: 'POST', body: JSON.stringify({ ideaId }) });
-        showToast('Опубликовано в Instagram!');
-    } catch (e) {
-        alert('Ошибка отправки в Instagram: ' + e.message);
-    }
-}
-
 // YouTube (Data API v3 videos.insert via OAuth2 refresh token)
-async function openYtSettings() {
-    try {
-        ytMeta = await api('/api/settings/youtube');
-    } catch (e) {
-        showToast('Не удалось получить настройки YouTube: ' + e.message);
-    }
-    const clientIdInput = document.getElementById('yt-client-id-input');
-    const clientSecretInput = document.getElementById('yt-client-secret-input');
-    const refreshTokenInput = document.getElementById('yt-refresh-token-input');
-    const channelTitleInput = document.getElementById('yt-channel-title-input');
-    if (clientIdInput) clientIdInput.value = ytMeta.clientId || '';
-    if (clientSecretInput) {
-        clientSecretInput.value = '';
-        clientSecretInput.placeholder = ytMeta.hasClientSecret ? 'Сохранён — введите новый, чтобы заменить' : 'GOCSPX-xxxxxxxx...';
-    }
-    if (refreshTokenInput) {
-        refreshTokenInput.value = '';
-        refreshTokenInput.placeholder = ytMeta.hasRefreshToken ? 'Сохранён — введите новый, чтобы заменить' : '1//0gxxxxxxxx...';
-    }
-    if (channelTitleInput) channelTitleInput.value = ytMeta.channelTitle || '';
-    openOverlay('yt-config-overlay');
-}
-
 async function saveYtSettings() {
     const clientId = document.getElementById('yt-client-id-input').value.trim();
     const clientSecret = document.getElementById('yt-client-secret-input').value.trim();
@@ -988,7 +1007,6 @@ async function saveYtSettings() {
     const channelTitle = document.getElementById('yt-channel-title-input').value.trim();
     try {
         ytMeta = await api('/api/settings/youtube', { method: 'PUT', body: JSON.stringify({ clientId, clientSecret, refreshToken, channelTitle }) });
-        closeOverlay('yt-config-overlay');
         showToast('Настройки YouTube сохранены');
         renderBankView();
     } catch (e) {
@@ -996,45 +1014,12 @@ async function saveYtSettings() {
     }
 }
 
-async function postToYoutube(ideaId) {
-    if (!ytMeta.configured) {
-        alert('Укажите Client ID, Client Secret и Refresh Token в настройках YouTube!');
-        openYtSettings();
-        return;
-    }
-    try {
-        await api('/api/publish/youtube', { method: 'POST', body: JSON.stringify({ ideaId }) });
-        showToast('Опубликовано на YouTube!');
-    } catch (e) {
-        alert('Ошибка отправки на YouTube: ' + e.message);
-    }
-}
-
 // Threads (Publishing API: create media container, then publish - text-only allowed)
-async function openThSettings() {
-    try {
-        thMeta = await api('/api/settings/threads');
-    } catch (e) {
-        showToast('Не удалось получить настройки Threads: ' + e.message);
-    }
-    const tokenInput = document.getElementById('th-token-input');
-    const userInput = document.getElementById('th-user-input');
-    if (tokenInput) {
-        tokenInput.value = '';
-        tokenInput.placeholder = thMeta.hasToken
-            ? `Сохранён токен ${thMeta.tokenPreview} — введите новый, чтобы заменить`
-            : 'THQVJ...xxxxxxxx...';
-    }
-    if (userInput) userInput.value = thMeta.userId || '';
-    openOverlay('th-config-overlay');
-}
-
 async function saveThSettings() {
     const accessToken = document.getElementById('th-token-input').value.trim();
     const userId = document.getElementById('th-user-input').value.trim();
     try {
         thMeta = await api('/api/settings/threads', { method: 'PUT', body: JSON.stringify({ accessToken, userId }) });
-        closeOverlay('th-config-overlay');
         showToast('Настройки Threads сохранены');
         renderBankView();
     } catch (e) {
@@ -1042,17 +1027,163 @@ async function saveThSettings() {
     }
 }
 
-async function postToThreads(ideaId) {
-    if (!thMeta.hasToken || !thMeta.userId) {
-        alert('Укажите Access Token и Threads User ID в настройках Threads!');
-        openThSettings();
-        return;
-    }
+// PUBLISH MODAL (Task 3 - the "Опубликовать" confirmation flow, one entry point per idea
+// card replacing the previous one-click-per-platform buttons). Selecting a platform,
+// channel or language below only updates local state and re-renders the preview - the
+// only click that fires a real API call is confirmPublish() on "Подтвердить публикацию".
+const PUBLISH_PLATFORMS = [
+    { id: 'telegram', label: '✈️ Telegram', isConfigured: () => tgMeta.hasToken, notConfiguredMsg: 'Telegram бот не настроен. Укажите Bot Token в настройках публикаций.' },
+    { id: 'vk', label: '🔵 VK', isConfigured: () => vkMeta.hasToken, notConfiguredMsg: 'VK не настроен. Укажите Access Token и ID сообщества в настройках публикаций.' },
+    { id: 'instagram', label: '📸 Instagram', isConfigured: () => igMeta.hasToken, notConfiguredMsg: 'Instagram не настроен. Укажите Page Access Token и Business Account ID в настройках публикаций.' },
+    { id: 'youtube', label: '▶️ YouTube', isConfigured: () => ytMeta.configured, notConfiguredMsg: 'YouTube не настроен. Укажите Client ID, Client Secret и Refresh Token в настройках публикаций.' },
+    { id: 'threads', label: '🧵 Threads', isConfigured: () => thMeta.hasToken, notConfiguredMsg: 'Threads не настроен. Укажите Access Token и User ID в настройках публикаций.' },
+];
+
+function getPublishModalIdea() {
+    return ideasBank.find(i => i.id === publishModalState.ideaId) || null;
+}
+
+// Client-side mirror of server/lib/resolveIdeaLang.js's pickLangFields, for the live
+// preview only - the actual publish request still sends just {ideaId, lang}; the server
+// re-derives title/desc/cta itself as the source of truth.
+function pickLangFieldsClient(idea, lang) {
+    if (lang !== 'en') return { title: idea.title, desc: idea.desc, cta: idea.cta };
+    return {
+        title: idea.titleEn || idea.title,
+        desc: idea.descEn || idea.desc,
+        cta: idea.ctaEn || idea.cta,
+    };
+}
+
+async function openPublishModal(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    publishModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null };
+
     try {
-        await api('/api/publish/threads', { method: 'POST', body: JSON.stringify({ ideaId }) });
-        showToast('Опубликовано в Threads!');
+        const [telegram, vk, instagram, youtube, threads] = await Promise.all([
+            api('/api/settings/telegram'),
+            api('/api/settings/vk'),
+            api('/api/settings/instagram'),
+            api('/api/settings/youtube'),
+            api('/api/settings/threads'),
+        ]);
+        tgMeta = telegram; vkMeta = vk; igMeta = instagram; ytMeta = youtube; thMeta = threads;
     } catch (e) {
-        alert('Ошибка отправки в Threads: ' + e.message);
+        showToast('Не удалось получить настройки публикаций: ' + e.message);
+    }
+    await loadTelegramChannels();
+    if (telegramChannels.length > 0) publishModalState.channelId = telegramChannels[0].id;
+
+    document.getElementById('publish-idea-title').innerText = idea.title;
+    openOverlay('publish-overlay');
+    renderPublishModal();
+}
+
+function setPublishPlatform(platformId) {
+    publishModalState.platform = platformId;
+    if (platformId === 'telegram' && !publishModalState.channelId && telegramChannels.length > 0) {
+        publishModalState.channelId = telegramChannels[0].id;
+    }
+    renderPublishModal();
+}
+
+function setPublishLang(lang) {
+    const idea = getPublishModalIdea();
+    if (lang === 'en' && (!idea || !idea.titleEn)) return; // greyed out - defense in depth against a stray click
+    publishModalState.lang = lang;
+    renderPublishModal();
+}
+
+function onPublishChannelChange() {
+    const select = document.getElementById('publish-channel-select');
+    publishModalState.channelId = select.value ? Number(select.value) : null;
+}
+
+function renderPublishModal() {
+    const idea = getPublishModalIdea();
+    if (!idea) return;
+
+    const platformRow = document.getElementById('publish-platform-row');
+    platformRow.innerHTML = PUBLISH_PLATFORMS.map(p => {
+        const configured = p.isConfigured();
+        const active = publishModalState.platform === p.id;
+        const activeStyle = active ? 'background:var(--accent-blue); color:#fff;' : '';
+        const dimStyle = configured ? '' : 'opacity:0.55;';
+        return `<button class="edit-btn" style="${activeStyle}${dimStyle}" onclick="setPublishPlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
+    }).join('');
+
+    const currentPlatform = PUBLISH_PLATFORMS.find(p => p.id === publishModalState.platform);
+    const configured = currentPlatform.isConfigured();
+
+    const channelRow = document.getElementById('publish-channel-row');
+    const channelSelect = document.getElementById('publish-channel-select');
+    if (publishModalState.platform === 'telegram') {
+        channelRow.style.display = '';
+        channelSelect.innerHTML = telegramChannels.length === 0
+            ? `<option value="">— нет каналов —</option>`
+            : telegramChannels.map(ch => `<option value="${ch.id}" ${ch.id === publishModalState.channelId ? 'selected' : ''}>${escapeHtml(ch.label)}</option>`).join('');
+    } else {
+        channelRow.style.display = 'none';
+    }
+
+    const warnBox = document.getElementById('publish-not-configured-box');
+    let warnMsg = '';
+    if (!configured) {
+        warnMsg = currentPlatform.notConfiguredMsg;
+    } else if (publishModalState.platform === 'telegram' && telegramChannels.length === 0) {
+        warnMsg = 'Нет добавленных каналов для публикации. Добавьте хотя бы один канал в настройках публикаций.';
+    }
+    if (warnMsg) {
+        warnBox.style.display = '';
+        warnBox.innerHTML = `<p style="margin:0 0 8px;">${escapeHtml(warnMsg)}</p><button class="edit-btn" onclick="closeOverlay('publish-overlay'); openPublishSettingsModal();">Открыть настройки публикаций</button>`;
+    } else {
+        warnBox.style.display = 'none';
+        warnBox.innerHTML = '';
+    }
+
+    const hasEn = Boolean(idea.titleEn);
+    if (!hasEn && publishModalState.lang === 'en') publishModalState.lang = 'ru';
+    const ruBtn = document.getElementById('publish-lang-ru-btn');
+    const enBtn = document.getElementById('publish-lang-en-btn');
+    ruBtn.style.background = publishModalState.lang === 'ru' ? 'var(--accent-blue)' : '';
+    ruBtn.style.color = publishModalState.lang === 'ru' ? '#fff' : '';
+    enBtn.style.background = publishModalState.lang === 'en' ? 'var(--accent-blue)' : '';
+    enBtn.style.color = publishModalState.lang === 'en' ? '#fff' : '';
+    enBtn.disabled = !hasEn;
+    enBtn.style.opacity = hasEn ? '1' : '0.4';
+    enBtn.style.cursor = hasEn ? 'pointer' : 'not-allowed';
+    document.getElementById('publish-lang-hint').innerText = hasEn
+        ? ''
+        : 'У этой идеи нет перевода на английский — сначала переведите её («Перевести на английский» в карточке идеи).';
+
+    const { title, desc, cta } = pickLangFieldsClient(idea, publishModalState.lang);
+    document.getElementById('publish-preview-title').innerText = title;
+    document.getElementById('publish-preview-desc').innerText = desc || '';
+    document.getElementById('publish-preview-cta').innerText = cta ? `👉 ${cta}` : '';
+
+    const canPublish = configured && (publishModalState.platform !== 'telegram' || publishModalState.channelId);
+    document.getElementById('publish-confirm-btn').disabled = !canPublish;
+}
+
+async function confirmPublish() {
+    const idea = getPublishModalIdea();
+    if (!idea) return;
+    const { platform, lang, channelId, ideaId } = publishModalState;
+
+    try {
+        if (platform === 'telegram') {
+            if (!channelId) { showToast('Выберите канал для публикации'); return; }
+            await api('/api/telegram/post', { method: 'POST', body: JSON.stringify({ ideaId, channelId, lang }) });
+        } else {
+            await api(`/api/publish/${platform}`, { method: 'POST', body: JSON.stringify({ ideaId, lang }) });
+        }
+        const platformLabel = (PUBLISH_PLATFORMS.find(p => p.id === platform) || {}).label || platform;
+        showToast(`Опубликовано: ${platformLabel}`);
+        closeOverlay('publish-overlay');
+    } catch (e) {
+        alert('Ошибка публикации: ' + e.message);
     }
 }
 

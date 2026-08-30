@@ -8,6 +8,8 @@
 // server-side, it isn't uploaded as bytes). This module is self-contained:
 // a failure here can't affect Telegram/VK/YouTube.
 
+import { pickLangFields } from '../resolveIdeaLang.js';
+
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
@@ -32,8 +34,9 @@ async function graphCall(path, params, method = 'GET') {
     return data;
 }
 
-function buildCaption(idea) {
-    return `${idea.title}\n\n${idea.desc || ''}\n\n${idea.cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
+function buildCaption(idea, lang) {
+    const { title, desc, cta } = pickLangFields(idea, lang);
+    return `${title}\n\n${desc || ''}\n\n${cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
 }
 
 async function waitForContainerReady(containerId, accessToken, { attempts = 10, delayMs = 1500 } = {}) {
@@ -48,7 +51,9 @@ async function waitForContainerReady(containerId, accessToken, { attempts = 10, 
 
 // idea: the row from `ideas`. credentials: { accessToken, businessAccountId }.
 // coverAsset: { url, type } from media_assets for idea.cover_asset_id, or null.
-export async function publish(idea, credentials, coverAsset) {
+// lang: 'ru' (default) or 'en' - selects idea.title/desc/cta vs the _en mirror,
+// see server/lib/resolveIdeaLang.js.
+export async function publish(idea, credentials, coverAsset, lang) {
     const { accessToken, businessAccountId } = credentials || {};
     if (!accessToken || !businessAccountId) {
         return { success: false, error: 'Instagram не настроен (нет access_token или business_account_id)' };
@@ -57,7 +62,7 @@ export async function publish(idea, credentials, coverAsset) {
         return { success: false, error: 'Для публикации в Instagram у идеи должна быть обложка (изображение или видео)' };
     }
 
-    const caption = buildCaption(idea);
+    const caption = buildCaption(idea, lang);
     const isVideo = coverAsset.type === 'video';
 
     try {

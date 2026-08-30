@@ -10,6 +10,8 @@
 // This module is self-contained: it never touches the DB or other
 // platforms' code, and a failure here can't affect Telegram/Instagram/YouTube.
 
+import { pickLangFields } from '../resolveIdeaLang.js';
+
 const VK_API_VERSION = '5.199';
 const VK_API_BASE = 'https://api.vk.com/method';
 
@@ -60,19 +62,22 @@ async function tryUploadCoverPhoto(groupId, accessToken, coverUrl) {
     }
 }
 
-function buildMessage(idea) {
-    return `${idea.title}\n\n${idea.desc || ''}\n\n${idea.cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
+function buildMessage(idea, lang) {
+    const { title, desc, cta } = pickLangFields(idea, lang);
+    return `${title}\n\n${desc || ''}\n\n${cta || ''}\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
 }
 
 // idea: the row from `ideas`. credentials: { accessToken, groupId }.
 // coverUrl: optional public URL of the idea's cover image (from media_assets).
-export async function publish(idea, credentials, coverUrl) {
+// lang: 'ru' (default) or 'en' - selects idea.title/desc/cta vs the _en mirror,
+// see server/lib/resolveIdeaLang.js.
+export async function publish(idea, credentials, coverUrl, lang) {
     const { accessToken, groupId } = credentials || {};
     if (!accessToken || !groupId) {
         return { success: false, error: 'VK не настроен (нет access_token или group_id)' };
     }
 
-    const message = buildMessage(idea);
+    const message = buildMessage(idea, lang);
     const attachment = coverUrl ? await tryUploadCoverPhoto(groupId, accessToken, coverUrl) : null;
 
     try {
