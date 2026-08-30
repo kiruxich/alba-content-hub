@@ -496,8 +496,8 @@
                         <p class="idea-desc-text">Офлайн нейросетевая озвучка (ru_RU-dmitri). Бесплатная альтернатива ElevenLabs — выбирается в форме генерации озвучки.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>video-worker</b><span class="parser-niche-status captcha">○ ждёт деплоя</span></div>
-                        <p class="idea-desc-text">FFmpeg-сборка Shorts: видео-клип + озвучка + субтитры → готовый вертикальный ролик. Код готов, переменные добавлены, ждёт деплоя на Coolify.</p>
+                        <div class="parser-niche-head"><b>video-worker</b><span class="parser-niche-status captcha">○ ждёт публикации порта</span></div>
+                        <p class="idea-desc-text">FFmpeg-сборка Shorts: видео-клип + озвучка + субтитры → готовый вертикальный ролик. Контейнер уже задеплоен и работает, VIDEO_WORKER_URL и ufw-правило (8788) настроены — осталось включить «Ports Exposes: 8788» в Coolify для этого ресурса.</p>
                     </div>
                 </div>
 
@@ -505,12 +505,12 @@
                 <div class="p-section-title">ГЕНЕРАЦИЯ МЕДИА (ВНЕШНИЕ API)</div>
                 <div class="parser-niches-grid">
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>kie.ai (Flux / Kling)</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">AI-обложки (Flux) и видео-клипы (Kling) по запросу. Ждёт KIE_API_KEY.</p>
+                        <div class="parser-niche-head"><b>kie.ai (Flux / Kling)</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">AI-обложки (Flux) и видео-клипы (Kling) по запросу. KIE_API_KEY настроен.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>ElevenLabs</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">Платная озвучка высокого качества, несколько голосов на выбор. Ждёт ELEVENLABS_API_KEY.</p>
+                        <div class="parser-niche-head"><b>ElevenLabs</b><span class="parser-niche-status captcha">○ требует оплаты</span></div>
+                        <p class="idea-desc-text">Платная озвучка высокого качества, несколько голосов на выбор. Ключ добавлен, но план ElevenLabs не оплачен — запросы будут падать с ошибкой оплаты, пока не куплен тариф.</p>
                     </div>
                 </div>
 
@@ -548,12 +548,12 @@
                         <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый день в 9:15 (Amsterdam). Читает бриф от Researcher, пишет пост по формуле «Золотая середина», шлёт черновик в Telegram на approve.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Insights</b><span class="parser-niche-status running">○ ждёт активации</span></div>
-                        <p class="idea-desc-text">Эндпоинт готов: агрегирует метрики публикаций, ищет закономерности по форматам/рубрикам, пишет выводы в agent_runs. Ждёт настройки как routine.</p>
+                        <div class="parser-niche-head"><b>Insights</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый понедельник в 8:20 (Amsterdam летом — UTC-время фиксировано, зимой сдвинется на час). Читает /insights/brief за 7 дней, ищет закономерности по форматам/рубрикам, пишет выводы в agent_runs.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Metrics Sync</b><span class="parser-niche-status running">○ ждёт активации</span></div>
-                        <p class="idea-desc-text">Эндпоинт готов: подтягивает просмотры/лайки с VK/Instagram/YouTube обратно в scheduled_events по опубликованным постам. Ждёт cron-записи.</p>
+                        <div class="parser-niche-head"><b>Metrics Sync</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">System cron на VPS, каждые 6 часов. Подтягивает просмотры/лайки с VK/Instagram/YouTube обратно в scheduled_events по опубликованным постам.</p>
                     </div>
                 </div>
 
