@@ -112,6 +112,9 @@
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Управление гипотезами и связи с продуктами</p>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                         <button class="edit-btn" onclick="openTgSettings()">⚙️ TG Бот</button>
+                        <button class="edit-btn" onclick="openVkSettings()">⚙️ VK</button>
+                        <button class="edit-btn" onclick="openIgSettings()">⚙️ Instagram</button>
+                        <button class="edit-btn" onclick="openYtSettings()">⚙️ YouTube</button>
                         <button class="edit-btn" onclick="document.getElementById('import-file-input').click()">📂 Импорт</button>
                         <button class="edit-btn" onclick="exportIdeasJSON()">💾 Экспорт</button>
                         <button class="schedule-btn" onclick="openNewIdeaModal()">+ Новая идея</button>
@@ -770,6 +773,72 @@
                 <input type="text" id="tg-chat-input" class="form-input" placeholder="@my_channel или -10012345678">
 
                 <button class="submit-btn" onclick="saveTgSettings()">Сохранить настройки</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VK CONFIG MODAL -->
+    <div id="vk-config-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Настройки VK</span>
+                <button class="back-btn" onclick="closeOverlay('vk-config-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Токен сообщества (community access token) с правом wall — создаётся в настройках сообщества VK или через Standalone-приложение.</p>
+                <label class="form-label">Access Token сообщества:</label>
+                <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
+
+                <label class="form-label">ID сообщества (group_id, без минуса):</label>
+                <input type="text" id="vk-group-input" class="form-input" placeholder="123456789">
+
+                <button class="submit-btn" onclick="saveVkSettings()">Сохранить настройки</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- INSTAGRAM CONFIG MODAL -->
+    <div id="ig-config-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Настройки Instagram</span>
+                <button class="back-btn" onclick="closeOverlay('ig-config-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Page access token из приложения Meta Graph API, привязанного к странице Facebook с подключённым Instagram Business/Creator аккаунтом.</p>
+                <label class="form-label">Page Access Token:</label>
+                <input type="text" id="ig-token-input" class="form-input" placeholder="EAAxxxxxxxx...">
+
+                <label class="form-label">Instagram Business Account ID:</label>
+                <input type="text" id="ig-account-input" class="form-input" placeholder="17841400000000000">
+
+                <button class="submit-btn" onclick="saveIgSettings()">Сохранить настройки</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- YOUTUBE CONFIG MODAL -->
+    <div id="yt-config-overlay" class="overlay">
+        <div class="drawer-content">
+            <div class="nav-bar">
+                <span style="font-weight:600; font-size:16px;">Настройки YouTube</span>
+                <button class="back-btn" onclick="closeOverlay('yt-config-overlay')">Закрыть ✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">OAuth2-приложение из Google Cloud Console + refresh token, полученный один раз через экран согласия (не просто токен, как в Telegram/VK).</p>
+                <label class="form-label">OAuth Client ID:</label>
+                <input type="text" id="yt-client-id-input" class="form-input" placeholder="xxxxx.apps.googleusercontent.com">
+
+                <label class="form-label">OAuth Client Secret:</label>
+                <input type="text" id="yt-client-secret-input" class="form-input" placeholder="GOCSPX-xxxxxxxx...">
+
+                <label class="form-label">Refresh Token:</label>
+                <input type="text" id="yt-refresh-token-input" class="form-input" placeholder="1//0gxxxxxxxx...">
+
+                <label class="form-label">Название канала (опционально, для справки):</label>
+                <input type="text" id="yt-channel-title-input" class="form-input" placeholder="Alba Creation">
+
+                <button class="submit-btn" onclick="saveYtSettings()">Сохранить настройки</button>
             </div>
         </div>
     </div>

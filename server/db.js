@@ -106,6 +106,37 @@ CREATE TABLE IF NOT EXISTS telegram_settings (
 );
 INSERT OR IGNORE INTO telegram_settings (id, token, chat_id) VALUES (1, '', '');
 
+-- VK: a community (group) access token with wall permission, plus the group
+-- id it posts to. See server/lib/socialPublishers/vk.js.
+CREATE TABLE IF NOT EXISTS vk_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    access_token TEXT DEFAULT '',
+    group_id TEXT DEFAULT ''
+);
+INSERT OR IGNORE INTO vk_settings (id, access_token, group_id) VALUES (1, '', '');
+
+-- Instagram: a long-lived Page access token (Meta Graph API) plus the
+-- connected Instagram Business/Creator account id it publishes to. See
+-- server/lib/socialPublishers/instagram.js.
+CREATE TABLE IF NOT EXISTS instagram_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    access_token TEXT DEFAULT '',
+    business_account_id TEXT DEFAULT ''
+);
+INSERT OR IGNORE INTO instagram_settings (id, access_token, business_account_id) VALUES (1, '', '');
+
+-- YouTube: OAuth2 client credentials + a long-lived refresh token (obtained
+-- once via a consent flow, not a simple pasted token - see
+-- scripts/register-youtube-oauth.mjs and server/lib/socialPublishers/youtube.js).
+CREATE TABLE IF NOT EXISTS youtube_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    client_id TEXT DEFAULT '',
+    client_secret TEXT DEFAULT '',
+    refresh_token TEXT DEFAULT '',
+    channel_title TEXT DEFAULT ''
+);
+INSERT OR IGNORE INTO youtube_settings (id, client_id, client_secret, refresh_token, channel_title) VALUES (1, '', '', '', '');
+
 -- Two-way approval workflow: one row per idea sent to Telegram for review,
 -- keyed by the sendMessage-returned message_id so an incoming reply (whose
 -- reply_to_message.message_id points back at it) can be correlated to the
