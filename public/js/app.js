@@ -314,12 +314,13 @@ async function renderBankView() {
             <div class="action-btn-row">
                 <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
                 <button class="edit-btn" onclick="generateAIPrompt('${idea.id}')">🤖 AI Промпт</button>
-                <button class="tg-btn" onclick="copyTelegramFormatted('${idea.id}')">📋 Скопировать</button>
+                <button class="tg-btn" style="background:var(--accent-purple);" onclick="autoGenerateIdeaMedia('${idea.id}')">✨ Сгенерировать</button>
                 <button class="tg-btn" style="background:var(--accent-blue);" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
                 <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
             </div>
+            <div id="idea-gen-status-${idea.id}" class="generation-status" style="display:none;"></div>
         </div>`;
     });
 
@@ -502,6 +503,87 @@ function copyTelegramFormatted(ideaId) {
     const formattedText = `*${idea.title}*\n\n${idea.desc || ''}\n\n👉 _${idea.cta || ''}_\n\n#${(idea.funnel || 'TOFU')} #AlbaCreation`;
     navigator.clipboard.writeText(formattedText);
     showToast('Скопировано с разметкой!');
+}
+
+// АВТО-ГЕНЕРАЦИЯ МЕДИА ДЛЯ ИДЕИ ("✨ Сгенерировать" на карточке в Банке идей)
+//
+// Calls POST /api/ideas/:id/auto-generate (server/routes/ideas.js), which
+// runs cover-image + voiceover generation (and, for 'Reels / Shorts' ideas,
+// video + assembly) server-side and returns per-step results. Assembly is
+// job-based (video-worker), so once that job is kicked off this polls
+// GET /api/video-assembly/:jobId the same way parser niches poll their own
+// job status (see startParserPolling above) until it reaches done/error.
+async function autoGenerateIdeaMedia(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const btn = event && event.target;
+    if (btn) btn.disabled = true;
+
+    const statusElId = `idea-gen-status-${ideaId}`;
+    const isReels = idea.format === 'Reels / Shorts';
+    const finishTicker = startGenerationTicker(statusElId, [
+        { afterSeconds: 0, text: 'Запускаем генерацию обложки и озвучки…' },
+        { afterSeconds: 15, text: 'kie.ai и провайдер озвучки всё ещё работают…' },
+        { afterSeconds: 90, text: isReels ? 'Обложка и озвучка почти готовы, дальше — видео…' : 'Почти готово…' },
+        { afterSeconds: 240, text: 'Видео (kie.ai Kling) может генерироваться до 7 минут…' },
+    ]);
+
+    try {
+        const result = await api(`/api/ideas/${ideaId}/auto-generate`, { method: 'POST' });
+        if (result.idea) {
+            ideasBank = ideasBank.map(i => i.id === ideaId ? result.idea : i);
+        }
+
+        const errors = [];
+        if (result.cover?.error) errors.push('Обложка: ' + result.cover.error);
+        if (result.voiceover?.error) errors.push('Озвучка: ' + result.voiceover.error);
+        if (result.video?.error) errors.push('Видео: ' + result.video.error);
+        if (result.assembly?.error) errors.push('Сборка: ' + result.assembly.error);
+
+        if (result.assembly && result.assembly.jobId) {
+            finishTicker(true, 'Обложка и озвучка готовы — собираем ролик…');
+            const finishAssemblyTicker = startGenerationTicker(statusElId, [
+                { afterSeconds: 0, text: 'Собираем ролик из видео и озвучки…' },
+                { afterSeconds: 15, text: 'video-worker всё ещё обрабатывает…' },
+                { afterSeconds: 60, text: 'Дольше обычного, но ещё может сработать…' },
+            ]);
+            startIdeaAssemblyPolling(result.assembly.jobId, finishAssemblyTicker);
+        } else if (errors.length) {
+            finishTicker(false, errors.join('; '));
+        } else {
+            finishTicker(true, 'Готово: обложка и озвучка сгенерированы');
+        }
+
+        showToast(errors.length ? 'Готово частично — статус смотрите на карточке идеи' : 'Медиа для идеи сгенерировано!');
+        renderMediaAssets();
+    } catch (e) {
+        finishTicker(false, 'Ошибка: ' + e.message);
+        showToast('Не удалось сгенерировать медиа: ' + e.message);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function startIdeaAssemblyPolling(jobId, finishTicker) {
+    const timer = setInterval(async () => {
+        try {
+            const job = await api(`/api/video-assembly/${jobId}`);
+            if (job.status === 'done') {
+                clearInterval(timer);
+                finishTicker(true, 'Ролик собран!');
+                showToast('Ролик для идеи готов!');
+                renderMediaAssets();
+            } else if (job.status === 'error') {
+                clearInterval(timer);
+                finishTicker(false, 'Ошибка сборки: ' + (job.error || 'неизвестная ошибка'));
+            }
+            // queued/running - keep polling
+        } catch (e) {
+            clearInterval(timer);
+            finishTicker(false, 'Ошибка опроса статуса сборки: ' + e.message);
+        }
+    }, 4000);
 }
 
 function checkFunnelBalance() {
@@ -2686,6 +2768,24 @@ async function renderMediaAssets() {
         }
     });
 
+    // Idea selects (cover-gen / voiceover-gen forms only - the plain
+    // "add media by URL" form has no text field to prefill from an idea).
+    // Rebuilt on every render, unlike the product selects above, since
+    // ideasBank can grow while this tab is open and a stale list would just
+    // be missing recently-added ideas.
+    [
+        document.getElementById('ma-gen-idea-input'),
+        document.getElementById('vo-idea-input'),
+    ].forEach(ideaSelect => {
+        if (!ideaSelect) return;
+        const currentValue = ideaSelect.value;
+        ideaSelect.innerHTML = '<option value="">— без привязки —</option>' + ideasBank.map(idea => {
+            const label = idea.title.length > 60 ? idea.title.slice(0, 60) + '…' : idea.title;
+            return `<option value="${escapeHtml(idea.id)}">${escapeHtml(label)}</option>`;
+        }).join('');
+        if (ideasBank.some(i => i.id === currentValue)) ideaSelect.value = currentValue;
+    });
+
     try {
         const params = new URLSearchParams();
         if (mediaAssetFilterType) params.set('type', mediaAssetFilterType);
@@ -2870,6 +2970,23 @@ function openVoiceoverForm() {
     document.getElementById('vo-provider-input').value = 'elevenlabs';
     document.getElementById('vo-voiceid-input').value = '';
     document.getElementById('vo-product-input').value = '';
+    const ideaSelect = document.getElementById('vo-idea-input');
+    if (ideaSelect) ideaSelect.value = '';
+}
+
+// Picking an idea prefills the voiceover text with its post text (idea.desc -
+// the same field rendered on the idea card in Банк идей) rather than
+// clearing whatever the user may have already typed by hand. "— без
+// привязки —" (empty value) never triggers a prefill/overwrite.
+function onVoiceoverIdeaSelectChange() {
+    const ideaId = document.getElementById('vo-idea-input').value;
+    if (!ideaId) return;
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const textField = document.getElementById('vo-text-input');
+    if (textField.value.trim() && !confirm('В поле уже есть текст — заменить его текстом идеи?')) return;
+    textField.value = idea.desc || idea.title || '';
 }
 
 function closeVoiceoverForm() {
@@ -2942,6 +3059,30 @@ function openGenerateMediaAssetForm() {
     document.getElementById('ma-gen-prompt-input').value = '';
     document.getElementById('ma-gen-type-input').value = 'image';
     document.getElementById('ma-gen-product-input').value = '';
+    const ideaSelect = document.getElementById('ma-gen-idea-input');
+    if (ideaSelect) ideaSelect.value = '';
+}
+
+// Builds a reasonable *image* prompt from an idea's title/desc rather than
+// dumping the raw post text into kie.ai - mirrors
+// buildImagePromptFromIdea() in server/routes/ideas.js's auto-generate
+// endpoint, just phrased for a human to still edit before submitting.
+function buildImagePromptFromIdea(idea) {
+    const context = (idea.desc || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    return `Обложка для поста на тему: «${idea.title}».${context ? ` Контекст: ${context}.` : ''} Стиль: минималистичный, современный, привлекающий внимание.`;
+}
+
+// Same "don't clobber manually-typed text" rule as the voiceover form's
+// idea select: only prefills when the field is empty or the user confirms.
+function onGenIdeaSelectChange() {
+    const ideaId = document.getElementById('ma-gen-idea-input').value;
+    if (!ideaId) return;
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const promptField = document.getElementById('ma-gen-prompt-input');
+    if (promptField.value.trim() && !confirm('В поле уже есть текст — заменить его промптом из идеи?')) return;
+    promptField.value = buildImagePromptFromIdea(idea);
 }
 
 function closeGenerateMediaAssetForm() {
