@@ -3,8 +3,19 @@ import { db } from '../db.js';
 import { translateToEnglish } from '../lib/translateToEnglish.js';
 import { validateDraft } from '../lib/editorValidation.js';
 import { sendIdeaForApproval } from '../lib/telegramApproval.js';
+import { isKieConfigured, generateImage, generateVideo } from '../lib/kieClient.js';
+import { generateVoiceover, isElevenLabsConfigured } from '../lib/elevenLabsClient.js';
+import { generatePiperVoiceover, isPiperConfigured } from '../lib/piperTtsClient.js';
+import { isObjectStorageConfigured, uploadBuffer, uploadFromUrl } from '../lib/objectStorage.js';
+import { createVideoJob } from '../lib/videoWorkerClient.js';
 
 const router = Router();
+
+// Same agent_expenses identity kie.ai-driven spend uses in mediaAssets.js -
+// kept in sync deliberately so Cost Tracker doesn't need to know this
+// endpoint exists separately from the manual generate-cover/generate-video
+// routes.
+const KIE_AGENT_NAME = 'generator';
 
 function serialize(row) {
     return {
@@ -33,6 +44,8 @@ function serialize(row) {
         rubricId: row.rubric_id || null,
         qualityFlags: JSON.parse(row.quality_flags || '[]'),
         coverAssetId: row.cover_asset_id || null,
+        voiceoverAssetId: row.voiceover_asset_id || null,
+        videoAssetId: row.video_asset_id || null,
     };
 }
 
@@ -334,6 +347,219 @@ router.post('/import', async (req, res) => {
     }
     const result = await db.execute('SELECT * FROM ideas ORDER BY created_at DESC');
     res.json(result.rows.map(serialize));
+});
+
+// --- AUTO-GENERATE MEDIA CHAIN (Банк идей "✨ Сгенерировать" button) ---
+//
+// kie.ai's returned URLs point at its own temp storage which isn't
+// permanent - same rehosting-if-configured fallback as mediaAssets.js's
+// rehostIfConfigured(): best-effort, falls back to the kie.ai URL on any
+// failure rather than failing a generation that already spent credits.
+async function rehostGeneratedUrl(kieUrl, keyPrefix) {
+    if (!isObjectStorageConfigured()) return kieUrl;
+    try {
+        const { url } = await uploadFromUrl(kieUrl, { keyPrefix });
+        return url;
+    } catch (e) {
+        console.error(`ideas/auto-generate: failed to re-upload ${kieUrl} to object storage, falling back to kie.ai URL:`, e.message);
+        return kieUrl;
+    }
+}
+
+// Builds a reasonable *image* prompt from an idea's title/desc rather than
+// just dumping the raw post text at kie.ai (which is written as a post, not
+// an image brief).
+function buildImagePromptFromIdea(idea) {
+    const context = (idea.desc || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+    return `Обложка для поста на тему: "${idea.title}".${context ? ` Контекст: ${context}.` : ''} Стиль: минималистичный, современный, привлекающий внимание, без текста на изображении.`;
+}
+
+function newAssetId() {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function insertMediaAssetRow({ url, type, productId, tags }) {
+    const id = newAssetId();
+    await db.execute({
+        sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
+              VALUES (?, ?, ?, ?, NULL, ?, 'ai_generated')`,
+        args: [id, url, type, productId || null, JSON.stringify(tags || [])],
+    });
+    const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [id] });
+    return result.rows[0];
+}
+
+function serializeAsset(row) {
+    return {
+        id: row.id,
+        url: row.url,
+        type: row.type,
+        productId: row.product_id || null,
+        tags: JSON.parse(row.tags || '[]'),
+        source: row.source || 'manual',
+        usedCount: row.used_count || 0,
+        createdAt: row.created_at,
+    };
+}
+
+// POST /api/ideas/:id/auto-generate
+//
+// One-click "make media for this idea" from the Банк идей card - kicks off
+// cover image generation (kie.ai Flux) and voiceover generation (ElevenLabs
+// if configured, else Piper) in parallel, and - only when the idea's format
+// is exactly 'Reels / Shorts' - also generates a short video clip (kie.ai
+// Kling) and, once both that clip and the voiceover are ready, starts a
+// video-worker assembly job that stitches them into the final short.
+//
+// Best-effort aggregation: a failure in any one step (kie.ai/ElevenLabs/
+// Piper not configured, out of credits, network error, ...) does NOT abort
+// the whole request - each step reports its own { asset } or { error } so
+// the caller can see exactly what succeeded. This mirrors how every other
+// optional integration in this app degrades (a normal error surfaced per
+// step, not a hard failure of the whole action).
+//
+// Assembly is job-based (video-worker sits on an internal-network address
+// and can take a while to render) - this endpoint only kicks the job off via
+// createVideoJob() and returns { jobId, status }; the same
+// GET /api/video-assembly/:jobId endpoint the existing manual flow already
+// uses is what the frontend polls to find out when the job is done and to
+// pick up the resulting media_assets row.
+//
+// Response 200 (only 404s if the idea itself doesn't exist):
+// {
+//   idea: <serialized idea - coverAssetId/voiceoverAssetId/videoAssetId
+//          updated for whichever steps succeeded>,
+//   cover: { asset } | { error },
+//   voiceover: { asset } | { error },
+//   video: { asset } | { error } | null,        // null when format isn't 'Reels / Shorts'
+//   assembly: { jobId, status } | { error } | null,
+// }
+router.post('/:id/auto-generate', async (req, res) => {
+    const row = (await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'idea not found' });
+
+    const idea = serialize(row);
+    const productId = (idea.targetGroups && idea.targetGroups[0]) || null;
+    const ideaTag = `idea:${idea.id}`;
+    const isReels = idea.format === 'Reels / Shorts';
+    const imagePrompt = buildImagePromptFromIdea(idea);
+
+    async function runCover() {
+        if (!isKieConfigured()) return { error: 'kie.ai не настроен — добавьте KIE_API_KEY в переменные окружения' };
+        try {
+            const { url: kieUrl, creditsConsumed } = await generateImage(imagePrompt);
+            const url = await rehostGeneratedUrl(kieUrl, 'covers');
+            const assetRow = await insertMediaAssetRow({ url, type: 'image', productId, tags: [ideaTag, 'auto-generated'] });
+            await db.execute({
+                sql: `INSERT INTO agent_expenses (agent_name, model_used, kie_credits_spent) VALUES (?, ?, ?)`,
+                args: [KIE_AGENT_NAME, 'flux-2/pro-text-to-image', creditsConsumed || 0],
+            });
+            return { asset: serializeAsset(assetRow) };
+        } catch (e) {
+            console.error('ideas/auto-generate: cover generation failed:', e.message);
+            return { error: `Не удалось сгенерировать обложку: ${e.message}` };
+        }
+    }
+
+    async function runVoiceover() {
+        const text = (idea.desc || idea.title || '').trim();
+        if (!text) return { error: 'У идеи нет текста для озвучки' };
+        const provider = isElevenLabsConfigured() ? 'elevenlabs' : (isPiperConfigured() ? 'piper' : null);
+        if (!provider) return { error: 'Ни ElevenLabs, ни Piper не настроены — добавьте ELEVENLABS_API_KEY или PIPER_WORKER_TOKEN' };
+
+        try {
+            let voiceover, modelUsed;
+            if (provider === 'piper') {
+                voiceover = await generatePiperVoiceover({ text });
+                modelUsed = 'piper:ru_RU-dmitri-medium';
+            } else {
+                voiceover = await generateVoiceover({ text });
+                modelUsed = 'elevenlabs:eleven_multilingual_v2';
+            }
+
+            let url;
+            if (isObjectStorageConfigured()) {
+                try {
+                    ({ url } = await uploadBuffer(voiceover.audioBuffer, { contentType: voiceover.contentType, keyPrefix: 'voiceovers' }));
+                } catch (e) {
+                    console.error('ideas/auto-generate: voiceover object storage upload failed, falling back to base64 data URL:', e.message);
+                }
+            }
+            if (!url) url = `data:${voiceover.contentType};base64,${voiceover.audioBuffer.toString('base64')}`;
+
+            const assetRow = await insertMediaAssetRow({ url, type: 'audio', productId, tags: [ideaTag, 'auto-generated'] });
+            await db.execute({
+                sql: `INSERT INTO agent_expenses (agent_name, model_used, total_usd) VALUES ('generator', ?, ?)`,
+                args: [modelUsed, voiceover.estimatedCostUsd || 0],
+            });
+            return { asset: serializeAsset(assetRow) };
+        } catch (e) {
+            return { error: `Не удалось сгенерировать озвучку: ${e.message}` };
+        }
+    }
+
+    async function runVideo() {
+        if (!isReels) return null;
+        if (!isKieConfigured()) return { error: 'kie.ai не настроен — добавьте KIE_API_KEY в переменные окружения' };
+        try {
+            const { url: kieUrl, creditsConsumed } = await generateVideo(imagePrompt);
+            const url = await rehostGeneratedUrl(kieUrl, 'covers');
+            const assetRow = await insertMediaAssetRow({ url, type: 'video', productId, tags: [ideaTag, 'auto-generated'] });
+            await db.execute({
+                sql: `INSERT INTO agent_expenses (agent_name, model_used, kie_credits_spent) VALUES (?, ?, ?)`,
+                args: [KIE_AGENT_NAME, 'kling-2.6/text-to-video', creditsConsumed || 0],
+            });
+            return { asset: serializeAsset(assetRow) };
+        } catch (e) {
+            return { error: `Не удалось сгенерировать видео: ${e.message}` };
+        }
+    }
+
+    const [coverResult, voiceoverResult, videoResult] = await Promise.all([runCover(), runVoiceover(), runVideo()]);
+
+    let assemblyResult = null;
+    if (isReels) {
+        if (videoResult?.asset && voiceoverResult?.asset) {
+            try {
+                const job = await createVideoJob({
+                    videoUrl: videoResult.asset.url,
+                    audioUrl: voiceoverResult.asset.url,
+                    captionText: idea.title,
+                    outputFormat: 'mp4',
+                });
+                await db.execute({
+                    sql: `INSERT INTO video_assembly_jobs (id, job_id, video_url, audio_url, caption_text, status)
+                          VALUES (?, ?, ?, ?, ?, ?)`,
+                    args: [job.job_id, job.job_id, videoResult.asset.url, voiceoverResult.asset.url, idea.title, job.status || 'queued'],
+                });
+                assemblyResult = { jobId: job.job_id, status: job.status || 'queued' };
+            } catch (e) {
+                assemblyResult = { error: `Не удалось запустить сборку ролика: ${e.message}` };
+            }
+        } else {
+            assemblyResult = { error: 'Сборка ролика пропущена: нет и видео, и озвучки одновременно' };
+        }
+    }
+
+    // Persist whichever asset ids succeeded onto the idea itself - same
+    // cover_asset_id column the manual media picker already reads/writes.
+    const updates = {};
+    if (coverResult?.asset) updates.cover_asset_id = coverResult.asset.id;
+    if (voiceoverResult?.asset) updates.voiceover_asset_id = voiceoverResult.asset.id;
+    if (videoResult?.asset) updates.video_asset_id = videoResult.asset.id;
+    if (Object.keys(updates).length) {
+        const setClauses = Object.keys(updates).map((k) => `${k} = ?`).join(', ');
+        await db.execute({ sql: `UPDATE ideas SET ${setClauses} WHERE id = ?`, args: [...Object.values(updates), idea.id] });
+    }
+
+    const finalRow = (await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [idea.id] })).rows[0];
+    res.json({
+        idea: serialize(finalRow),
+        cover: coverResult,
+        voiceover: voiceoverResult,
+        video: videoResult,
+        assembly: assemblyResult,
+    });
 });
 
 export default router;

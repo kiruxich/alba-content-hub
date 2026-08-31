@@ -358,6 +358,11 @@
                         <option value="">— без привязки —</option>
                     </select>
 
+                    <label class="form-label">Идея (необязательно):</label>
+                    <select id="ma-gen-idea-input" class="form-select" onchange="onGenIdeaSelectChange()">
+                        <option value="">— без привязки —</option>
+                    </select>
+
                     <p style="color:var(--text-secondary); font-size:12px; margin:4px 0 0;">Генерация может занять до нескольких минут — окно можно не закрывать, кнопка заблокируется на время запроса.</p>
 
                     <div style="display:flex; gap:8px;">
@@ -386,6 +391,11 @@
 
                     <label class="form-label">Продукт (необязательно):</label>
                     <select id="vo-product-input" class="form-select">
+                        <option value="">— без привязки —</option>
+                    </select>
+
+                    <label class="form-label">Идея (необязательно):</label>
+                    <select id="vo-idea-input" class="form-select" onchange="onVoiceoverIdeaSelectChange()">
                         <option value="">— без привязки —</option>
                     </select>
 

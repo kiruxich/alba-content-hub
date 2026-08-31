@@ -359,6 +359,11 @@ await ensureColumn('ideas', 'rubric_id', 'TEXT');
 // a JSON array of issue codes; empty array = passed the quality gate.
 await ensureColumn('ideas', 'quality_flags', "TEXT DEFAULT '[]'");
 await ensureColumn('ideas', 'cover_asset_id', 'TEXT');
+// Same idea as cover_asset_id above, filled in by POST /api/ideas/:id/auto-generate
+// (server/routes/ideas.js) alongside it - one column per media type the
+// auto-generate chain can produce for an idea.
+await ensureColumn('ideas', 'voiceover_asset_id', 'TEXT');
+await ensureColumn('ideas', 'video_asset_id', 'TEXT');
 // English translation of the same post, generated on demand from the
 // (always-primary) Russian title/desc/cta - for the studio's English-speaking
 // audience. Empty until "Перевести на английский" is clicked.

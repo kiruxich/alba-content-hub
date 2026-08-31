@@ -183,6 +183,7 @@ html, body {
 
 .form-label { font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700; margin-top:12px; display:block; }
 .form-input, .form-textarea, .form-select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-size: 14px; margin-top: 6px; margin-bottom: 12px; }
+.form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(10,132,255,0.15); }
 .form-textarea { min-height: 90px; resize: vertical; }
 
 .date-picker-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-size: 16px; margin-top: 10px; color-scheme: dark; }
@@ -572,7 +573,15 @@ html, body {
 }
 .media-lightbox-overlay.active #media-lightbox-body { transform: scale(1); opacity: 1; }
 
-.media-lightbox-preview { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; border-radius: 16px; background: #000; display: block; }
+/* Real target dimensions instead of just max-width/max-height, which only
+   ever shrink - a small kie.ai-generated image would otherwise render tiny
+   and centered in a huge black overlay. width+height:auto scales small
+   media UP to fill the target box (up to 900px, or 85% of viewport width on
+   narrower screens) while max-height keeps tall media from overflowing the
+   viewport; object-fit:contain preserves aspect ratio without distorting
+   either <img> or <video> (mediaAssetPreviewHtml() renders both through this
+   same class - see openMediaLightbox() in app.js). */
+.media-lightbox-preview { width: min(85vw, 900px); max-width: 100%; height: auto; max-height: 85vh; object-fit: contain; border-radius: 16px; background: #000; display: block; }
 .media-lightbox-controls { position: fixed; top: 20px; right: 24px; z-index: 210; display: flex; gap: 10px; }
 .media-lightbox-icon-btn {
     width: 40px; height: 40px; border-radius: 50%; border: none;
