@@ -47,8 +47,16 @@ function buildEmbeddingText(row, fallbackTitle) {
     const keyDifferentiators = row?.key_differentiators || '';
     const commonObjections = row?.common_objections || '';
     const keywords = row?.keywords || '';
+    // Roadmap in-progress/planned items carry real timely signal ("we're
+    // launching X this month") that RSS-trend matching should be able to
+    // lean on, not just the static product description.
+    let roadmapSummary = '';
+    try {
+        const items = JSON.parse(row?.roadmap_json || '[]');
+        roadmapSummary = items.map(r => `${r.title}${r.description ? ` — ${r.description}` : ''} (${r.status})`).join('; ');
+    } catch { /* malformed roadmap_json - skip, not fatal */ }
 
-    if (!about && !targetAudience && !valueProposition && !keyDifferentiators && !commonObjections && !keywords) {
+    if (!about && !targetAudience && !valueProposition && !keyDifferentiators && !commonObjections && !keywords && !roadmapSummary) {
         return fallbackTitle;
     }
 
@@ -59,12 +67,13 @@ function buildEmbeddingText(row, fallbackTitle) {
         `Отличия от конкурентов: ${keyDifferentiators}`,
         `Частые возражения: ${commonObjections}`,
         `Ключевые слова: ${keywords}`,
+        `Роадмап продвижения: ${roadmapSummary}`,
     ].join('\n');
 }
 
 async function getProductVectors() {
     const infoResult = await db.execute(
-        'SELECT product_id, about, target_audience, value_proposition, key_differentiators, common_objections, keywords FROM project_info'
+        'SELECT product_id, about, target_audience, value_proposition, key_differentiators, common_objections, keywords, roadmap_json FROM project_info'
     );
     const infoById = {};
     infoResult.rows.forEach(r => { infoById[r.product_id] = r; });
