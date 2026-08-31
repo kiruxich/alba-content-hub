@@ -324,7 +324,6 @@ async function renderBankView() {
                 <button class="tg-btn" style="background:var(--accent-purple);" onclick="toggleAutogenPanel('${idea.id}')">✨ Медиа (обложка/озвучка/видео)</button>
                 <button class="tg-btn" style="background:var(--accent-blue);" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
-                <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
                 <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
             </div>
             <div id="idea-gen-status-${idea.id}" class="generation-status" style="display:none;"></div>
@@ -633,8 +632,8 @@ function ideaEvents(ideaId) {
 function getKanbanBucket(idea) {
     if ((idea.status || 'idea') === 'done') return 'done';
     const events = ideaEvents(idea.id);
-    if (events.some(e => e.publishStatus === 'sent')) return 'published';
-    if (events.some(e => e.publishStatus !== 'sent')) return 'scheduled';
+    if (events.some(e => e.publishStatus === 'published')) return 'published';
+    if (events.some(e => e.publishStatus !== 'published')) return 'scheduled';
     if (idea.status === 'ready') return 'ready';
     return 'idea';
 }
@@ -661,7 +660,7 @@ function formatRuDateDMY(date) {
 // у идеи нет ни одного отправленного события с publishAt (не должно
 // случаться для колонки 'published', но на всякий случай).
 function metricsReadyInfo(idea) {
-    const sentEvents = ideaEvents(idea.id).filter(e => e.publishStatus === 'sent' && e.publishAt);
+    const sentEvents = ideaEvents(idea.id).filter(e => e.publishStatus === 'published' && e.publishAt);
     if (!sentEvents.length) return null;
     const latestPublishAt = Math.max(...sentEvents.map(e => e.publishAt));
     const readyDate = new Date((latestPublishAt + METRICS_COLLECTION_DAYS * 86400) * 1000);
@@ -672,14 +671,14 @@ function metricsReadyInfo(idea) {
 // плюс среднее по последним 5 опубликованным идеям того же формата -
 // целиком на фронте, без отдельного бэкенд-эндпоинта.
 function buildKanbanAnalysis(idea) {
-    const sentEvents = ideaEvents(idea.id).filter(e => e.publishStatus === 'sent');
+    const sentEvents = ideaEvents(idea.id).filter(e => e.publishStatus === 'published');
     const views = (idea.metrics?.views || 0) + sentEvents.reduce((s, e) => s + (e.metrics?.views || 0), 0);
     const saves = (idea.metrics?.saves || 0) + sentEvents.reduce((s, e) => s + (e.metrics?.saves || 0), 0);
     const clicks = (idea.metrics?.clicks || 0) + sentEvents.reduce((s, e) => s + (e.metrics?.clicks || 0), 0);
     const leads = idea.metrics?.leads || 0;
 
     const peers = ideasBank
-        .filter(i => i.id !== idea.id && i.format === idea.format && ideaEvents(i.id).some(e => e.publishStatus === 'sent'))
+        .filter(i => i.id !== idea.id && i.format === idea.format && ideaEvents(i.id).some(e => e.publishStatus === 'published'))
         .sort((a, b) => Number(b.id) - Number(a.id))
         .slice(0, 5);
 
@@ -792,7 +791,27 @@ async function handleDrop(e, targetStatus) {
 
 // AI ПРОМПТ ГЕНЕРАТОР
 // ДАШБОРД И АНАЛИТИКА
-function renderAnalyticsView() {
+//
+// Everything on this page is built from data the app already has - nothing
+// here needs the user to type numbers in by hand except leads (see the
+// "Лиды и заявки" section below and its glossary entry). Sections, in order:
+//   1. Эффективность расходов (agent_expenses summary ÷ published ideas/leads)
+//   2. Автосводка по площадкам (scheduledEvents grouped by platform, summed
+//      metrics_views/saves/clicks - populated by server/lib/metricsSync.js
+//      once a platform's tokens are connected; legitimately all-zero until
+//      then, not a bug)
+//   3. Рейтинг конверсий & ROI (existing top-by-leads widget)
+//   4. Лиды и заявки - вручную (leads has no source anywhere in the system,
+//      so it's the one metric that stays manual; views/saves/clicks are
+//      editable here too only as a fallback for platforms metricsSync
+//      doesn't cover yet)
+//   5. Сплит форматов (bugfixed to the 4 real idea formats)
+//   6. Дашборд баланса продуктов
+//   7. Глоссарий
+//
+// Platform labels/order reuse PUBLISH_PLATFORMS (defined further down this
+// file) so the platform list here never drifts from the publish modal's.
+async function renderAnalyticsView() {
     const container = document.getElementById('analytics-content');
     if (!container) return;
 
@@ -801,7 +820,11 @@ function renderAnalyticsView() {
         return { title: p.title, count, color: p.badgeColor };
     });
 
-    const formats = ['TG Пост', 'Threads ветка', 'Insta Reels', 'Insta Публикация', 'Insta История', 'YouTube Shorts', 'VK Клип'];
+    // Real idea formats - see the <select id="edit-idea-format-input"> options
+    // in index.html. This list used to be stale (old platform-specific
+    // formats that no longer exist as choices), so every idea fell through
+    // and every bucket read 0.
+    const formats = ['TG Пост', 'Reels / Shorts', 'Threads', 'Лонгрид Habr/VC'];
     let formatStats = formats.map(f => {
         const count = ideasBank.filter(i => i.format === f).length;
         return { format: f, count };
@@ -809,24 +832,150 @@ function renderAnalyticsView() {
 
     let topROI = [...ideasBank].sort((a,b) => ((b.metrics?.leads || 0) - (a.metrics?.leads || 0))).slice(0, 3);
 
+    // --- 1. Эффективность расходов -----------------------------------------
+    let expenseSummary = { todayUsd: 0, monthUsd: 0 };
+    try {
+        expenseSummary = await api('/api/agent-expenses/summary');
+    } catch (e) {
+        console.debug('renderAnalyticsView: agent-expenses/summary недоступен:', e.message);
+    }
+    const currentMonthKey = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    const publishedIdeaIdsThisMonth = new Set(
+        scheduledEvents
+            .filter(e => e.publishStatus === 'published' && e.rawDate && e.rawDate.slice(0, 7) === currentMonthKey)
+            .map(e => e.ideaId)
+    );
+    const postsThisMonth = publishedIdeaIdsThisMonth.size;
+    const totalLeads = ideasBank.reduce((sum, i) => sum + (i.metrics?.leads || 0), 0);
+    const costPerPost = postsThisMonth > 0 ? (expenseSummary.monthUsd / postsThisMonth) : null;
+    const costPerLead = totalLeads > 0 ? (expenseSummary.monthUsd / totalLeads) : null;
+
     let html = `
     <div class="analytics-card">
-        <h3>📊 Дашборд баланса продуктов</h3>
-        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Распределение контент-гипотез по направлениям студии</p>`;
-
-    productStats.forEach(p => {
-        const pct = ideasBank.length ? Math.round((p.count / ideasBank.length) * 100) : 0;
-        html += `
-        <div style="margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-bottom:4px;">
-                <span>${p.title}</span>
-                <span>${p.count} идей (${pct}%)</span>
+        <h3>💸 Эффективность расходов</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Расход AI-агентов (Cost Tracker) за текущий месяц, делённый на результат</p>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px;">
+            <div class="stat-box">
+                <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">$${expenseSummary.monthUsd.toFixed(2)}</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Расход за месяц</div>
             </div>
-            <div class="progress-bar-bg">
-                <div class="progress-bar-fill" style="width:${pct}%; background:${p.color}"></div>
+            <div class="stat-box">
+                <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">${costPerPost !== null ? '$' + costPerPost.toFixed(2) : '—'}</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Стоимость поста (${postsThisMonth} опубл. за месяц)</div>
+            </div>
+            <div class="stat-box">
+                <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">${costPerLead !== null ? '$' + costPerLead.toFixed(2) : '—'}</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Стоимость лида (${totalLeads} лидов всего)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="analytics-card">
+        <h3>📡 Автосводка по площадкам</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Суммы по всем запланированным/опубликованным постам (${scheduledEvents.length}), собранные автоматически из GET /api/events. 0 означает "ещё не синхронизировано" - это нормально, если токен площадки не подключен, не ошибка.</p>
+        <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+                <tr style="text-align:left; color:var(--text-secondary); font-size:11px; text-transform:uppercase;">
+                    <th style="padding:6px 8px;">Площадка</th>
+                    <th style="padding:6px 8px;">Постов</th>
+                    <th style="padding:6px 8px;">Просмотры</th>
+                    <th style="padding:6px 8px;">Сохранения</th>
+                    <th style="padding:6px 8px;">Клики</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    const knownPlatformIds = PUBLISH_PLATFORMS.map(p => p.id);
+    const extraPlatformIds = [...new Set(scheduledEvents.map(e => e.platform || 'telegram'))].filter(id => !knownPlatformIds.includes(id));
+    [...knownPlatformIds, ...extraPlatformIds].forEach(platformId => {
+        const platformDef = PUBLISH_PLATFORMS.find(p => p.id === platformId);
+        const label = platformDef ? platformDef.label : platformId;
+        const events = scheduledEvents.filter(e => (e.platform || 'telegram') === platformId);
+        const views = events.reduce((s, e) => s + (e.metrics?.views || 0), 0);
+        const saves = events.reduce((s, e) => s + (e.metrics?.saves || 0), 0);
+        const clicks = events.reduce((s, e) => s + (e.metrics?.clicks || 0), 0);
+
+        html += `
+                <tr style="border-top:0.5px solid var(--separator);">
+                    <td style="padding:6px 8px; font-weight:600;">${escapeHtml(label)}</td>
+                    <td style="padding:6px 8px;">${events.length}</td>
+                    <td style="padding:6px 8px;">${platformId === 'telegram' ? '—' : views}</td>
+                    <td style="padding:6px 8px;">${saves}</td>
+                    <td style="padding:6px 8px;">${clicks}</td>
+                </tr>`;
+    });
+
+    html += `
+            </tbody>
+        </table>
+        </div>
+        <div class="info-box" style="margin-top:12px; font-size:12px;">
+            <strong>✈️ Telegram:</strong> просмотры недоступны в принципе — у Bot API нет метода, который возвращает счётчик просмотров поста канала (эта цифра существует только в MTProto/клиентском API, для которого нужна полноценная user-сессия, а не бот-токен). Из-за этого автосинк метрик для Telegram не запускается вовсе.<br>
+            <strong>📌 Pinterest:</strong> публикация уже работает, но синхронизация метрик пока не реализована (в <code>server/lib/metricsSync.js</code> для Pinterest нет фетчера) — площадка в таблице выше всегда будет показывать 0.
+        </div>
+    </div>
+
+    <div class="analytics-card">
+        <h3>🏆 Рейтинг конверсий & ROI (Топ по B2B лидам)</h3>
+        <div style="margin-top:10px;">`;
+
+    if (topROI.length === 0) {
+        html += `<div style="color:var(--text-secondary); font-size:13px; padding:8px 0;">Идей пока нет.</div>`;
+    }
+    topROI.forEach((item, idx) => {
+        const leads = item.metrics?.leads || 0;
+        const clicks = item.metrics?.clicks || 0;
+        html += `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:0.5px solid var(--separator);">
+            <div>
+                <strong>#${idx+1} ${escapeHtml(item.title)}</strong>
+                <div style="font-size:12px; color:var(--text-secondary);">${escapeHtml(item.format)} • ${item.funnel || 'TOFU'}</div>
+            </div>
+            <div style="text-align:right;">
+                <span class="funnel-badge" style="background:rgba(48,209,88,0.2); color:var(--accent-green); font-size:13px;">🎯 ${leads} лидов</span>
+                <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${clicks} кликов</div>
             </div>
         </div>`;
     });
+
+    html += `</div></div>
+
+    <div class="analytics-card">
+        <h3>✍️ Лиды и заявки (вводится вручную)</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Лиды нигде в системе не считаются автоматически — их вводит человек. Просмотры/сохранения/клики здесь редактируемы только как запасной вариант для площадок, которые ещё не синхронизируются (см. автосводку выше).</p>`;
+
+    const leadsIdeas = ideasBank.filter(i => i.status === 'published' || i.status === 'done' ||
+        (i.metrics && (i.metrics.views || i.metrics.saves || i.metrics.clicks || i.metrics.leads)));
+
+    if (leadsIdeas.length === 0) {
+        html += `<div style="color:var(--text-secondary); font-size:13px;">Нет опубликованных идей или идей с метриками.</div>`;
+    } else {
+        html += `<div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">`;
+        leadsIdeas.forEach(idea => {
+            const m = idea.metrics || {};
+            html += `
+            <div style="border:0.5px solid var(--separator); border-radius:10px; padding:10px 12px;">
+                <div style="font-weight:600; font-size:13px; margin-bottom:8px;">${escapeHtml(idea.title)} <span style="font-weight:400; color:var(--text-secondary); font-size:12px;">(${escapeHtml(idea.format || '')})</span></div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                    <label style="font-size:11px; color:var(--text-secondary);">Просмотры<br>
+                        <input type="number" id="am-views-${idea.id}" class="form-input" style="width:90px; margin:4px 0 0;" value="${m.views || 0}">
+                    </label>
+                    <label style="font-size:11px; color:var(--text-secondary);">Сохранения<br>
+                        <input type="number" id="am-saves-${idea.id}" class="form-input" style="width:90px; margin:4px 0 0;" value="${m.saves || 0}">
+                    </label>
+                    <label style="font-size:11px; color:var(--text-secondary);">Клики<br>
+                        <input type="number" id="am-clicks-${idea.id}" class="form-input" style="width:90px; margin:4px 0 0;" value="${m.clicks || 0}">
+                    </label>
+                    <label style="font-size:11px; color:var(--accent-green); font-weight:600;">Лиды*<br>
+                        <input type="number" id="am-leads-${idea.id}" class="form-input" style="width:90px; margin:4px 0 0; border-color:var(--accent-green);" value="${m.leads || 0}">
+                    </label>
+                    <button class="submit-btn" style="margin:0; padding:12px 16px;" onclick="saveIdeaMetricsInline('${idea.id}')">Сохранить</button>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
 
     html += `</div>
 
@@ -838,34 +987,66 @@ function renderAnalyticsView() {
         html += `
         <div class="stat-box">
             <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">${fs.count}</div>
-            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${fs.format}</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${escapeHtml(fs.format)}</div>
         </div>`;
     });
 
     html += `</div></div>
 
     <div class="analytics-card">
-        <h3>🏆 Рейтинг конверсий & ROI (Топ по B2B лидам)</h3>
-        <div style="margin-top:10px;">`;
+        <h3>📊 Дашборд баланса продуктов</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Распределение контент-гипотез по направлениям студии</p>`;
 
-    topROI.forEach((item, idx) => {
-        const leads = item.metrics?.leads || 0;
-        const clicks = item.metrics?.clicks || 0;
+    productStats.forEach(p => {
+        const pct = ideasBank.length ? Math.round((p.count / ideasBank.length) * 100) : 0;
         html += `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:0.5px solid var(--separator);">
-            <div>
-                <strong>#${idx+1} ${item.title}</strong>
-                <div style="font-size:12px; color:var(--text-secondary);">${item.format} • ${item.funnel || 'TOFU'}</div>
+        <div style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-bottom:4px;">
+                <span>${escapeHtml(p.title)}</span>
+                <span>${p.count} идей (${pct}%)</span>
             </div>
-            <div style="text-align:right;">
-                <span class="funnel-badge" style="background:rgba(48,209,88,0.2); color:var(--accent-green); font-size:13px;">🎯 ${leads} лидов</span>
-                <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${clicks} кликов</div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width:${pct}%; background:${p.color}"></div>
             </div>
         </div>`;
     });
 
-    html += `</div></div>`;
+    html += `</div>
+
+    <div class="analytics-card">
+        <h3>📖 Глоссарий метрик</h3>
+        <div class="info-box" style="font-size:13px; line-height:1.6;">
+            <p style="margin:0 0 10px;"><strong>Просмотры (views)</strong> — сколько раз пост показали пользователю. Источник: авто, из <code>metrics_views</code> — синкается по VK/Instagram/YouTube через <code>server/lib/metricsSync.js</code>, когда подключён токен площадки; для Telegram недоступно (см. заметку в автосводке выше); можно поправить вручную в разделе "Лиды и заявки", если площадка ещё не синхронизируется. Показывает охват контента.</p>
+            <p style="margin:0 0 10px;"><strong>Сохранения (saves)</strong> — пользователь сохранил/оценил пост (для VK и YouTube это proxy-метрика — лайки, т.к. у площадок нет отдельного счётчика "сохранений"; для Instagram — буквально saved). Источник: авто (те же условия, что и просмотры) или вручную. Показывает, насколько контент оказался ценным, а не просто просмотренным.</p>
+            <p style="margin:0 0 10px;"><strong>Клики (clicks)</strong> — переходы/репосты/комментарии в зависимости от площадки (VK — репосты, Instagram — шеринги, YouTube — комментарии; см. комментарии в <code>metricsSync.js</code> — ни у одной площадки нет прямого "клика по ссылке" без отдельного ads-API). Источник: авто или вручную. Proxy-метрика вовлечённости/распространения.</p>
+            <p style="margin:0 0 10px;"><strong>Лиды (leads)</strong> — заявки/обращения, которые реально пришли от поста (например, написали в бот или на почту после прочтения). Источник: <strong>только вручную</strong> — ни одна площадка не отдаёт это через API, это нужно проверять в CRM/почте/боте самому. Главная метрика ROI контента — именно по ней считается рейтинг конверсий и "стоимость лида".</p>
+            <p style="margin:0 0 10px;"><strong>Стоимость поста</strong> — расход AI-агентов за месяц (<code>GET /api/agent-expenses/summary</code>) ÷ число идей, опубликованных в этом месяце (по <code>scheduledEvents</code> со статусом <code>publishStatus === 'published'</code>). Показывает, во сколько в среднем обходится один пост с учётом трат на генерацию текста/медиа.</p>
+            <p style="margin:0;"><strong>Стоимость лида</strong> — расход за месяц ÷ сумму лидов по всем идеям. Показывает эффективность вложений в контент относительно реальных заявок; "—", если лидов ещё не было (не делим на ноль).</p>
+        </div>
+    </div>`;
+
     container.innerHTML = html;
+}
+
+async function saveIdeaMetricsInline(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const metrics = {
+        views: parseInt(document.getElementById(`am-views-${ideaId}`)?.value, 10) || 0,
+        saves: parseInt(document.getElementById(`am-saves-${ideaId}`)?.value, 10) || 0,
+        clicks: parseInt(document.getElementById(`am-clicks-${ideaId}`)?.value, 10) || 0,
+        leads: parseInt(document.getElementById(`am-leads-${ideaId}`)?.value, 10) || 0,
+    };
+
+    try {
+        const updated = await api(`/api/ideas/${ideaId}`, { method: 'PUT', body: JSON.stringify({ metrics }) });
+        ideasBank = ideasBank.map(i => i.id === ideaId ? updated : i);
+        showToast('Метрики сохранены!');
+        renderAnalyticsView();
+    } catch (e) {
+        showToast('Не удалось сохранить метрики: ' + e.message);
+    }
 }
 
 // ЭКСПОРТ И TELEGRAM
@@ -1096,43 +1277,9 @@ function validateLimits() {
 }
 
 // МЕТРИКИ И РЕДАКТИРОВАНИЕ
-function openMetricsModal(ideaId) {
-    const idea = ideasBank.find(i => i.id === ideaId);
-    if (!idea) return;
-
-    document.getElementById('metrics-idea-id').value = idea.id;
-    document.getElementById('metrics-idea-title').innerText = idea.title;
-    document.getElementById('m-views').value = idea.metrics?.views || 0;
-    document.getElementById('m-saves').value = idea.metrics?.saves || 0;
-    document.getElementById('m-clicks').value = idea.metrics?.clicks || 0;
-    document.getElementById('m-leads').value = idea.metrics?.leads || 0;
-
-    openOverlay('metrics-overlay');
-}
-
-async function saveMetrics() {
-    const id = document.getElementById('metrics-idea-id').value;
-    const idea = ideasBank.find(i => i.id === id);
-    if (!idea) return;
-
-    const metrics = {
-        views: parseInt(document.getElementById('m-views').value, 10) || 0,
-        saves: parseInt(document.getElementById('m-saves').value, 10) || 0,
-        clicks: parseInt(document.getElementById('m-clicks').value, 10) || 0,
-        leads: parseInt(document.getElementById('m-leads').value, 10) || 0
-    };
-
-    try {
-        const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ metrics }) });
-        ideasBank = ideasBank.map(i => i.id === id ? updated : i);
-        showToast('Метрики сохранены!');
-        closeOverlay('metrics-overlay');
-        renderBankView();
-        renderAnalyticsView();
-    } catch (e) {
-        showToast('Не удалось сохранить метрики: ' + e.message);
-    }
-}
+// Ручной ввод ROI-метрик (views/saves/clicks/leads) переехал с карточки
+// Хранилища на страницу Аналитики - см. renderAnalyticsView() (раздел
+// "Лиды и заявки") и saveIdeaMetricsInline() выше в этом файле.
 
 async function toggleGroupForIdea(ideaId, groupId) {
     const idea = ideasBank.find(i => i.id === ideaId);
