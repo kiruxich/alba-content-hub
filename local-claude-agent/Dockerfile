@@ -2,7 +2,7 @@
 # the real `claude` CLI so the container authenticates as the user's actual
 # Claude account/subscription (via `claude setup-token`, run once after the
 # container is up), not a separate pay-per-token API key.
-FROM node:20-slim
+FROM node:22-slim
 
 RUN npm install -g @anthropic-ai/claude-code@latest
 
