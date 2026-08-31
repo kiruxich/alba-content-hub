@@ -870,7 +870,7 @@ async function openCoverPickerModal() {
             ${mediaAssetPreviewHtml(asset)}
             <div class="media-asset-body">
                 <div class="media-asset-meta-row"><span class="format-tag">${escapeHtml(asset.type)}</span></div>
-                <div class="media-asset-url" title="${escapeHtml(asset.url)}">${escapeHtml(asset.url)}</div>
+                ${mediaAssetSubtextHtml(asset)}
             </div>
         </div>
     `).join('');
@@ -2720,6 +2720,7 @@ function drawParserNiches() {
                     onblur="saveParserNicheField('${n.id}','description',this.value)">${escapeHtml(n.description)}</textarea>
                 <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨</button>
             </div>
+            <div id="parser-desc-status-${n.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-top:2px;"></div>
 
             <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log || '')}</div>
 
@@ -2745,6 +2746,7 @@ function drawParserNiches() {
                     <input type="file" accept=".xlsx" style="display:none;" onchange="uploadParserNicheFile('${n.id}', this)">
                 </label>
                 ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
+                ${n.canDedupeUpload && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNicheUpload('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
                 ${n.files.raw && n.jobId ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
                 <button class="delete-btn" onclick="removeParserNiche('${n.id}')">Удалить</button>
             </div>
@@ -2792,16 +2794,24 @@ async function generateNicheDescription(id) {
     const input = document.getElementById(`parser-desc-${id}`);
     if (!input) return;
     const btn = event && event.target;
+    const status = document.getElementById(`parser-desc-status-${id}`);
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    // Separate from the parser-run console below it (parser-log-${id}) - that
+    // one only reflects 2ГИС scrape progress and stays empty/unrelated during
+    // this call, which was confusing when they sat right next to each other.
+    if (status) status.textContent = 'Генерируем через ИИ на вашем ПК (local-claude-agent)...';
     try {
         const result = await api(`/api/parser-niches/${id}/generate-description`, { method: 'POST' });
         input.value = result.description;
         await saveParserNicheField(id, 'description', result.description);
+        if (status) status.textContent = 'Готово.';
         showToast('Описание сгенерировано');
     } catch (e) {
+        if (status) status.textContent = 'Ошибка: ' + e.message;
         showToast('Не удалось сгенерировать: ' + e.message);
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = '✨'; }
+        if (status) setTimeout(() => { status.textContent = ''; }, 4000);
     }
 }
 
@@ -2856,6 +2866,24 @@ async function dedupeParserNiche(id) {
         showToast('Чистка дублей запущена');
     } catch (e) {
         showToast('Ошибка: ' + e.message);
+    }
+}
+
+// Dedupe for an uploaded (not scraped) raw file - runs synchronously
+// server-side (no worker/job_id involved), so unlike dedupeParserNiche
+// above this doesn't need polling - the response already carries the result.
+async function dedupeParserNicheUpload(id) {
+    const btn = event && event.target;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    try {
+        const updated = await api(`/api/parser-niches/${id}/upload/dedupe`, { method: 'POST' });
+        const idx = parserNiches.findIndex(n => n.id === id);
+        if (idx !== -1) parserNiches[idx] = updated;
+        drawParserNiches();
+        showToast('Дубликаты удалены');
+    } catch (e) {
+        showToast('Ошибка: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = '🧹 Удалить дубликаты'; }
     }
 }
 
@@ -3055,6 +3083,33 @@ function setMediaAssetProductFilter(productId) {
     renderMediaAssets();
 }
 
+// Voiceovers with no configured object storage store their audio as a
+// data:audio/...;base64,... URL directly in `url` (see generate-voiceover in
+// server/routes/mediaAssets.js) - that string can be megabytes long and is
+// meaningless to read, so it must never be dumped as visible text. Show the
+// actual voiceover script (`transcript`, clamped to 4 lines with a toggle)
+// when there is one; otherwise fall back to the URL, except when the URL
+// itself is a data: URI, which gets a short placeholder instead.
+function mediaAssetSubtextHtml(asset) {
+    if (asset.type === 'audio' && asset.transcript) {
+        const id = `mt-${asset.id}`;
+        return `
+            <div class="media-asset-transcript clamped" id="${id}">${escapeHtml(asset.transcript)}</div>
+            <button type="button" class="media-asset-transcript-toggle" onclick="event.stopPropagation(); toggleMediaTranscript('${id}', this)">Показать больше</button>`;
+    }
+    if (asset.url.startsWith('data:')) {
+        return `<div class="media-asset-url">аудио (данные встроены, ссылки нет)</div>`;
+    }
+    return `<div class="media-asset-url" title="${escapeHtml(asset.url)}">${escapeHtml(asset.url)}</div>`;
+}
+
+function toggleMediaTranscript(id, btn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const expanded = el.classList.toggle('clamped') === false;
+    if (btn) btn.textContent = expanded ? 'Свернуть' : 'Показать больше';
+}
+
 function mediaAssetPreviewHtml(asset) {
     // Built with single-quoted HTML attrs and HTML-entity-escaped single quotes so it can be
     // safely embedded inside the (double-quoted) onerror="..." attribute below without the
@@ -3093,7 +3148,7 @@ function drawMediaAssetsGrid() {
                     <span style="font-size:11px; color:var(--text-secondary); margin-left:auto;">исп.: ${asset.usedCount}</span>
                 </div>
                 ${asset.tags.length ? `<div class="media-asset-tags">${asset.tags.map(t => `<span class="group-chip" style="cursor:default;">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
-                <div class="media-asset-url" title="${escapeHtml(asset.url)}">${escapeHtml(asset.url)}</div>
+                ${mediaAssetSubtextHtml(asset)}
                 <div class="parser-niche-actions">
                     <button class="edit-btn" onclick="openMediaLightbox('${asset.id}')">Открыть</button>
                     <button class="delete-btn" onclick="deleteMediaAsset('${asset.id}')">Удалить</button>

@@ -142,11 +142,11 @@ app.post('/run/niche-description', requireToken, async (req, res) => {
     const category = (req.body?.category || '').trim();
     if (!category) return res.status(400).json({ error: 'category is required' });
 
-    const prompt = `A downstream script will take your answer, lowercase it, split it into individual words, and use only the FIRST 8 unique words as literal search keywords for finding "${category}" businesses on 2ГИС (a Russian business directory). It does NOT read your answer as a sentence - only isolated words matter, in order.
+    const prompt = `A downstream script will take your answer, lowercase it, split it into individual words on whitespace/commas/punctuation, and use only the FIRST 8 unique words as literal search keywords for finding "${category}" businesses on 2ГИС (a Russian business directory). It does NOT read your answer as a sentence - only isolated bare words matter, in order. Any character that isn't a plain letter (quotation marks «», "", punctuation) stays glued to the word and breaks the match.
 
-Write a comma-separated list of alternate names and search synonyms Russian users would actually type into 2ГИС to find this type of business - most common/important term first. Each item should be 1-2 words, no connecting words ("и", "а также", "включает" etc.), no sentence structure at all - just the terms themselves, e.g. for "барбершопы": "барбершоп, барбер, мужская парикмахерская, стрижка бороды, мужской салон, barbershop". Russian, unless a term is commonly searched in Latin script (e.g. brand-style words).
+Write a comma-separated list of alternate names and search synonyms Russian users would actually type into 2ГИС to find this type of business - most common/important term first. Rules: each item is 1-2 bare words with NO surrounding punctuation (no quotation marks of any kind around a term); NO connecting words anywhere in the list, including "и" before the last item - a normal Russian list would put "и" there, but do not, since this is parsed by a script, not read as a sentence; no sentence structure at all, just terms separated by commas. Example for "барбершопы" (plain words, no quotes, no "и"): барбершоп, барбер, мужская парикмахерская, стрижка бороды, мужской салон, barbershop. Russian, unless a term is commonly searched in Latin script (e.g. brand-style words).
 
-Respond with a JSON object: { "description": "term one, term two, term three, ..." }`;
+Respond with a JSON object: { "description": "term one, term two, term three, ..." } - the description value itself must be plain comma-separated text, no quotation marks inside it.`;
 
     try {
         const result = await runClaudeForJson(prompt);

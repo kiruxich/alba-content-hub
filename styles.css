@@ -584,6 +584,9 @@ html, body {
 .media-asset-meta-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .media-asset-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .media-asset-url { font-size: 11px; color: var(--text-secondary); word-break: break-all; }
+.media-asset-transcript { font-size: 11px; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; }
+.media-asset-transcript.clamped { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.media-asset-transcript-toggle { background: none; border: none; padding: 2px 0; color: var(--accent-blue); font-size: 11px; cursor: pointer; }
 
 /* MEDIA LIGHTBOX - just the media itself, large, centered, no card chrome -
    fills the inner view area rather than reading as another form/settings

@@ -447,6 +447,18 @@ await ensureColumn('telegram_settings', 'webhook_secret', 'TEXT');
 // parserNiches.js, which fetches those live from the worker by job_id).
 await ensureColumn('parser_niches', 'raw_upload_data', 'TEXT');
 await ensureColumn('parser_niches', 'raw_upload_name', 'TEXT');
+// Franchise-domain dedupe result for an uploaded raw file (POST
+// /:id/upload/dedupe) - separate from dedup_file, which only ever points at
+// a scraper job's worker-produced dedup.xlsx. Uploaded rows have no job_id,
+// so the deduped bytes are stored directly, same reasoning as
+// raw_upload_data above.
+await ensureColumn('parser_niches', 'dedup_upload_data', 'TEXT');
+// The script text a voiceover was generated from - generate-voiceover only
+// ever used it to call ElevenLabs/Piper and threw it away afterwards, so a
+// voiceover's media_assets row had no readable content at all (the card
+// could only show `url`, which for an unconfigured-S3 fallback is itself a
+// giant data:audio/...;base64,... string, not something meant to be read).
+await ensureColumn('media_assets', 'transcript', 'TEXT');
 
 // project_info: moves what used to be hardcoded frontend productsData fields
 // (target audience, value proposition) into the DB and adds new fields the

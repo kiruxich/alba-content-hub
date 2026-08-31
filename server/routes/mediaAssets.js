@@ -62,6 +62,7 @@ function serialize(row) {
         id: row.id,
         url: row.url,
         type: row.type,
+        transcript: row.transcript || null,
         productId: row.product_id || null,
         rubricId: row.rubric_id || null,
         tags: JSON.parse(row.tags || '[]'),
@@ -103,10 +104,11 @@ router.post('/', async (req, res) => {
 
     const id = String(Date.now());
     await db.execute({
-        sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO media_assets (id, url, type, transcript, product_id, rubric_id, tags, source)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
             id, url, type,
+            b.transcript ? String(b.transcript) : null,
             b.productId || null,
             b.rubricId || null,
             JSON.stringify(b.tags || []),
@@ -125,13 +127,14 @@ router.put('/:id', async (req, res) => {
     const merged = {
         url: b.url !== undefined ? String(b.url).trim() : row.url,
         type: b.type !== undefined ? String(b.type).trim() : row.type,
+        transcript: b.transcript !== undefined ? (b.transcript ? String(b.transcript) : null) : row.transcript,
         product_id: b.productId !== undefined ? (b.productId || null) : row.product_id,
         rubric_id: b.rubricId !== undefined ? (b.rubricId || null) : row.rubric_id,
         tags: b.tags !== undefined ? JSON.stringify(b.tags || []) : row.tags,
     };
     await db.execute({
-        sql: `UPDATE media_assets SET url = ?, type = ?, product_id = ?, rubric_id = ?, tags = ? WHERE id = ?`,
-        args: [merged.url, merged.type, merged.product_id, merged.rubric_id, merged.tags, row.id],
+        sql: `UPDATE media_assets SET url = ?, type = ?, transcript = ?, product_id = ?, rubric_id = ?, tags = ? WHERE id = ?`,
+        args: [merged.url, merged.type, merged.transcript, merged.product_id, merged.rubric_id, merged.tags, row.id],
     });
     const result = await db.execute({ sql: 'SELECT * FROM media_assets WHERE id = ?', args: [row.id] });
     res.json(serialize(result.rows[0]));
@@ -271,10 +274,10 @@ router.post('/generate-voiceover', async (req, res) => {
     }
     const id = String(Date.now());
     await db.execute({
-        sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
-              VALUES (?, ?, 'audio', ?, ?, ?, 'ai-generated')`,
+        sql: `INSERT INTO media_assets (id, url, type, transcript, product_id, rubric_id, tags, source)
+              VALUES (?, ?, 'audio', ?, ?, ?, ?, 'ai-generated')`,
         args: [
-            id, url,
+            id, url, text,
             b.productId || null,
             b.rubricId || null,
             JSON.stringify(b.tags || []),

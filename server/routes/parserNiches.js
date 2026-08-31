@@ -136,9 +136,10 @@ function serialize(row) {
         stats: row.stats_json ? JSON.parse(row.stats_json) : null,
         files: {
             raw: Boolean(row.raw_file),
-            dedup: Boolean(row.dedup_file),
+            dedup: Boolean(row.dedup_file) || Boolean(row.dedup_upload_data),
             archive: Boolean(row.archive_file),
         },
+        canDedupeUpload: Boolean(row.raw_upload_data) && !row.job_id,
         jobId: row.job_id,
     };
 }
@@ -343,7 +344,11 @@ router.post('/:id/upload', (req, res, next) => {
     }
     if (!req.file) return res.status(400).json({ error: 'Файл не выбран' });
 
-    const originalName = req.file.originalname || 'raw.xlsx';
+    // multer/busboy decode the multipart filename header as latin1 by
+    // default, even when the browser actually sent UTF-8 bytes (e.g. a
+    // Cyrillic filename) - re-decoding fixes the mojibake without affecting
+    // ASCII-only names, for which the round-trip is a no-op.
+    const originalName = Buffer.from(req.file.originalname || 'raw.xlsx', 'latin1').toString('utf8');
     if (!/\.xlsx$/i.test(originalName)) {
         return res.status(400).json({ error: 'Поддерживаются только файлы .xlsx' });
     }
@@ -378,13 +383,70 @@ router.post('/:id/upload', (req, res, next) => {
 
     await db.execute({
         sql: `UPDATE parser_niches SET status = 'done', raw_file = 'raw.xlsx', dedup_file = NULL, archive_file = NULL,
-              raw_upload_data = ?, raw_upload_name = ?, log = ?, updated_at = strftime('%s','now') WHERE id = ?`,
+              raw_upload_data = ?, raw_upload_name = ?, dedup_upload_data = NULL, log = ?, updated_at = strftime('%s','now') WHERE id = ?`,
         args: [
             outBuf.toString('base64'),
             originalName,
             `Загружен файл «${originalName}» — ${rows.length} строк.`,
             row.id,
         ],
+    });
+    const result = await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [row.id] });
+    res.json(serialize(result.rows[0]));
+});
+
+// POST /:id/upload/dedupe - runs the same franchise-domain dedupe the
+// scraper's own worker does (parser_core.py's dedupe_franchises: drop rows
+// whose site column repeats 2+ times), but locally in JS for an uploaded
+// raw file - uploaded rows have no job_id, so they can't hit the worker's
+// own /dedupe endpoint (dedupeParserJob). Column index 4 (5th column) is
+// the site URL, matching parser-worker's raw.xlsx layout - re-uploads are
+// expected to be in that same shape.
+router.post('/:id/upload/dedupe', async (req, res) => {
+    const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'niche not found' });
+    if (!row.raw_upload_data) return res.status(400).json({ error: 'Нет загруженного файла для этой ниши' });
+
+    let rows;
+    try {
+        const workbook = XLSX.read(Buffer.from(row.raw_upload_data, 'base64'), { type: 'buffer' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    } catch (e) {
+        return res.status(400).json({ error: 'Не удалось прочитать Excel-файл: ' + e.message });
+    }
+    if (rows.length < 2) return res.status(400).json({ error: 'Файл пустой или не содержит строк с данными' });
+
+    const getDomain = (site) => {
+        let s = String(site || '').trim().toLowerCase();
+        if (!s || s === 'нет сайта' || s === 'не указан') return null;
+        if (!s.startsWith('http')) s = 'http://' + s;
+        try {
+            const host = new URL(s).hostname;
+            return host.startsWith('www.') ? host.slice(4) : host;
+        } catch {
+            return null;
+        }
+    };
+
+    const header = rows[0];
+    const dataRows = rows.slice(1);
+    const domainCounts = {};
+    for (const r of dataRows) {
+        const domain = getDomain(r[4]);
+        if (domain) domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+    }
+    const franchiseDomains = new Set(Object.entries(domainCounts).filter(([, c]) => c >= 2).map(([d]) => d));
+    const kept = dataRows.filter(r => !franchiseDomains.has(getDomain(r[4])));
+    const deletedCount = dataRows.length - kept.length;
+
+    const outWb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([header, ...kept]), 'Leads');
+    const outBuf = XLSX.write(outWb, { type: 'buffer', bookType: 'xlsx' });
+
+    await db.execute({
+        sql: `UPDATE parser_niches SET dedup_upload_data = ?, log = ?, updated_at = strftime('%s','now') WHERE id = ?`,
+        args: [outBuf.toString('base64'), `Дедупликация: удалено ${deletedCount} строк (${franchiseDomains.size} доменов-франшиз).`, row.id],
     });
     const result = await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [row.id] });
     res.json(serialize(result.rows[0]));
@@ -401,6 +463,12 @@ router.get('/:id/download/:kind', async (req, res) => {
         const filename = (row.raw_upload_name || 'raw.xlsx').replace(/"/g, '');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(buf);
+    }
+    if (req.params.kind === 'dedup' && row.dedup_upload_data) {
+        const buf = Buffer.from(row.dedup_upload_data, 'base64');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="dedup.xlsx"');
         return res.send(buf);
     }
 
