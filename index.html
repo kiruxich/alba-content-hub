@@ -49,6 +49,10 @@
             <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
             <span>Календарь</span>
         </button>
+        <button class="tab-item" onclick="switchTab('archive')">
+            <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+            <span>Архив публикаций</span>
+        </button>
         <button class="tab-item" onclick="switchTab('contentplan')">
             <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>
             <span>Контент план</span>
@@ -219,6 +223,24 @@
 
                 <h3 style="margin: 24px 0 12px 4px; font-size:16px;">Запланированные публикации</h3>
                 <div id="calendar-list-content"></div>
+            </div>
+        </div>
+
+        <!-- TAB 6b: PUBLICATION ARCHIVE - everything ever published, from
+             already-loaded ideasBank/scheduledEvents, no new backend needed -->
+        <div id="view-archive" class="view">
+            <div class="large-header">
+                <p>Что уже вышло</p>
+                <h1>Архив публикаций</h1>
+            </div>
+            <div class="clients-container">
+                <div class="controls-row">
+                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Всё, что когда-либо ушло в статус «Опубликовано»/«Завершено», с датой, площадкой и метриками</p>
+                    <select class="form-select" style="width:auto; margin:0;" id="archive-product-filter" onchange="renderArchiveView()">
+                        <option value="">Все продукты</option>
+                    </select>
+                </div>
+                <div id="archive-list"></div>
             </div>
         </div>
 

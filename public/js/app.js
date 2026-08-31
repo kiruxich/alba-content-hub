@@ -119,7 +119,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'kanban': 3, 'analytics': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'mediaassets': 9, 'urlchecker': 10, 'systeminfo': 11, 'agentcenter': 12 };
+    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'kanban': 3, 'analytics': 4, 'calendar': 5, 'archive': 6, 'contentplan': 7, 'clients': 8, 'customers': 9, 'mediaassets': 10, 'urlchecker': 11, 'systeminfo': 12, 'agentcenter': 13 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -132,6 +132,7 @@ function switchTab(tabName) {
         renderCalendar();
         checkFunnelBalance();
     }
+    if (tabName === 'archive') renderArchiveView();
     if (tabName === 'contentplan') renderContentPlan();
     if (tabName === 'clients') renderClientsView();
     if (tabName === 'customers') renderParserNiches();
@@ -1136,6 +1137,65 @@ async function generateIdeaVoiceover(ideaId) {
     const stillIdea = ideasBank.find(i => i.id === ideaId);
     if (stillIdea) stillIdea.generatingVoiceover = false;
     renderBankView();
+}
+
+// Архив публикаций - everything ever published/done, built entirely from
+// data already loaded client-side (ideasBank + scheduledEvents), no new
+// backend endpoint needed. One row per sent scheduledEvent, newest first;
+// an idea can appear more than once if it went out on several platforms.
+function renderArchiveView() {
+    const list = document.getElementById('archive-list');
+    if (!list) return;
+
+    const productFilter = document.getElementById('archive-product-filter');
+    if (productFilter && productFilter.options.length <= 1) {
+        productsData.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.title;
+            productFilter.appendChild(opt);
+        });
+    }
+    const filterProductId = productFilter ? productFilter.value : '';
+
+    const archivedIdeaIds = new Set(ideasBank.filter(i => i.status === 'published' || i.status === 'done').map(i => i.id));
+    let rows = scheduledEvents
+        .filter(e => e.publishStatus === 'published' && archivedIdeaIds.has(e.ideaId))
+        .map(e => ({ event: e, idea: ideasBank.find(i => i.id === e.ideaId) }))
+        .filter(r => r.idea);
+
+    if (filterProductId) {
+        rows = rows.filter(r => r.idea.targetGroups && r.idea.targetGroups.includes(filterProductId));
+    }
+    rows.sort((a, b) => (b.event.publishAt || 0) - (a.event.publishAt || 0));
+
+    if (rows.length === 0) {
+        list.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Пока ничего не опубликовано.</div>`;
+        return;
+    }
+
+    const platformLabel = id => (PUBLISH_PLATFORMS.find(p => p.id === id) || {}).label || id;
+    list.innerHTML = rows.map(({ event, idea }) => {
+        const date = event.publishAt ? new Date(event.publishAt * 1000).toLocaleDateString('ru-RU') : '—';
+        const m = event.metrics || {};
+        return `
+        <div class="idea-card" style="margin-bottom:12px;">
+            <div class="idea-header">
+                <div class="idea-title">${escapeHtml(idea.title)}</div>
+                <div>${kanbanProductBadge(idea)}<span class="format-tag">${escapeHtml(platformLabel(event.platform))}</span></div>
+            </div>
+            <div class="meta-stats">
+                <span>📅 ${date}</span>
+                <span>👁 ${m.views || 0}</span>
+                <span>💾 ${m.saves || 0}</span>
+                <span>🔗 ${m.clicks || 0}</span>
+                <span>🎯 ${idea.metrics?.leads || 0} лидов</span>
+            </div>
+            <div class="action-btn-row">
+                <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Открыть идею</button>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function checkFunnelBalance() {
