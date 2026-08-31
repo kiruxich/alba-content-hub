@@ -480,6 +480,12 @@ html, body {
 .uc-findings-list { display: flex; flex-direction: column; gap: 10px; }
 .uc-finding { background: var(--bg-grouped); border-radius: 12px; padding: 14px; border-left: 3px solid rgba(255,255,255,0.15); }
 .uc-finding-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.uc-chart { background: var(--bg-grouped); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
+.uc-bar-row { display: flex; align-items: center; gap: 10px; }
+.uc-bar-label { width: 68px; flex-shrink: 0; font-size: 10px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+.uc-bar-track { flex: 1; background: rgba(255,255,255,0.06); border-radius: 6px; height: 16px; overflow: hidden; }
+.uc-bar-fill { height: 100%; border-radius: 6px; background: var(--accent-blue); min-width: 2px; transition: width 0.4s ease; }
+.uc-bar-value { width: 64px; flex-shrink: 0; text-align: right; font-size: 12px; font-weight: 700; color: var(--text-primary); }
 
 /* --- CUSTOMER PARSER (niche cards) --- */
 .parser-niches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 16px; }

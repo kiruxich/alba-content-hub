@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from parser_core import Job, run_parser_job, dedupe_franchises
+from parser_core import Job, run_parser_job, dedupe_franchises, render_live_page
 
 DATA_DIR = os.environ.get("PARSER_DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 NOVNC_URL = os.environ.get("NOVNC_URL", "https://vnc.alba-creation.ru")
@@ -44,6 +44,11 @@ class CreateJobRequest(BaseModel):
     category: str
     description: str = ""
     queries: list[QueryItem]
+
+
+class RenderRequest(BaseModel):
+    url: str
+    timeout_ms: int = 25000
 
 
 async def notify_captcha(job: Job):
@@ -190,6 +195,23 @@ async def get_file(job_id: str, kind: str):
         raise HTTPException(404, "file not ready")
     filename = f"{job.category}-{kind}.{'zip' if kind == 'archive' else 'xlsx'}"
     return FileResponse(path, filename=filename)
+
+
+@app.post("/render")
+async def render_page(body: RenderRequest):
+    """Used by the hub's url-checker 'live' scan mode. Unlike /jobs, this is
+    a synchronous one-off - not queued through the niche-scraping pipeline -
+    since it's a single ad-hoc navigation, not a long grid scrape. Runs the
+    same headed Chromium under Xvfb as the 2GIS scraper (see parser_core.py's
+    run_parser_job), the only browser this repo runs."""
+    timeout_ms = max(5000, min(body.timeout_ms, 60000))
+    try:
+        result = await asyncio.wait_for(render_live_page(body.url, timeout_ms), timeout=(timeout_ms / 1000) + 20)
+        return result
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "render timed out")
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.get("/health")

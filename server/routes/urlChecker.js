@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { scanSources, defaultCatalog, dedupeFindings } from '@legit-agent/core';
 import PDFDocument from 'pdfkit';
 import { runLoadTest } from '../lib/loadTest.js';
+import { renderLivePage } from '../lib/parserWorkerClient.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FONT_REGULAR = path.join(__dirname, '..', 'fonts', 'Roboto-Regular.ttf');
@@ -22,39 +23,68 @@ function normalizeUrl(input) {
     }
 }
 
-// POST /api/url-checker/scan {url, concurrency?, durationMs?}
-// Runs the legitAgent static rule catalog (152-FZ / 38-FZ / ZoZPP) against
-// the page's server-rendered HTML, plus a bounded load test. The browser-
-// based legitAgent checks (cookie banner before/after clicking "decline",
-// full SPA hydration) need Chromium and are deferred to a post-VPS "live"
-// scan mode - this only sees what's in the raw HTML response.
+// POST /api/url-checker/scan {url, mode?, concurrency?, durationMs?, requestCount?}
+// Runs the legitAgent static rule catalog (152-FZ / 38-FZ / ZoZPP) against the
+// page's HTML, plus a bounded load test.
+//
+// mode: 'fast' (default) - plain server-side fetch() of the raw HTML, no
+//   browser, no cookie-banner interaction, no SPA hydration.
+// mode: 'live' - delegates to parser-worker's headed-Chromium /render
+//   endpoint (the only process in this repo that runs a browser), which
+//   navigates the page, waits for it to settle, best-effort declines a
+//   cookie-consent banner if it can confidently find one, and returns the
+//   fully hydrated post-JS HTML. Slower, but sees what the actual page
+//   showed a real visitor instead of just the initial HTML response.
 router.post('/scan', async (req, res) => {
     const url = normalizeUrl(req.body?.url);
     if (!url) return res.status(400).json({ error: 'valid url is required' });
+    const mode = req.body?.mode === 'live' ? 'live' : 'fast';
 
-    const report = { url, checkedAt: new Date().toISOString() };
+    const report = { url, checkedAt: new Date().toISOString(), mode };
 
     const fetchStart = Date.now();
     let html = '';
     try {
-        const pageRes = await fetch(url, { redirect: 'follow' });
-        html = await pageRes.text();
-        report.health = {
-            ok: pageRes.ok,
-            status: pageRes.status,
-            finalUrl: pageRes.url,
-            https: pageRes.url.startsWith('https://'),
-            responseTimeMs: Date.now() - fetchStart,
-            contentLength: html.length,
-            securityHeaders: {
-                'strict-transport-security': pageRes.headers.get('strict-transport-security') || null,
-                'content-security-policy': pageRes.headers.get('content-security-policy') || null,
-                'x-content-type-options': pageRes.headers.get('x-content-type-options') || null,
-                'x-frame-options': pageRes.headers.get('x-frame-options') || null,
-            },
-        };
+        if (mode === 'live') {
+            const rendered = await renderLivePage(url);
+            html = rendered.html || '';
+            const finalUrl = rendered.final_url || url;
+            const headers = rendered.headers || {};
+            report.health = {
+                ok: !!rendered.ok,
+                status: rendered.status ?? null,
+                finalUrl,
+                https: finalUrl.startsWith('https://'),
+                responseTimeMs: Date.now() - fetchStart,
+                contentLength: html.length,
+                securityHeaders: {
+                    'strict-transport-security': headers['strict-transport-security'] || null,
+                    'content-security-policy': headers['content-security-policy'] || null,
+                    'x-content-type-options': headers['x-content-type-options'] || null,
+                    'x-frame-options': headers['x-frame-options'] || null,
+                },
+            };
+            report.cookieBanner = rendered.cookie_banner || null;
+        } else {
+            const pageRes = await fetch(url, { redirect: 'follow' });
+            html = await pageRes.text();
+            report.health = {
+                ok: pageRes.ok,
+                status: pageRes.status,
+                finalUrl: pageRes.url,
+                https: pageRes.url.startsWith('https://'),
+                responseTimeMs: Date.now() - fetchStart,
+                contentLength: html.length,
+                securityHeaders: {
+                    'strict-transport-security': pageRes.headers.get('strict-transport-security') || null,
+                    'content-security-policy': pageRes.headers.get('content-security-policy') || null,
+                    'x-content-type-options': pageRes.headers.get('x-content-type-options') || null,
+                    'x-frame-options': pageRes.headers.get('x-frame-options') || null,
+                },
+            };
+        }
     } catch (e) {
-        report.health = { ok: false, error: e.message };
+        report.health = { ok: false, error: mode === 'live' ? `Полная проверка (браузер) недоступна: ${e.message}` : e.message };
     }
 
     report.findings = html
@@ -66,9 +96,13 @@ router.post('/scan', async (req, res) => {
     }
 
     try {
+        const requestCount = req.body?.requestCount !== undefined && req.body?.requestCount !== null && req.body?.requestCount !== ''
+            ? Number(req.body.requestCount)
+            : undefined;
         report.loadTest = await runLoadTest(url, {
             concurrency: Number(req.body?.concurrency) || 10,
             durationMs: Number(req.body?.durationMs) || 5000,
+            requestCount,
         });
     } catch (e) {
         report.loadTest = { error: e.message };

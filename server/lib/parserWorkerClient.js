@@ -52,3 +52,26 @@ export async function archiveParserJob(jobId) {
 export async function fetchParserFile(jobId, kind) {
     return workerFetch(`/jobs/${jobId}/files/${kind}`);
 }
+
+// Used by the url-checker's "live" scan mode: asks parser-worker to open an
+// arbitrary URL in its existing headed Chromium (the hub's own Node process
+// has no browser and isn't meant to run one - that's parser-worker's job),
+// wait for the page to settle, best-effort decline a cookie-consent banner,
+// and hand back the fully hydrated post-JS HTML.
+export async function renderLivePage(url, { timeoutMs } = {}) {
+    const effectiveTimeoutMs = timeoutMs || 25000;
+    // Client-side abort a bit past the server-side timeout so a wedged
+    // browser on the worker side can't hang this request forever.
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), effectiveTimeoutMs + 20000);
+    try {
+        const res = await workerFetch('/render', {
+            method: 'POST',
+            body: JSON.stringify({ url, timeout_ms: effectiveTimeoutMs }),
+            signal: controller.signal,
+        });
+        return res.json();
+    } finally {
+        clearTimeout(abortTimer);
+    }
+}

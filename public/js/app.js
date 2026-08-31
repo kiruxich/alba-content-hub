@@ -2163,15 +2163,23 @@ let urlCheckerLastReport = null;
 async function runUrlCheck() {
     const input = document.getElementById('url-checker-input');
     const btn = document.getElementById('url-checker-scan-btn');
+    const requestCountInput = document.getElementById('url-checker-requestcount-input');
+    const modeInput = document.getElementById('url-checker-mode-input');
     const url = input.value.trim();
     if (!url) return showToast('Введите URL');
 
+    const mode = modeInput?.value === 'live' ? 'live' : 'fast';
+    const requestCount = Math.max(1, Math.min(5000, Number(requestCountInput?.value) || 100));
+
     btn.disabled = true;
     btn.textContent = 'Проверяю...';
-    document.getElementById('url-checker-results').innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary); margin-top:20px;">Сканирую сайт и запускаю нагрузочный тест...</div>`;
+    const loadingText = mode === 'live'
+        ? 'Открываю сайт в браузере (полная проверка), это займёт больше времени...'
+        : 'Сканирую сайт и запускаю нагрузочный тест...';
+    document.getElementById('url-checker-results').innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary); margin-top:20px;">${loadingText}</div>`;
 
     try {
-        const report = await api('/api/url-checker/scan', { method: 'POST', body: JSON.stringify({ url }) });
+        const report = await api('/api/url-checker/scan', { method: 'POST', body: JSON.stringify({ url, mode, requestCount }) });
         urlCheckerLastReport = report;
         renderUrlCheckReport(report);
     } catch (e) {
@@ -2180,6 +2188,50 @@ async function runUrlCheck() {
         btn.disabled = false;
         btn.textContent = 'Проверить';
     }
+}
+
+// Horizontal CSS bar (no chart library / no SVG) - width is a percentage of
+// the largest value in the set, floored so a non-zero value always shows a
+// sliver of color.
+function ucBarRow(label, value, maxValue, unit, color) {
+    const pct = maxValue > 0 ? Math.max(value > 0 ? 3 : 0, Math.round((value / maxValue) * 100)) : 0;
+    return `
+        <div class="uc-bar-row">
+            <span class="uc-bar-label">${escapeHtml(label)}</span>
+            <div class="uc-bar-track"><div class="uc-bar-fill" style="width:${pct}%; background:${color || 'var(--accent-blue)'};"></div></div>
+            <span class="uc-bar-value">${value ?? '—'}${unit || ''}</span>
+        </div>`;
+}
+
+function renderResponseTimeChart(lt) {
+    const rows = [
+        ['Min', lt.minMs],
+        ['Avg', lt.avgMs],
+        ['p50', lt.p50Ms],
+        ['p95', lt.p95Ms],
+        ['Max', lt.maxMs],
+    ];
+    const maxValue = Math.max(1, ...rows.map(([, v]) => v || 0));
+    return `<div class="uc-chart">${rows.map(([label, v]) => ucBarRow(label, v || 0, maxValue, ' мс')).join('')}</div>`;
+}
+
+function renderStatusCodeChart(lt) {
+    const counts = lt.statusCounts || {};
+    const entries = Object.entries(counts).filter(([, c]) => c > 0);
+    if (entries.length === 0) return '';
+    const maxValue = Math.max(1, ...entries.map(([, c]) => c));
+    const colorFor = (status) => {
+        const code = Number(status);
+        if (code >= 200 && code < 300) return 'var(--accent-green)';
+        if (code >= 300 && code < 400) return 'var(--accent-blue)';
+        if (code >= 400 && code < 500) return 'var(--accent-orange)';
+        return 'var(--accent-red)'; // 5xx and 0 (network error)
+    };
+    const rowsHtml = entries
+        .sort((a, b) => Number(a[0]) - Number(b[0]))
+        .map(([status, count]) => ucBarRow(status === '0' ? 'err' : status, count, maxValue, '', colorFor(status)))
+        .join('');
+    return `<div class="uc-chart">${rowsHtml}</div>`;
 }
 
 function renderUrlCheckReport(report) {
@@ -2216,19 +2268,40 @@ function renderUrlCheckReport(report) {
 
     const loadTestHtml = lt.error
         ? `<div class="info-box" style="color:var(--accent-red);">Ошибка нагрузочного теста: ${escapeHtml(lt.error)}</div>`
-        : `<div class="uc-stats-row">
+        : `<div class="uc-stats-row" style="margin-bottom:12px;">
             <div class="uc-stat"><span class="uc-stat-label">Запросов</span><span class="uc-stat-value">${lt.totalRequests ?? '—'}</span></div>
             <div class="uc-stat"><span class="uc-stat-label">Ошибок</span><span class="uc-stat-value">${lt.errors ?? 0} (${Math.round((lt.errorRate || 0) * 100)}%)</span></div>
             <div class="uc-stat"><span class="uc-stat-label">RPS</span><span class="uc-stat-value">${lt.requestsPerSecond ?? '—'}</span></div>
             <div class="uc-stat"><span class="uc-stat-label">Средний</span><span class="uc-stat-value">${lt.avgMs ?? '—'} мс</span></div>
             <div class="uc-stat"><span class="uc-stat-label">p95</span><span class="uc-stat-value">${lt.p95Ms ?? '—'} мс</span></div>
             <div class="uc-stat"><span class="uc-stat-label">Макс</span><span class="uc-stat-value">${lt.maxMs ?? '—'} мс</span></div>
+        </div>
+        <div class="uc-stats-row" style="align-items:flex-start;">
+            <div style="flex:1; min-width:260px;">
+                <div class="uc-stat-label" style="margin-bottom:6px;">Время ответа, мс</div>
+                ${renderResponseTimeChart(lt)}
+            </div>
+            ${renderStatusCodeChart(lt) ? `<div style="flex:1; min-width:200px;">
+                <div class="uc-stat-label" style="margin-bottom:6px;">Коды ответов</div>
+                ${renderStatusCodeChart(lt)}
+            </div>` : ''}
         </div>`;
 
+    const cookieBanner = report.cookieBanner;
+    const cookieBannerHtml = cookieBanner ? `
+        <div class="info-box" style="margin-top:10px; color:${cookieBanner.clicked ? 'var(--accent-green)' : 'var(--text-secondary)'};">
+            ${cookieBanner.clicked
+                ? `Баннер cookie обнаружен, нажата кнопка отклонения: «${escapeHtml(cookieBanner.buttonText || '')}»`
+                : cookieBanner.detected
+                    ? 'Баннер cookie обнаружен, но кнопка отклонения не найдена с уверенностью — не нажималась.'
+                    : 'Баннер cookie не обнаружен.'}
+        </div>` : '';
+
     container.innerHTML = `
-        <div class="p-section-title" style="margin-top:20px;">ДОСТУПНОСТЬ</div>
+        <div class="p-section-title" style="margin-top:20px;">ДОСТУПНОСТЬ${report.mode === 'live' ? ' (полная проверка, с браузером)' : ''}</div>
         <div class="uc-stats-row">${healthStats}</div>
         ${missingHeaders.length ? `<div class="warning-banner" style="margin-top:10px;">Отсутствуют заголовки безопасности: ${missingHeaders.join(', ')}</div>` : ''}
+        ${cookieBannerHtml}
 
         <div class="p-section-title" style="margin-top:24px;">ЮРИДИЧЕСКИЕ РИСКИ (152-ФЗ / 38-ФЗ / ЗоЗПП) — найдено ${findings.length}</div>
         <div class="uc-stats-row" style="margin-bottom:12px;">
@@ -2243,13 +2316,19 @@ function renderUrlCheckReport(report) {
 
         <div class="controls-row" style="margin-top:24px;">
             <p style="color:var(--text-secondary); font-size:11px; margin:0;">Эвристическая проверка, не юридическое заключение. Нагрузочный тест — только для своих/клиентских проектов.</p>
-            <button class="edit-btn" onclick="generateUrlCheckPdf()">📄 Сформировать и скачать PDF</button>
+            <button class="edit-btn" id="url-checker-pdf-btn" onclick="generateUrlCheckPdf()">📄 Сформировать и скачать PDF</button>
         </div>
     `;
 }
 
 async function generateUrlCheckPdf() {
     if (!urlCheckerLastReport) return;
+    const btn = document.getElementById('url-checker-pdf-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = 'Формирую...';
+    }
     try {
         const res = await fetch('/api/url-checker/pdf', {
             method: 'POST',
@@ -2269,6 +2348,11 @@ async function generateUrlCheckPdf() {
         showToast('PDF готов, скачивание началось!');
     } catch (e) {
         showToast('Ошибка: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn.dataset.originalText || '📄 Сформировать и скачать PDF';
+        }
     }
 }
 

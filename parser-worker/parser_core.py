@@ -397,3 +397,135 @@ def dedupe_franchises(raw_path, dedup_path):
 
     wb.save(dedup_path)
     return {"deleted_rows": len(rows_to_delete), "franchise_domains": len(franchise_domains)}
+
+
+# --- LIVE RENDER (used by the hub's url-checker "live" scan mode) ---
+#
+# One-off job, unrelated to the 2GIS niche-scraping pipeline above: navigate
+# to an arbitrary URL with the same headed-Chromium-under-Xvfb setup, wait for
+# it to settle, best-effort decline a cookie-consent banner, and hand back the
+# fully hydrated post-JS HTML. Reuses the same browser launch args/UA as
+# run_parser_job for consistency (same anti-automation-detection posture).
+
+RENDER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+
+async def find_and_click_cookie_decline(page):
+    """Best-effort, in-page search for a visible control whose text confidently
+    reads as a cookie-consent decline/reject action, and click it. Only ever
+    clicks when it finds a text match against an explicit decline-ish phrase
+    list - never guesses at an "accept"/"ok" button, and if a banner is seen
+    but no confident decline control is found, just reports that instead of
+    clicking something that might actually be an accept."""
+    try:
+        return await page.evaluate("""() => {
+            const declineMarkers = [
+                "отклонить всё", "отклонить все", "отклонить", "запретить все", "запретить",
+                "только необходимые", "только необходимые файлы", "не принимать",
+                "reject all", "decline all", "reject", "decline",
+                "necessary only", "necessary cookies only",
+            ];
+            const bannerMarkers = [
+                "cookie", "куки", "cookie-файл", "файлов cookie", "персональных данных",
+            ];
+
+            const nodes = Array.from(document.querySelectorAll(
+                'button, a, [role="button"], input[type="button"], input[type="submit"]'
+            ));
+            const visible = nodes.filter(el => {
+                const r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            });
+
+            let bannerSeen = false;
+            let target = null;
+            let targetText = '';
+            for (const el of visible) {
+                const raw = el.innerText || el.value || el.textContent || '';
+                const text = raw.trim().toLowerCase();
+                if (!text || text.length > 60) continue;
+                if (bannerMarkers.some(m => text.includes(m))) bannerSeen = true;
+                if (!target && declineMarkers.some(m => text === m || text.includes(m))) {
+                    target = el;
+                    targetText = raw.trim().slice(0, 80);
+                }
+            }
+            if (!target) {
+                return {
+                    detected: bannerSeen,
+                    clicked: false,
+                    note: bannerSeen
+                        ? "cookie banner text seen but no confidently-labeled decline control found"
+                        : "no cookie banner detected",
+                };
+            }
+            try {
+                target.click();
+                return { detected: true, clicked: true, buttonText: targetText };
+            } catch (e) {
+                return { detected: true, clicked: false, buttonText: targetText, note: `click failed: ${e}` };
+            }
+        }""")
+    except Exception as e:
+        return {"detected": False, "clicked": False, "note": f"cookie banner inspection failed: {e}"}
+
+
+async def render_live_page(url, timeout_ms=25000):
+    """Launches a fresh headed Chromium (via Xvfb), navigates to `url`, waits
+    for it to settle (network-idle, falling back to a fixed grace period for
+    SPAs that keep background network activity alive forever), best-effort
+    declines a cookie-consent banner, and returns the fully hydrated HTML plus
+    what was found/done about the banner. Used for a single ad-hoc check, not
+    queued through the niche-scraping job system."""
+    display = os.environ.get("DISPLAY", ":99")
+    result = {
+        "ok": False,
+        "url": url,
+        "final_url": url,
+        "status": None,
+        "html": "",
+        "headers": {},
+        "cookie_banner": {"detected": False, "clicked": False},
+    }
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=False,
+            env={**os.environ, "DISPLAY": display},
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        try:
+            context = await browser.new_context(
+                user_agent=RENDER_USER_AGENT,
+                locale="ru-RU", timezone_id="Europe/Moscow", viewport={"width": 1366, "height": 900},
+            )
+            page = await context.new_page()
+            nav_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+
+            try:
+                await page.wait_for_load_state("networkidle", timeout=8000)
+            except Exception:
+                pass  # long-polling/analytics can keep the network busy forever - HTML is likely settled anyway
+
+            await page.wait_for_timeout(800)  # let post-hydration banners/widgets finish mounting
+
+            result["cookie_banner"] = await find_and_click_cookie_decline(page)
+            if result["cookie_banner"].get("clicked"):
+                await page.wait_for_timeout(600)  # let the banner's dismiss animation/DOM update settle
+
+            result["html"] = await page.content()
+            result["final_url"] = page.url
+            if nav_response is not None:
+                result["status"] = nav_response.status
+                try:
+                    result["headers"] = dict(nav_response.headers)
+                except Exception:
+                    result["headers"] = {}
+            result["ok"] = True
+        finally:
+            await browser.close()
+
+    return result
