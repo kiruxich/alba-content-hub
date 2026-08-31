@@ -316,7 +316,7 @@ async function renderBankView() {
             <div class="action-btn-row">
                 <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
                 <button class="edit-btn" onclick="generateAIPrompt('${idea.id}')">🤖 AI Промпт</button>
-                <button class="tg-btn" style="background:var(--accent-purple);" onclick="autoGenerateIdeaMedia('${idea.id}')">✨ Сгенерировать</button>
+                <button class="tg-btn" style="background:var(--accent-purple);" onclick="openAutoGenerateModal('${idea.id}')">✨ Сгенерировать</button>
                 <button class="tg-btn" style="background:var(--accent-blue);" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
@@ -509,83 +509,176 @@ function copyTelegramFormatted(ideaId) {
 
 // АВТО-ГЕНЕРАЦИЯ МЕДИА ДЛЯ ИДЕИ ("✨ Сгенерировать" на карточке в Банке идей)
 //
-// Calls POST /api/ideas/:id/auto-generate (server/routes/ideas.js), which
-// runs cover-image + voiceover generation (and, for 'Reels / Shorts' ideas,
-// video + assembly) server-side and returns per-step results. Assembly is
-// job-based (video-worker), so once that job is kicked off this polls
-// GET /api/video-assembly/:jobId the same way parser niches poll their own
-// job status (see startParserPolling above) until it reaches done/error.
-async function autoGenerateIdeaMedia(ideaId) {
+// Two-step flow: openAutoGenerateModal() lets the user pick a voiceover
+// provider first (ElevenLabs looking "configured" via a present API key
+// doesn't mean it actually works - e.g. an unpaid plan 403s at call time -
+// so defaulting silently to it and failing was the old, confusing behavior).
+// confirmAutoGenerate() then calls POST /api/ideas/:id/auto-generate
+// (server/routes/ideas.js), which runs cover-image + voiceover generation
+// (and, for 'Reels / Shorts' ideas, a shot-list+voiceover script via
+// local-claude-agent, then video + assembly) server-side and returns
+// per-step results. Assembly is job-based (video-worker), so once that job
+// is kicked off this polls GET /api/video-assembly/:jobId the same way
+// parser niches poll their own job status (see startParserPolling above)
+// until it reaches done/error.
+//
+// The "terminal" log (#autogen-log) is simulated client-side staged
+// progress, not truly live server output - the actual generation happens in
+// one blocking request server-side, there's no streaming/SSE wired up for
+// it. Framed as such (see the log lines below) rather than pretending
+// otherwise.
+let autogenState = { ideaId: null };
+
+function openAutoGenerateModal(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+    autogenState = { ideaId };
+
+    document.getElementById('autogen-idea-title').innerText = idea.title;
+    document.getElementById('autogen-options').style.display = '';
+    const log = document.getElementById('autogen-log');
+    log.style.display = 'none';
+    log.innerHTML = '';
+    const result = document.getElementById('autogen-result');
+    result.style.display = 'none';
+    result.innerHTML = '';
+
+    openOverlay('autogen-overlay');
+}
+
+function logToAutogen(text) {
+    const log = document.getElementById('autogen-log');
+    if (!log) return;
+    const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+    log.innerHTML += `[${time}] ${escapeHtml(text)}\n`;
+    log.scrollTop = log.scrollHeight;
+}
+
+async function confirmAutoGenerate() {
+    const { ideaId } = autogenState;
+    if (!ideaId) return;
+    const provider = document.getElementById('autogen-voiceover-provider').value;
+
+    document.getElementById('autogen-options').style.display = 'none';
+    const log = document.getElementById('autogen-log');
+    log.style.display = '';
+    log.innerHTML = '';
+
+    await autoGenerateIdeaMedia(ideaId, provider);
+}
+
+async function autoGenerateIdeaMedia(ideaId, voiceoverProvider) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
 
-    const btn = event && event.target;
-    if (btn) btn.disabled = true;
-
     const statusElId = `idea-gen-status-${ideaId}`;
     const isReels = idea.format === 'Reels / Shorts';
+    logToAutogen(isReels
+        ? 'Запускаем: обложка (kie.ai Flux), сценарий Reels, озвучка…'
+        : 'Запускаем: обложка (kie.ai Flux), озвучка…');
+    logToAutogen(`Провайдер озвучки: ${voiceoverProvider === 'piper' ? 'Piper' : 'ElevenLabs'} (симулированный прогресс — реальный лог сервера сюда не транслируется)`);
     const finishTicker = startGenerationTicker(statusElId, [
-        { afterSeconds: 0, text: 'Запускаем генерацию обложки и озвучки…' },
         { afterSeconds: 15, text: 'kie.ai и провайдер озвучки всё ещё работают…' },
         { afterSeconds: 90, text: isReels ? 'Обложка и озвучка почти готовы, дальше — видео…' : 'Почти готово…' },
         { afterSeconds: 240, text: 'Видео (kie.ai Kling) может генерироваться до 7 минут…' },
     ]);
 
     try {
-        const result = await api(`/api/ideas/${ideaId}/auto-generate`, { method: 'POST' });
+        const result = await api(`/api/ideas/${ideaId}/auto-generate`, { method: 'POST', body: JSON.stringify({ voiceoverProvider }) });
         if (result.idea) {
             ideasBank = ideasBank.map(i => i.id === ideaId ? result.idea : i);
         }
 
-        const errors = [];
-        if (result.cover?.error) errors.push('Обложка: ' + result.cover.error);
-        if (result.voiceover?.error) errors.push('Озвучка: ' + result.voiceover.error);
-        if (result.video?.error) errors.push('Видео: ' + result.video.error);
-        if (result.assembly?.error) errors.push('Сборка: ' + result.assembly.error);
+        if (result.cover?.asset) logToAutogen('✅ Обложка готова');
+        if (result.cover?.error) logToAutogen('❌ Обложка: ' + result.cover.error);
+        if (result.reelsScript) logToAutogen('✅ Сценарий Reels сгенерирован');
+        if (result.voiceover?.asset) {
+            logToAutogen(`✅ Озвучка готова${result.voiceover.usedFallback ? ` (запрошенный провайдер не сработал, использован ${result.voiceover.provider === 'piper' ? 'Piper' : 'ElevenLabs'})` : ''}`);
+        }
+        if (result.voiceover?.error) logToAutogen('❌ Озвучка: ' + result.voiceover.error);
+        if (result.video?.asset) logToAutogen('✅ Видео-клип готов');
+        if (result.video?.error) logToAutogen('❌ Видео: ' + result.video.error);
 
         if (result.assembly && result.assembly.jobId) {
-            finishTicker(true, 'Обложка и озвучка готовы — собираем ролик…');
-            const finishAssemblyTicker = startGenerationTicker(statusElId, [
-                { afterSeconds: 0, text: 'Собираем ролик из видео и озвучки…' },
-                { afterSeconds: 15, text: 'video-worker всё ещё обрабатывает…' },
-                { afterSeconds: 60, text: 'Дольше обычного, но ещё может сработать…' },
-            ]);
-            startIdeaAssemblyPolling(result.assembly.jobId, finishAssemblyTicker);
-        } else if (errors.length) {
-            finishTicker(false, errors.join('; '));
+            logToAutogen('Обложка и озвучка готовы — собираем ролик через video-worker…');
+            finishTicker(true, 'Собираем ролик…');
+            startIdeaAssemblyPolling(result.assembly.jobId, result, statusElId);
         } else {
-            finishTicker(true, 'Готово: обложка и озвучка сгенерированы');
+            if (result.assembly?.error) logToAutogen('❌ Сборка: ' + result.assembly.error);
+            const hasAnyError = result.cover?.error || result.voiceover?.error || result.video?.error || result.assembly?.error;
+            finishTicker(!hasAnyError, hasAnyError ? 'Готово частично' : 'Готово');
+            renderAutogenResult(result);
         }
-
-        showToast(errors.length ? 'Готово частично — статус смотрите на карточке идеи' : 'Медиа для идеи сгенерировано!');
         renderMediaAssets();
     } catch (e) {
+        logToAutogen('❌ Ошибка запроса: ' + e.message);
         finishTicker(false, 'Ошибка: ' + e.message);
         showToast('Не удалось сгенерировать медиа: ' + e.message);
-    } finally {
-        if (btn) btn.disabled = false;
     }
 }
 
-function startIdeaAssemblyPolling(jobId, finishTicker) {
+function startIdeaAssemblyPolling(jobId, resultSoFar, statusElId) {
     const timer = setInterval(async () => {
         try {
             const job = await api(`/api/video-assembly/${jobId}`);
             if (job.status === 'done') {
                 clearInterval(timer);
-                finishTicker(true, 'Ролик собран!');
+                logToAutogen('✅ Ролик собран');
                 showToast('Ролик для идеи готов!');
+                renderAutogenResult({ ...resultSoFar, assembly: { ...resultSoFar.assembly, status: 'done' } });
                 renderMediaAssets();
             } else if (job.status === 'error') {
                 clearInterval(timer);
-                finishTicker(false, 'Ошибка сборки: ' + (job.error || 'неизвестная ошибка'));
+                logToAutogen('❌ Ошибка сборки: ' + (job.error || 'неизвестная ошибка'));
+                renderAutogenResult(resultSoFar);
             }
             // queued/running - keep polling
         } catch (e) {
             clearInterval(timer);
-            finishTicker(false, 'Ошибка опроса статуса сборки: ' + e.message);
+            logToAutogen('❌ Ошибка опроса статуса сборки: ' + e.message);
+            renderAutogenResult(resultSoFar);
         }
     }, 4000);
+}
+
+// Final view after generation - the actual post text (already on the idea),
+// the Reels shot list/voiceover script if one was generated, and the media
+// itself inline (image/audio/video), so there's one place to see everything
+// that came out of a generation run instead of hunting through Медиатека.
+function renderAutogenResult(result) {
+    const idea = ideasBank.find(i => i.id === autogenState.ideaId);
+    const box = document.getElementById('autogen-result');
+    if (!box || !idea) return;
+
+    let html = `<div class="info-box"><strong>${escapeHtml(idea.title)}</strong><p style="margin:8px 0; white-space:pre-wrap; color:var(--text-secondary);">${escapeHtml(idea.desc || '')}</p></div>`;
+
+    if (result.reelsScript) {
+        html += `<div class="p-section-title" style="margin-top:16px;">СЦЕНАРИЙ REELS</div>
+            <div class="info-box">
+                <div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; margin-bottom:6px;">Раскадровка</div>
+                <ul style="margin:0 0 12px; padding-left:18px;">${(result.reelsScript.shotList || []).map(s => `<li style="margin-bottom:4px;">${escapeHtml(s)}</li>`).join('')}</ul>
+                <div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; margin-bottom:6px;">Текст озвучки</div>
+                <p style="margin:0; white-space:pre-wrap;">${escapeHtml(result.reelsScript.voiceoverText || '')}</p>
+            </div>`;
+    }
+
+    if (result.cover?.asset) {
+        html += `<div class="p-section-title" style="margin-top:16px;">ОБЛОЖКА</div><img src="${result.cover.asset.url}" style="width:100%; border-radius:12px; display:block;">`;
+    }
+    if (result.voiceover?.asset) {
+        html += `<div class="p-section-title" style="margin-top:16px;">ОЗВУЧКА</div><audio controls style="width:100%;" src="${result.voiceover.asset.url}"></audio>`;
+    }
+    if (result.video?.asset) {
+        html += `<div class="p-section-title" style="margin-top:16px;">ВИДЕО-КЛИП</div><video controls style="width:100%; border-radius:12px;" src="${result.video.asset.url}"></video>`;
+    }
+    if (result.assembly?.status === 'done') {
+        html += `<div class="p-section-title" style="margin-top:16px;">ГОТОВЫЙ РОЛИК</div><p style="color:var(--text-secondary); font-size:13px;">Собран и сохранён в Медиатеке.</p>`;
+    } else if (result.assembly?.jobId) {
+        html += `<div class="p-section-title" style="margin-top:16px;">ГОТОВЫЙ РОЛИК</div><p style="color:var(--text-secondary); font-size:13px;">Ещё собирается — смотрите лог выше.</p>`;
+    }
+
+    box.innerHTML = html;
+    box.style.display = '';
 }
 
 function checkFunnelBalance() {
@@ -2352,6 +2445,17 @@ async function runUrlCheck() {
         : 'Сканирую сайт и запускаю нагрузочный тест...';
     document.getElementById('url-checker-results').innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary); margin-top:20px;">${loadingText}</div>`;
 
+    const liveView = document.getElementById('url-checker-live-view');
+    if (mode === 'live') {
+        // Live browser session runs on parser-worker's own Xvfb/Chromium - the
+        // iframe just points at the existing noVNC endpoint so you can watch
+        // it work, not something this request drives directly.
+        document.getElementById('url-checker-live-iframe').src = '/vnc/vnc.html?autoconnect=true&resize=scale&view_only=true';
+        liveView.style.display = '';
+    } else {
+        liveView.style.display = 'none';
+    }
+
     try {
         const report = await api('/api/url-checker/scan', { method: 'POST', body: JSON.stringify({ url, mode, requestCount }) });
         urlCheckerLastReport = report;
@@ -2361,6 +2465,10 @@ async function runUrlCheck() {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Проверить';
+        if (mode === 'live') {
+            liveView.style.display = 'none';
+            document.getElementById('url-checker-live-iframe').src = '';
+        }
     }
 }
 
@@ -2486,6 +2594,7 @@ function renderUrlCheckReport(report) {
         <div class="uc-findings-list">${findingsHtml}</div>
 
         <div class="p-section-title" style="margin-top:24px;">НАГРУЗОЧНЫЙ ТЕСТ</div>
+        ${lt.hitDurationCap ? `<div class="warning-banner" style="margin-bottom:10px;">Остановлено по таймауту (15 сек, защита от зависания) — не дошли до заданного числа запросов (${lt.requestCount}), успели сделать ${lt.totalRequests}.</div>` : ''}
         ${loadTestHtml}
 
         <div class="controls-row" style="margin-top:24px;">

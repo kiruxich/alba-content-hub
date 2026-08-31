@@ -99,8 +99,17 @@ router.post('/scan', async (req, res) => {
         const requestCount = req.body?.requestCount !== undefined && req.body?.requestCount !== null && req.body?.requestCount !== ''
             ? Number(req.body.requestCount)
             : undefined;
+        // Request-count mode is still bounded by loadTest.js's own hard
+        // MAX_DURATION_MS (15s) safety net - a large requestCount at the
+        // default concurrency=10 would rarely finish in time (e.g. 1000
+        // requests at ~250ms each needs ~25s at concurrency 10, but only
+        // ~12.5s at concurrency 20). Auto-scale concurrency toward that cap
+        // when the caller didn't explicitly ask for a specific one, so
+        // "количество запросов" actually has a realistic shot at being hit.
+        const explicitConcurrency = Number(req.body?.concurrency) || 0;
+        const autoConcurrency = requestCount ? Math.min(20, Math.max(10, Math.ceil(requestCount / 50))) : 10;
         report.loadTest = await runLoadTest(url, {
-            concurrency: Number(req.body?.concurrency) || 10,
+            concurrency: explicitConcurrency || autoConcurrency,
             durationMs: Number(req.body?.durationMs) || 5000,
             requestCount,
         });

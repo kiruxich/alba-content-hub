@@ -8,6 +8,7 @@ import { generateVoiceover, isElevenLabsConfigured } from '../lib/elevenLabsClie
 import { generatePiperVoiceover, isPiperConfigured } from '../lib/piperTtsClient.js';
 import { isObjectStorageConfigured, uploadBuffer, uploadFromUrl } from '../lib/objectStorage.js';
 import { createVideoJob } from '../lib/videoWorkerClient.js';
+import { isLocalClaudeAgentConfigured, generateReelsScript } from '../lib/localClaudeAgent.js';
 
 const router = Router();
 
@@ -444,6 +445,29 @@ router.post('/:id/auto-generate', async (req, res) => {
     const isReels = idea.format === 'Reels / Shorts';
     const imagePrompt = buildImagePromptFromIdea(idea);
 
+    // requestedProvider: 'elevenlabs' | 'piper' | undefined (auto-pick, old
+    // behavior). Explicit choice from the "Сгенерировать" options modal - see
+    // public/js/app.js's autoGenerateIdeaMedia(). If the requested provider
+    // fails at runtime (e.g. ElevenLabs configured but the plan isn't paid -
+    // a 403, not a "not configured" case isConfigured() can catch), this
+    // automatically retries once with the other provider if it's available,
+    // rather than just failing the whole voiceover step.
+    const requestedProvider = ['elevenlabs', 'piper'].includes(req.body?.voiceoverProvider) ? req.body.voiceoverProvider : null;
+
+    // Reels/Shorts get a scene-by-scene shot list + a voiceover script
+    // tailored for a 20-40s video, via local-claude-agent (best-effort - see
+    // server/lib/localClaudeAgent.js). Falls back to using the post text
+    // directly for the voiceover (old behavior) when local-claude-agent isn't
+    // configured/reachable, exactly like every other optional integration here.
+    let reelsScript = null;
+    if (isReels && isLocalClaudeAgentConfigured()) {
+        try {
+            reelsScript = await generateReelsScript(idea.title, idea.desc || '');
+        } catch (e) {
+            console.error('ideas/auto-generate: reels script generation failed, falling back to post text:', e.message);
+        }
+    }
+
     async function runCover() {
         if (!isKieConfigured()) return { error: 'kie.ai не настроен — добавьте KIE_API_KEY в переменные окружения' };
         try {
@@ -461,22 +485,50 @@ router.post('/:id/auto-generate', async (req, res) => {
         }
     }
 
+    async function generateWithProvider(provider, text) {
+        if (provider === 'piper') {
+            return { voiceover: await generatePiperVoiceover({ text }), modelUsed: 'piper:ru_RU-dmitri-medium' };
+        }
+        return { voiceover: await generateVoiceover({ text }), modelUsed: 'elevenlabs:eleven_multilingual_v2' };
+    }
+
     async function runVoiceover() {
-        const text = (idea.desc || idea.title || '').trim();
+        const text = (reelsScript?.voiceoverText || idea.desc || idea.title || '').trim();
         if (!text) return { error: 'У идеи нет текста для озвучки' };
-        const provider = isElevenLabsConfigured() ? 'elevenlabs' : (isPiperConfigured() ? 'piper' : null);
+
+        const elevenAvailable = isElevenLabsConfigured();
+        const piperAvailable = isPiperConfigured();
+        // Explicit choice from the modal wins if that provider is actually
+        // configured; otherwise fall back to auto-pick (prefer ElevenLabs,
+        // same as the old default) so a stale/unavailable selection doesn't
+        // just hard-fail.
+        let provider = requestedProvider && (requestedProvider === 'elevenlabs' ? elevenAvailable : piperAvailable)
+            ? requestedProvider
+            : (elevenAvailable ? 'elevenlabs' : (piperAvailable ? 'piper' : null));
         if (!provider) return { error: 'Ни ElevenLabs, ни Piper не настроены — добавьте ELEVENLABS_API_KEY или PIPER_WORKER_TOKEN' };
 
+        let usedFallback = false;
+        let voiceover, modelUsed;
         try {
-            let voiceover, modelUsed;
-            if (provider === 'piper') {
-                voiceover = await generatePiperVoiceover({ text });
-                modelUsed = 'piper:ru_RU-dmitri-medium';
-            } else {
-                voiceover = await generateVoiceover({ text });
-                modelUsed = 'elevenlabs:eleven_multilingual_v2';
+            ({ voiceover, modelUsed } = await generateWithProvider(provider, text));
+        } catch (e) {
+            // Runtime failure (e.g. ElevenLabs key present but the plan isn't
+            // paid - a 403 isConfigured() can't detect ahead of time) - retry
+            // once with the other provider if one is available, instead of
+            // failing the whole step over something the picker couldn't know.
+            const otherProvider = provider === 'elevenlabs' ? 'piper' : 'elevenlabs';
+            const otherAvailable = otherProvider === 'elevenlabs' ? elevenAvailable : piperAvailable;
+            if (!otherAvailable) return { error: `Не удалось сгенерировать озвучку (${provider}): ${e.message}` };
+            try {
+                ({ voiceover, modelUsed } = await generateWithProvider(otherProvider, text));
+                provider = otherProvider;
+                usedFallback = true;
+            } catch (e2) {
+                return { error: `Не удалось сгенерировать озвучку ни через ${provider === 'elevenlabs' ? 'ElevenLabs' : 'Piper'}, ни через ${otherProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper'}: ${e2.message}` };
             }
+        }
 
+        try {
             let url;
             if (isObjectStorageConfigured()) {
                 try {
@@ -492,7 +544,7 @@ router.post('/:id/auto-generate', async (req, res) => {
                 sql: `INSERT INTO agent_expenses (agent_name, model_used, total_usd) VALUES ('generator', ?, ?)`,
                 args: [modelUsed, voiceover.estimatedCostUsd || 0],
             });
-            return { asset: serializeAsset(assetRow) };
+            return { asset: serializeAsset(assetRow), provider, usedFallback };
         } catch (e) {
             return { error: `Не удалось сгенерировать озвучку: ${e.message}` };
         }
@@ -559,6 +611,7 @@ router.post('/:id/auto-generate', async (req, res) => {
         voiceover: voiceoverResult,
         video: videoResult,
         assembly: assemblyResult,
+        reelsScript,
     });
 });
 
