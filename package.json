@@ -3,6 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"node --env-file-if-exists=.env server/index.js\" \"vite\"",
     "server": "node --env-file-if-exists=.env server/index.js",
