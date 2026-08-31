@@ -1,7 +1,23 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { isLocalClaudeAgentConfigured, discoverRssSources } from '../lib/localClaudeAgent.js';
 
 const router = Router();
+
+// A candidate URL is only kept if it actually resolves to a real RSS/Atom
+// feed right now - local-claude-agent's suggestions are proposals, not
+// trusted input, since a web-search-based model can occasionally cite a URL
+// it didn't directly verify.
+async function isValidFeedUrl(url) {
+    try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) return false;
+        const text = (await res.text()).slice(0, 2000);
+        return /<rss[\s>]|<feed[\s>]/i.test(text);
+    } catch {
+        return false;
+    }
+}
 
 function serialize(row) {
     return {
@@ -50,6 +66,47 @@ router.put('/', async (req, res) => {
     });
     const result = await db.execute('SELECT * FROM agent_settings WHERE id = 1');
     res.json(serialize(result.rows[0]));
+});
+
+// "Обновить" button next to sources/keywords in Центр агентов - proposes new
+// RSS sources via local-claude-agent (see server/lib/localClaudeAgent.js),
+// validates each candidate for real, and appends only the new valid ones -
+// never touches/removes what's already there.
+router.post('/discover-sources', async (req, res) => {
+    if (!isLocalClaudeAgentConfigured()) {
+        return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
+    }
+
+    const current = (await db.execute('SELECT * FROM agent_settings WHERE id = 1')).rows[0];
+    const existingSources = JSON.parse(current.sources || '[]');
+
+    const nicheRows = (await db.execute('SELECT about FROM project_info')).rows;
+    const niches = nicheRows.map(r => (r.about || '').trim()).filter(Boolean);
+    if (niches.length === 0) {
+        return res.status(400).json({ error: 'Нет описаний продуктов (project_info) — нечего использовать как ниши' });
+    }
+
+    let candidates;
+    try {
+        const result = await discoverRssSources(existingSources, niches);
+        candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+    } catch (e) {
+        return res.status(502).json({ error: e.message });
+    }
+
+    const checks = await Promise.all(candidates.map(async (c) => ({
+        ...c,
+        valid: typeof c?.url === 'string' && !existingSources.includes(c.url) && await isValidFeedUrl(c.url),
+    })));
+    const added = checks.filter(c => c.valid).map(c => c.url);
+    const rejected = checks.filter(c => !c.valid).map(c => c.url).filter(Boolean);
+
+    if (added.length > 0) {
+        const merged = [...existingSources, ...added];
+        await db.execute({ sql: 'UPDATE agent_settings SET sources = ? WHERE id = 1', args: [JSON.stringify(merged)] });
+    }
+
+    res.json({ added, rejected, sources: added.length > 0 ? [...existingSources, ...added] : existingSources });
 });
 
 export default router;

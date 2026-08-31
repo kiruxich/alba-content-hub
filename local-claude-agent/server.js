@@ -68,8 +68,12 @@ async function runClaude(prompt) {
 // callers can decide whether to retry or surface the raw text to the user.
 async function runClaudeForJson(prompt) {
     const text = await runClaude(`${prompt}\n\nRespond with ONLY a single JSON value - no markdown fences, no prose before or after it.`);
+    // The model doesn't always honor "no markdown fences" - strip a ```json
+    // ... ``` (or bare ``` ... ```) wrapper if present before parsing, rather
+    // than failing on otherwise-valid JSON.
+    const unwrapped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
     try {
-        return JSON.parse(text);
+        return JSON.parse(unwrapped);
     } catch (e) {
         const err = new Error(`claude did not return valid JSON: ${e.message}`);
         err.rawText = text;

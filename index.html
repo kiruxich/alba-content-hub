@@ -674,8 +674,12 @@
                     <button class="schedule-btn" onclick="saveAgentSettingsForm()">💾 Сохранить</button>
                 </div>
 
-                <div class="p-section-title" style="margin-top:8px;">RSS-ИСТОЧНИКИ RESEARCHER (по одному URL на строку)</div>
+                <div class="controls-row" style="margin-top:8px; align-items:flex-end;">
+                    <div class="p-section-title" style="margin:0;">RSS-ИСТОЧНИКИ RESEARCHER (по одному URL на строку)</div>
+                    <button class="edit-btn" id="as-discover-btn" onclick="discoverRssSources()" title="Найти новые источники через local-claude-agent на вашем ПК">✨ Обновить</button>
+                </div>
                 <textarea id="as-sources-input" class="form-textarea" style="min-height:90px;" placeholder="https://example.com/rss"></textarea>
+                <div id="as-discover-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:-8px 0 12px;"></div>
 
                 <div class="p-section-title" style="margin-top:20px;">КЛЮЧЕВЫЕ СЛОВА (через запятую)</div>
                 <input type="text" id="as-keywords-input" class="form-input" placeholder="AI, SaaS, автоматизация">

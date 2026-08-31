@@ -2321,8 +2321,11 @@ function drawParserNiches() {
                     placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
                 <span class="parser-niche-status ${n.status}">${statusLabels[n.status] || n.status}</span>
             </div>
-            <input type="text" class="form-input" value="${escapeHtml(n.description)}"
-                placeholder="Описание ниши (для генерации запросов)" onblur="saveParserNicheField('${n.id}','description',this.value)">
+            <div style="display:flex; gap:8px; align-items:center;">
+                <input type="text" class="form-input" style="margin-bottom:0;" id="parser-desc-${n.id}" value="${escapeHtml(n.description)}"
+                    placeholder="Описание ниши (для генерации запросов)" onblur="saveParserNicheField('${n.id}','description',this.value)">
+                <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨</button>
+            </div>
 
             <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log || '')}</div>
 
@@ -2377,6 +2380,27 @@ async function saveParserNicheField(id, field, value) {
         niche[field] = previous;
         drawParserNiches();
         showToast('Не удалось сохранить: ' + e.message);
+    }
+}
+
+// "✨" рядом с описанием ниши - просит local-claude-agent (на ПК пользователя)
+// написать описание по названию ниши. Подставляет текст в поле, но не
+// сохраняет сам - saveParserNicheField сработает как обычно по onblur/явному
+// сохранению, чтобы пользователь успел поправить текст перед сохранением.
+async function generateNicheDescription(id) {
+    const input = document.getElementById(`parser-desc-${id}`);
+    if (!input) return;
+    const btn = event && event.target;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    try {
+        const result = await api(`/api/parser-niches/${id}/generate-description`, { method: 'POST' });
+        input.value = result.description;
+        await saveParserNicheField(id, 'description', result.description);
+        showToast('Описание сгенерировано');
+    } catch (e) {
+        showToast('Не удалось сгенерировать: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✨'; }
     }
 }
 
@@ -3009,6 +3033,37 @@ async function saveAgentSettingsForm() {
         showToast('Настройки агентов сохранены!');
     } catch (e) {
         showToast('Не удалось сохранить: ' + e.message);
+    }
+}
+
+// "✨ Обновить" рядом с RSS-источниками - просит local-claude-agent (на ПК
+// пользователя, см. local-claude-agent/README.md) найти новые фиды под
+// текущие продукты, сервер сам проверяет каждый кандидат живым запросом и
+// добавляет только валидные новые - существующий список не трогается.
+async function discoverRssSources() {
+    const btn = document.getElementById('as-discover-btn');
+    const statusEl = document.getElementById('as-discover-status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Ищу...';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Обращаюсь к local-claude-agent на вашем ПК — это может занять пару минут...';
+
+    try {
+        const result = await api('/api/agent-settings/discover-sources', { method: 'POST' });
+        if (result.added.length > 0) {
+            document.getElementById('as-sources-input').value = result.sources.join('\n');
+            agentSettings.sources = result.sources;
+            statusEl.textContent = `Добавлено новых источников: ${result.added.length}.`;
+            showToast(`Добавлено ${result.added.length} новых RSS-источников`);
+        } else {
+            statusEl.textContent = 'Новых подходящих источников не нашлось в этот раз.';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось найти источники: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ Обновить';
     }
 }
 

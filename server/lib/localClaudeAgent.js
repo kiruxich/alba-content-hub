@@ -1,0 +1,55 @@
+// Client for local-claude-agent (see local-claude-agent/README.md) - a small
+// HTTP wrapper the user runs on their own PC (Docker + a tunnel), running the
+// real `claude` CLI under their own subscription. Gated behind
+// LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN, same graceful-no-op
+// pattern as every other optional integration in this codebase (kie.ai,
+// ElevenLabs, S3, ...) - and additionally can fail simply because the user's
+// PC/container/tunnel happens to be off right now, which callers should
+// surface as a normal error, not a crash.
+const AGENT_URL = (process.env.LOCAL_CLAUDE_AGENT_URL || '').replace(/\/$/, '');
+const AGENT_TOKEN = process.env.LOCAL_CLAUDE_AGENT_TOKEN || '';
+
+export function isLocalClaudeAgentConfigured() {
+    return Boolean(AGENT_URL && AGENT_TOKEN);
+}
+
+async function callTask(task, body, { timeoutMs = 3 * 60 * 1000 } = {}) {
+    if (!isLocalClaudeAgentConfigured()) {
+        throw new Error('LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN не настроены');
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(`${AGENT_URL}/run/${task}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Agent-Token': AGENT_TOKEN },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || `local-claude-agent вернул ${res.status}`);
+        return data;
+    } catch (e) {
+        if (e.name === 'AbortError') {
+            throw new Error('local-claude-agent не ответил вовремя — проверьте, что контейнер и туннель на ПК запущены');
+        }
+        if (e.cause?.code === 'ECONNREFUSED' || /fetch failed/i.test(e.message)) {
+            throw new Error('Не удалось достучаться до local-claude-agent — проверьте, что контейнер/туннель на ПК запущены');
+        }
+        throw e;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+export function discoverRssSources(existingSources, niches) {
+    return callTask('rss-discovery', { existingSources, niches });
+}
+
+export function generateNicheDescription(category) {
+    return callTask('niche-description', { category });
+}
+
+export function generateReelsScript(title, postText) {
+    return callTask('reels-script', { title, postText });
+}

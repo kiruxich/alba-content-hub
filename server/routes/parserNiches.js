@@ -4,6 +4,7 @@ import XLSX from 'xlsx';
 import { db } from '../db.js';
 import { generateParserQueries } from '../lib/generateParserQueries.js';
 import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
+import { isLocalClaudeAgentConfigured, generateNicheDescription } from '../lib/localClaudeAgent.js';
 
 const router = Router();
 const WORKER_TOKEN = process.env.PARSER_WORKER_TOKEN || '';
@@ -77,6 +78,26 @@ router.post('/', async (req, res) => {
     });
     const result = await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [id] });
     res.json(serialize(result.rows[0]));
+});
+
+// "✨ Сгенерировать" next to the description field - writes a description via
+// local-claude-agent (see server/lib/localClaudeAgent.js) from just the
+// niche's category name. Returns the text for the user to review/edit before
+// saving rather than writing it directly - PUT /:id is what actually persists it.
+router.post('/:id/generate-description', async (req, res) => {
+    if (!isLocalClaudeAgentConfigured()) {
+        return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
+    }
+    const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'niche not found' });
+    if (!row.category || !row.category.trim()) return res.status(400).json({ error: 'Сначала укажите название ниши' });
+
+    try {
+        const result = await generateNicheDescription(row.category);
+        res.json({ description: result.description });
+    } catch (e) {
+        res.status(502).json({ error: e.message });
+    }
 });
 
 router.put('/:id', async (req, res) => {
