@@ -271,6 +271,29 @@ router.put('/:id', async (req, res) => {
         cta_en: b.ctaEn !== undefined ? b.ctaEn : existing.cta_en,
     };
     await db.execute({ sql: upsertSql, args: upsertArgs(merged) });
+
+    // Bridge manually-entered views/saves/clicks (the "📊 ROI" modal) into
+    // scheduled_events too - the Insights agent's weekly brief reads
+    // scheduled_events.metrics_*, NOT ideas.metrics_* (see
+    // server/routes/insights.js), so without this a manual entry here was
+    // silently invisible to Insights. This matters most for Telegram, which
+    // can never get real numbers from metricsSync.js (the Bot API has no
+    // view-count endpoint) - manual entry is the only way those posts' real
+    // performance ever reaches Insights. Best-effort: if an idea was posted
+    // to more than one platform/date, the same entered numbers get applied
+    // to every scheduled_events row for it, since the ROI modal only takes
+    // one aggregate figure per idea, not one per publication. Leads has no
+    // scheduled_events column (it's a business/CRM signal Insights doesn't
+    // use), so it stays ideas-only.
+    if (b.metrics && (b.metrics.views !== undefined || b.metrics.saves !== undefined || b.metrics.clicks !== undefined)) {
+        await db.execute({
+            sql: `UPDATE scheduled_events SET
+                    metrics_views = ?, metrics_saves = ?, metrics_clicks = ?, metrics_synced_at = strftime('%s','now')
+                  WHERE idea_id = ?`,
+            args: [merged.metrics_views, merged.metrics_saves, merged.metrics_clicks, existing.id],
+        });
+    }
+
     const result = await db.execute({ sql: 'SELECT * FROM ideas WHERE id = ?', args: [existing.id] });
     res.json(serialize(result.rows[0]));
 });
