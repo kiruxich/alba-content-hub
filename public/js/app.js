@@ -355,8 +355,10 @@ function addContentDraft() {
         id: `cd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         topic: '', productId: '',
         status: 'draft', // draft | generating | generated | translating
-        activeFormat: 'tgPost', activeLang: 'ru',
+        activeFormat: null, activeLang: 'ru',
         ru: null, en: null,
+        selectedFormats: CONTENT_FORMAT_DEFS.map(f => f.key), // which formats to generate - all by default
+        usedTopics: [], suggestingTopic: false, // topics already shown by "Подобрать тему" this session, so a re-click doesn't repeat one
     });
     renderContentCreationView();
 }
@@ -369,6 +371,52 @@ function removeContentDraft(id) {
 function setContentDraftFormat(id, key) {
     const draft = contentDrafts.find(d => d.id === id);
     if (draft) draft.activeFormat = key;
+    renderContentCreationView();
+}
+
+// Toggles one format chip before generation (see CONTENT_FORMAT_DEFS) - at
+// least one must stay selected, since generateContentDraft() has nothing to
+// send otherwise.
+function toggleContentDraftFormat(id, key) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft) return;
+    const selected = new Set(draft.selectedFormats || []);
+    if (selected.has(key)) {
+        if (selected.size === 1) return showToast('Выберите хотя бы один формат');
+        selected.delete(key);
+    } else {
+        selected.add(key);
+    }
+    draft.selectedFormats = CONTENT_FORMAT_DEFS.map(f => f.key).filter(k => selected.has(k));
+    renderContentCreationView();
+}
+
+// "Подобрать актуальную тему поста" - asks local-claude-agent (Sonnet +
+// WebSearch, see /api/content-drafts/suggest-topic) for one fresh topic and
+// fills it into the topic field. draft.usedTopics accumulates every topic
+// this card has shown/had typed so far and is sent back on the next click,
+// so re-clicking proposes something different instead of repeating - it's
+// also merged server-side with the ~20 most recent idea titles.
+async function suggestContentDraftTopic(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft) return;
+    const topicInput = document.getElementById(`cd-topic-${id}`);
+    const productSelect = document.getElementById(`cd-product-${id}`);
+    const currentTopic = topicInput ? topicInput.value.trim() : draft.topic;
+    draft.productId = productSelect ? productSelect.value : draft.productId;
+    draft.usedTopics = draft.usedTopics || [];
+    if (currentTopic && !draft.usedTopics.includes(currentTopic)) draft.usedTopics.push(currentTopic);
+
+    draft.suggestingTopic = true;
+    renderContentCreationView();
+    try {
+        const result = await api('/api/content-drafts/suggest-topic', { method: 'POST', body: JSON.stringify({ productId: draft.productId || null, excludeTopics: draft.usedTopics }) });
+        draft.topic = result.topic || '';
+        showToast('Тема подобрана');
+    } catch (e) {
+        showToast('Не удалось подобрать тему: ' + e.message);
+    }
+    draft.suggestingTopic = false;
     renderContentCreationView();
 }
 
@@ -391,12 +439,16 @@ async function generateContentDraft(id) {
     draft.topic = topicInput ? topicInput.value.trim() : draft.topic;
     draft.productId = productSelect ? productSelect.value : draft.productId;
     if (!draft.topic) return showToast('Укажите тему');
+    const formats = (draft.selectedFormats && draft.selectedFormats.length) ? draft.selectedFormats : CONTENT_FORMAT_DEFS.map(f => f.key);
 
     draft.status = 'generating';
     renderContentCreationView();
     try {
-        draft.ru = await api('/api/content-drafts/generate', { method: 'POST', body: JSON.stringify({ topic: draft.topic, productId: draft.productId || null }) });
+        draft.ru = await api('/api/content-drafts/generate', { method: 'POST', body: JSON.stringify({ topic: draft.topic, productId: draft.productId || null, formats }) });
         draft.status = 'generated';
+        // Default the active tab to the first format actually generated -
+        // 'tgPost' isn't guaranteed to be one of them anymore.
+        draft.activeFormat = CONTENT_FORMAT_DEFS.find(f => draft.ru?.[f.key])?.key || formats[0];
         showToast('Черновик сгенерирован');
     } catch (e) {
         draft.status = 'draft';
@@ -456,11 +508,14 @@ function renderContentDraftCard(draft) {
     const hasEn = Boolean(draft.en);
     const lang = draft.activeLang;
     const block = hasRu ? (lang === 'en' ? draft.en?.[draft.activeFormat] : draft.ru[draft.activeFormat]) : null;
+    const selectedFormats = (draft.selectedFormats && draft.selectedFormats.length) ? draft.selectedFormats : CONTENT_FORMAT_DEFS.map(f => f.key);
+    const generatedFormatDefs = hasRu ? CONTENT_FORMAT_DEFS.filter(f => draft.ru?.[f.key]) : [];
 
     return `
     <div class="idea-card" style="margin-bottom:16px;">
         <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px;">
             <input type="text" class="form-input" style="margin:0;" id="cd-topic-${draft.id}" placeholder="Тема поста..." value="${escapeHtml(draft.topic)}" ${hasRu ? 'readonly' : ''}>
+            ${!hasRu ? `<button class="edit-btn" style="margin:0; white-space:nowrap; align-self:stretch;" ${draft.suggestingTopic ? 'disabled' : ''} onclick="suggestContentDraftTopic('${draft.id}')">${draft.suggestingTopic ? '⏳ Подбираем...' : '🔎 Подобрать тему'}</button>` : ''}
             <select class="form-select" style="margin:0; max-width:220px;" id="cd-product-${draft.id}" ${hasRu ? 'disabled' : ''}>
                 <option value="">— без привязки —</option>
                 ${productsData.map(p => `<option value="${p.id}" ${draft.productId === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
@@ -469,10 +524,13 @@ function renderContentDraftCard(draft) {
         </div>
 
         ${!hasRu ? `
-            <button class="submit-btn" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">${isGenerating ? '⏳ Генерируем через ИИ (Sonnet)...' : '✨ Сгенерировать 4 формата'}</button>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                ${CONTENT_FORMAT_DEFS.map(f => `<button class="edit-btn" style="${selectedFormats.includes(f.key) ? 'background:var(--accent-blue); color:#fff;' : 'opacity:0.5;'}" onclick="toggleContentDraftFormat('${draft.id}', '${f.key}')">${selectedFormats.includes(f.key) ? '✓ ' : ''}${f.label}</button>`).join('')}
+            </div>
+            <button class="submit-btn" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">${isGenerating ? '⏳ Генерируем через ИИ (Sonnet)...' : `✨ Сгенерировать (${selectedFormats.length})`}</button>
         ` : `
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-                ${CONTENT_FORMAT_DEFS.map(f => `<button class="edit-btn" style="${draft.activeFormat === f.key ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftFormat('${draft.id}', '${f.key}')">${f.label}</button>`).join('')}
+                ${generatedFormatDefs.map(f => `<button class="edit-btn" style="${draft.activeFormat === f.key ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftFormat('${draft.id}', '${f.key}')">${f.label}</button>`).join('')}
             </div>
             ${hasEn ? `
                 <div style="display:flex; gap:6px; margin-bottom:10px;">

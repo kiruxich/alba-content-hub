@@ -385,14 +385,29 @@ ${JSON.stringify(items, null, 2)}`;
     }
 });
 
+// Format specs shared by content-draft's prompt/schema builder below - kept
+// as data so the prompt only ever mentions the formats actually requested
+// (see `formats` on the request), instead of always asking the model to
+// write all 4 regardless of what the caller wants.
+const CONTENT_FORMAT_SPECS = {
+    tgPost: { label: 'tgPost - a Telegram post', desc: 'title, body text (2-4 short paragraphs), and a call-to-action.' },
+    reelsScript: { label: 'reelsScript - a script for a 20-40 second vertical video (Reels/Shorts)', desc: 'title, then the body as a readable shot-by-shot script (scene description + spoken line, alternating), and a call-to-action.' },
+    threads: { label: 'threads - a Threads post', desc: 'a short punchy hook as the title, body text noticeably shorter and more casual than the Telegram post (Threads favors brevity), and a call-to-action.' },
+    pinterest: { label: 'pinterest - a Pinterest pin', desc: 'a short SEO-friendly title, a description (2-3 sentences, keyword-rich for Pinterest search), and a call-to-action.' },
+};
+const CONTENT_FORMAT_KEYS = Object.keys(CONTENT_FORMAT_SPECS);
+
 // task: content-draft
-// body: { topic: string, productContext?: string, toneOfVoice?: string, postFormula?: string }
-// Writes real, publish-ready copy for the "Создание контента" page (4
-// formats from one topic, in one call) - unlike every other task in this
-// file, this runs on Sonnet, not the container's default Haiku (see MODEL):
-// this is the same tier of output as the automated Generator routine
-// produces for actually-published content, not a low-stakes research/
-// labeling task.
+// body: { topic: string, productContext?: string, toneOfVoice?: string, postFormula?: string, formats?: string[] }
+// Writes real, publish-ready copy for the "Создание контента" page - one or
+// more of the 4 formats above, from one topic, in one call. `formats`
+// defaults to all 4 (back-compat with callers that don't send it yet); only
+// the requested keys are asked for and validated, so picking fewer formats
+// actually saves the model from writing (and the caller from paying for)
+// copy nobody asked for. Unlike every other task in this file, this runs on
+// Sonnet, not the container's default Haiku (see MODEL): this is the same
+// tier of output as the automated Generator routine produces for actually-
+// published content, not a low-stakes research/labeling task.
 app.post('/run/content-draft', requireToken, async (req, res) => {
     const topic = (req.body?.topic || '').trim();
     const productContext = (req.body?.productContext || '').trim();
@@ -400,24 +415,59 @@ app.post('/run/content-draft', requireToken, async (req, res) => {
     const postFormula = (req.body?.postFormula || '').trim();
     if (!topic) return res.status(400).json({ error: 'topic is required' });
 
-    const prompt = `You are writing content for Alba Creation's content-marketing hub, in 4 different formats for the same topic, all in Russian. Each format is a separate, complete, ready-to-publish piece - not variations of the same text, each adapted to how that platform is actually used.
+    const requestedFormats = Array.isArray(req.body?.formats) ? req.body.formats.filter(k => CONTENT_FORMAT_KEYS.includes(k)) : [];
+    const formats = requestedFormats.length ? requestedFormats : CONTENT_FORMAT_KEYS;
+
+    const formatList = formats.map((key, i) => `${i + 1}. ${CONTENT_FORMAT_SPECS[key].label}: ${CONTENT_FORMAT_SPECS[key].desc}`).join('\n');
+    const schemaFields = formats.map(key => `"${key}": { "title": "...", "desc": "...", "cta": "..." }`).join(', ');
+
+    const prompt = `You are writing content for Alba Creation's content-marketing hub, in ${formats.length} different format${formats.length > 1 ? 's' : ''} for the same topic, all in Russian. Each format is a separate, complete, ready-to-publish piece - not variations of the same text, each adapted to how that platform is actually used.
 
 Topic: "${topic}"
 ${productContext ? `Product/service context: ${productContext}\n` : ''}${toneOfVoice ? `Tone of voice to follow: ${toneOfVoice}\n` : ''}${postFormula ? `Post structure guideline ("золотая середина"): ${postFormula}\n` : ''}
-Write all 4 of the following:
-1. tgPost - a Telegram post: title, body text (2-4 short paragraphs), and a call-to-action.
-2. reelsScript - a script for a 20-40 second vertical video (Reels/Shorts): title, then the body as a readable shot-by-shot script (scene description + spoken line, alternating), and a call-to-action.
-3. threads - a Threads post: a short punchy hook as the title, body text noticeably shorter and more casual than the Telegram post (Threads favors brevity), and a call-to-action.
-4. pinterest - a Pinterest pin: a short SEO-friendly title, a description (2-3 sentences, keyword-rich for Pinterest search), and a call-to-action.
+Write ${formats.length > 1 ? 'all of the following' : 'the following'}:
+${formatList}
 
-Respond with a JSON object: { "tgPost": { "title": "...", "desc": "...", "cta": "..." }, "reelsScript": { "title": "...", "desc": "...", "cta": "..." }, "threads": { "title": "...", "desc": "...", "cta": "..." }, "pinterest": { "title": "...", "desc": "...", "cta": "..." } }`;
+Respond with a JSON object: { ${schemaFields} }`;
 
     try {
         const result = await runClaudeForJson(prompt, { model: 'claude-sonnet-5' });
-        for (const key of ['tgPost', 'reelsScript', 'threads', 'pinterest']) {
+        for (const key of formats) {
             if (typeof result?.[key]?.title !== 'string') throw new Error(`expected "${key}" in response`);
         }
         res.json(result);
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
+// task: suggest-topic
+// body: { productContext?: string, usedTopics?: string[] }
+// Pitches ONE fresh, currently-relevant post topic for the "Создание
+// контента" page's topic field, so the user doesn't have to think one up
+// themselves. Uses WebSearch (the container's only allowed tool - see
+// runClaude above) to ground the pitch in something actually current rather
+// than a generic evergreen topic, and is told which topics were already
+// used/suggested so a repeat click proposes something different instead of
+// looping on the same idea. Sonnet, same tier as content-draft - this is a
+// real pitch that gets typed straight into a publish-bound draft, not a
+// low-stakes labeling task.
+app.post('/run/suggest-topic', requireToken, async (req, res) => {
+    const productContext = (req.body?.productContext || '').trim();
+    const usedTopics = Array.isArray(req.body?.usedTopics)
+        ? req.body.usedTopics.filter(t => typeof t === 'string' && t.trim()).slice(0, 40)
+        : [];
+
+    const prompt = `You are pitching ONE fresh, currently relevant social-media post topic for a content-marketing hub, in Russian.
+${productContext ? `Product/service/niche context: ${productContext}\n` : ''}
+Use web search to ground this in something genuinely current (a recent news item, trend, seasonal moment, or event relevant to the niche/context above) - do not invent a generic, timeless topic that could have been written on any day.
+${usedTopics.length ? `Do NOT suggest any of these already-used/suggested topics, or close variants of them:\n${usedTopics.map(t => `- ${t}`).join('\n')}\n` : ''}
+Respond with a JSON object: { "topic": "one short, specific post topic in Russian, ready to write a post from" }`;
+
+    try {
+        const result = await runClaudeForJson(prompt, { model: 'claude-sonnet-5' });
+        if (typeof result?.topic !== 'string' || !result.topic.trim()) throw new Error('expected { topic }');
+        res.json({ topic: result.topic.trim() });
     } catch (e) {
         res.status(502).json({ error: e.message, rawText: e.rawText });
     }

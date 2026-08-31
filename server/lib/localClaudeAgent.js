@@ -74,9 +74,19 @@ export function generateScriptSection({ heading, prompt, nicheName, nicheSubtitl
 }
 
 // Runs on Sonnet server-side (see local-claude-agent/server.js), longer
-// timeout than the other tasks - it writes 4 full pieces of copy in one call.
-export function generateContentDraft({ topic, productContext, toneOfVoice, postFormula }) {
-    return callTask('content-draft', { topic, productContext, toneOfVoice, postFormula }, { timeoutMs: 4 * 60 * 1000 });
+// timeout than the other tasks - it can write up to 4 full pieces of copy in
+// one call. `formats` (subset of tgPost/reelsScript/threads/pinterest)
+// defaults to all 4 server-side when omitted/empty.
+export function generateContentDraft({ topic, productContext, toneOfVoice, postFormula, formats }) {
+    return callTask('content-draft', { topic, productContext, toneOfVoice, postFormula, formats }, { timeoutMs: 4 * 60 * 1000 });
+}
+
+// Also Sonnet (see local-claude-agent/server.js) - a real topic pitch that
+// gets typed straight into a publish-bound draft, using WebSearch to ground
+// it in something actually current. `usedTopics` lets the caller keep
+// re-rolling without getting the same suggestion twice.
+export function suggestContentTopic({ productContext, usedTopics }) {
+    return callTask('suggest-topic', { productContext, usedTopics }, { timeoutMs: 90 * 1000 });
 }
 
 // Short timeout (vs the 3-minute default) - reviewing a handful of short
