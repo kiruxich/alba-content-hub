@@ -49,10 +49,10 @@ function requireToken(req, res, next) {
 // Bash/Edit/Write - this container should never modify anything, local or
 // remote, only research and write text). --dangerously-skip-permissions is
 // required because there's no TTY here to approve WebSearch's first use.
-async function runClaude(prompt) {
+async function runClaude(prompt, { model } = {}) {
     const args = [
         '-p', prompt,
-        '--model', MODEL,
+        '--model', model || MODEL,
         '--output-format', 'json',
         '--allowedTools', 'WebSearch',
         '--dangerously-skip-permissions',
@@ -73,9 +73,13 @@ async function runClaude(prompt) {
 // callers can decide whether to retry or surface the raw text to the user.
 // Retries once on a malformed/truncated response (observed in practice -
 // occasional cut-off JSON) before giving up, since a fresh generation
-// attempt is usually well-formed.
-async function runClaudeForJsonOnce(prompt) {
-    const text = await runClaude(`${prompt}\n\nRespond with ONLY a single JSON value - no markdown fences, no prose before or after it.`);
+// attempt is usually well-formed. `model` overrides the container-wide
+// default (see MODEL) for tasks that need it - e.g. content-draft, which
+// writes real publish-ready copy and should match the quality bar the
+// automated Generator routine uses (Sonnet), not the Haiku default used for
+// lower-stakes tasks like RSS/keyword discovery.
+async function runClaudeForJsonOnce(prompt, { model } = {}) {
+    const text = await runClaude(`${prompt}\n\nRespond with ONLY a single JSON value - no markdown fences, no prose before or after it.`, { model });
     // The model doesn't always honor "no markdown fences" - strip a ```json
     // ... ``` (or bare ``` ... ```) wrapper if present before parsing, rather
     // than failing on otherwise-valid JSON.
@@ -89,11 +93,11 @@ async function runClaudeForJsonOnce(prompt) {
     }
 }
 
-async function runClaudeForJson(prompt) {
+async function runClaudeForJson(prompt, options = {}) {
     try {
-        return await runClaudeForJsonOnce(prompt);
+        return await runClaudeForJsonOnce(prompt, options);
     } catch (e) {
-        return await runClaudeForJsonOnce(prompt);
+        return await runClaudeForJsonOnce(prompt, options);
     }
 }
 
@@ -277,6 +281,44 @@ ${JSON.stringify(items, null, 2)}`;
         const result = await runClaudeForJson(prompt);
         if (!Array.isArray(result)) throw new Error('expected a JSON array');
         res.json({ reviewed: result });
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
+// task: content-draft
+// body: { topic: string, productContext?: string, toneOfVoice?: string, postFormula?: string }
+// Writes real, publish-ready copy for the "Создание контента" page (4
+// formats from one topic, in one call) - unlike every other task in this
+// file, this runs on Sonnet, not the container's default Haiku (see MODEL):
+// this is the same tier of output as the automated Generator routine
+// produces for actually-published content, not a low-stakes research/
+// labeling task.
+app.post('/run/content-draft', requireToken, async (req, res) => {
+    const topic = (req.body?.topic || '').trim();
+    const productContext = (req.body?.productContext || '').trim();
+    const toneOfVoice = (req.body?.toneOfVoice || '').trim();
+    const postFormula = (req.body?.postFormula || '').trim();
+    if (!topic) return res.status(400).json({ error: 'topic is required' });
+
+    const prompt = `You are writing content for Alba Creation's content-marketing hub, in 4 different formats for the same topic, all in Russian. Each format is a separate, complete, ready-to-publish piece - not variations of the same text, each adapted to how that platform is actually used.
+
+Topic: "${topic}"
+${productContext ? `Product/service context: ${productContext}\n` : ''}${toneOfVoice ? `Tone of voice to follow: ${toneOfVoice}\n` : ''}${postFormula ? `Post structure guideline ("золотая середина"): ${postFormula}\n` : ''}
+Write all 4 of the following:
+1. tgPost - a Telegram post: title, body text (2-4 short paragraphs), and a call-to-action.
+2. reelsScript - a script for a 20-40 second vertical video (Reels/Shorts): title, then the body as a readable shot-by-shot script (scene description + spoken line, alternating), and a call-to-action.
+3. threads - a Threads post: a short punchy hook as the title, body text noticeably shorter and more casual than the Telegram post (Threads favors brevity), and a call-to-action.
+4. pinterest - a Pinterest pin: a short SEO-friendly title, a description (2-3 sentences, keyword-rich for Pinterest search), and a call-to-action.
+
+Respond with a JSON object: { "tgPost": { "title": "...", "desc": "...", "cta": "..." }, "reelsScript": { "title": "...", "desc": "...", "cta": "..." }, "threads": { "title": "...", "desc": "...", "cta": "..." }, "pinterest": { "title": "...", "desc": "...", "cta": "..." } }`;
+
+    try {
+        const result = await runClaudeForJson(prompt, { model: 'claude-sonnet-5' });
+        for (const key of ['tgPost', 'reelsScript', 'threads', 'pinterest']) {
+            if (typeof result?.[key]?.title !== 'string') throw new Error(`expected "${key}" in response`);
+        }
+        res.json(result);
     } catch (e) {
         res.status(502).json({ error: e.message, rawText: e.rawText });
     }

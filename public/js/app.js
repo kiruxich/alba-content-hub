@@ -120,12 +120,13 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'mediaassets': 9, 'urlchecker': 10, 'systeminfo': 11, 'agentcenter': 12 };
+    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'kanban': 3, 'analytics': 4, 'graph': 5, 'calendar': 6, 'contentplan': 7, 'clients': 8, 'customers': 9, 'mediaassets': 10, 'urlchecker': 11, 'systeminfo': 12, 'agentcenter': 13 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
     }
 
+    if (tabName === 'contentcreation') renderContentCreationView();
     if (tabName === 'kanban') renderKanbanView();
     if (tabName === 'analytics') renderAnalyticsView();
     if (tabName === 'calendar') {
@@ -244,7 +245,7 @@ function updatePlanProgress() {
 // БАНК ИДЕЙ (поиск делегирован в SQLite FTS5 на сервере)
 async function renderBankView() {
     const countBadge = document.getElementById('tab-bank-count');
-    if (countBadge) countBadge.innerText = ideasBank.length;
+    if (countBadge) countBadge.innerText = ideasBank.filter(i => (i.status || 'idea') !== 'idea').length;
 
     const container = document.getElementById('bank-list-content');
     if (!container) return;
@@ -267,6 +268,12 @@ async function renderBankView() {
     } else {
         filtered = ideasBank;
     }
+    // Ideas still at status='idea' are unreviewed drafts (manually created on
+    // Создание контента but not yet promoted, or written by the agent
+    // Generator and awaiting approval) - they live on that page instead of
+    // here. Kanban's own "💡 Идеи" column is untouched by this filter and
+    // still shows them - this only narrows this one list view.
+    filtered = filtered.filter(i => (i.status || 'idea') !== 'idea');
 
     if (filtered.length === 0) {
         container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Идеи не найдены или банк пуст</div>`;
@@ -315,8 +322,7 @@ async function renderBankView() {
 
             <div class="action-btn-row">
                 <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
-                <button class="edit-btn" onclick="generateAIPrompt('${idea.id}')">🤖 AI Промпт</button>
-                <button class="tg-btn" style="background:var(--accent-purple);" onclick="toggleAutogenPanel('${idea.id}')">✨ Сгенерировать</button>
+                <button class="tg-btn" style="background:var(--accent-purple);" onclick="toggleAutogenPanel('${idea.id}')">✨ Медиа (обложка/озвучка/видео)</button>
                 <button class="tg-btn" style="background:var(--accent-blue);" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 <button class="edit-btn" onclick="openMetricsModal('${idea.id}')">📊 ROI</button>
@@ -328,6 +334,222 @@ async function renderBankView() {
     });
 
     container.innerHTML = html;
+}
+
+// СОЗДАНИЕ КОНТЕНТА - генерация с нуля (4 формата из одной темы), затем
+// перевод на английский, затем перенос отдельных форматов в Хранилище.
+// Черновики хранятся только в памяти вкладки (contentDrafts) до нажатия
+// "Добавить в хранилище" - как и раньше при ручном создании идеи, ничего не
+// пишется на сервер, пока пользователь явно не решит сохранить конкретный
+// формат/язык.
+let contentDrafts = [];
+const CONTENT_FORMAT_DEFS = [
+    { key: 'tgPost', label: 'ТГ Публикация', ideaFormat: 'TG Пост' },
+    { key: 'reelsScript', label: 'Сценарий Reels/Shorts', ideaFormat: 'Reels' },
+    { key: 'threads', label: 'Threads', ideaFormat: 'Threads' },
+    { key: 'pinterest', label: 'Pinterest', ideaFormat: 'Pinterest' },
+];
+
+function addContentDraft() {
+    contentDrafts.push({
+        id: `cd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        topic: '', productId: '',
+        status: 'draft', // draft | generating | generated | translating
+        activeFormat: 'tgPost', activeLang: 'ru',
+        ru: null, en: null,
+    });
+    renderContentCreationView();
+}
+
+function removeContentDraft(id) {
+    contentDrafts = contentDrafts.filter(d => d.id !== id);
+    renderContentCreationView();
+}
+
+function setContentDraftFormat(id, key) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft) draft.activeFormat = key;
+    renderContentCreationView();
+}
+
+function setContentDraftLang(id, lang) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft && (lang === 'ru' || draft.en)) draft.activeLang = lang;
+    renderContentCreationView();
+}
+
+function setContentDraftBlockField(id, lang, key, field, value) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft && draft[lang] && draft[lang][key]) draft[lang][key][field] = value;
+}
+
+async function generateContentDraft(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft) return;
+    const topicInput = document.getElementById(`cd-topic-${id}`);
+    const productSelect = document.getElementById(`cd-product-${id}`);
+    draft.topic = topicInput ? topicInput.value.trim() : draft.topic;
+    draft.productId = productSelect ? productSelect.value : draft.productId;
+    if (!draft.topic) return showToast('Укажите тему');
+
+    draft.status = 'generating';
+    renderContentCreationView();
+    try {
+        draft.ru = await api('/api/content-drafts/generate', { method: 'POST', body: JSON.stringify({ topic: draft.topic, productId: draft.productId || null }) });
+        draft.status = 'generated';
+        showToast('Черновик сгенерирован');
+    } catch (e) {
+        draft.status = 'draft';
+        showToast('Не удалось сгенерировать: ' + e.message);
+    }
+    renderContentCreationView();
+}
+
+async function translateContentDraft(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft || !draft.ru) return;
+    draft.status = 'translating';
+    renderContentCreationView();
+    try {
+        draft.en = await api('/api/content-drafts/translate', { method: 'POST', body: JSON.stringify({ items: draft.ru }) });
+        draft.activeLang = 'en';
+        draft.status = 'generated';
+        showToast('Переведено на английский');
+    } catch (e) {
+        draft.status = 'generated';
+        showToast('Не удалось перевести: ' + e.message);
+    }
+    renderContentCreationView();
+}
+
+async function promoteContentDraftFormat(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft) return;
+    const formatDef = CONTENT_FORMAT_DEFS.find(f => f.key === draft.activeFormat);
+    const ruBlock = draft.ru?.[draft.activeFormat];
+    const enBlock = draft.activeLang === 'en' ? draft.en?.[draft.activeFormat] : null;
+    if (!ruBlock) return;
+
+    const body = enBlock
+        ? { title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
+            titleEn: enBlock.title, descEn: enBlock.desc, ctaEn: enBlock.cta,
+            format: formatDef.ideaFormat, status: 'ready', source: 'manual',
+            targetGroups: draft.productId ? [draft.productId] : [] }
+        : { title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
+            format: formatDef.ideaFormat, status: 'ready', source: 'manual',
+            targetGroups: draft.productId ? [draft.productId] : [] };
+
+    try {
+        const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify(body) });
+        ideasBank.push(created);
+        renderBankView();
+        showToast(`Добавлено в хранилище: ${formatDef.label}${enBlock ? ' (RU+EN)' : ''}`);
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+function renderContentDraftCard(draft) {
+    const isGenerating = draft.status === 'generating';
+    const isTranslating = draft.status === 'translating';
+    const hasRu = Boolean(draft.ru);
+    const hasEn = Boolean(draft.en);
+    const lang = draft.activeLang;
+    const block = hasRu ? (lang === 'en' ? draft.en?.[draft.activeFormat] : draft.ru[draft.activeFormat]) : null;
+
+    return `
+    <div class="idea-card" style="margin-bottom:16px;">
+        <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px;">
+            <input type="text" class="form-input" style="margin:0;" id="cd-topic-${draft.id}" placeholder="Тема поста..." value="${escapeHtml(draft.topic)}" ${hasRu ? 'readonly' : ''}>
+            <select class="form-select" style="margin:0; max-width:220px;" id="cd-product-${draft.id}" ${hasRu ? 'disabled' : ''}>
+                <option value="">— без привязки —</option>
+                ${productsData.map(p => `<option value="${p.id}" ${draft.productId === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+            </select>
+            <button class="delete-btn" onclick="removeContentDraft('${draft.id}')">🗑</button>
+        </div>
+
+        ${!hasRu ? `
+            <button class="submit-btn" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">${isGenerating ? '⏳ Генерируем через ИИ (Sonnet)...' : '✨ Сгенерировать 4 формата'}</button>
+        ` : `
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                ${CONTENT_FORMAT_DEFS.map(f => `<button class="edit-btn" style="${draft.activeFormat === f.key ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftFormat('${draft.id}', '${f.key}')">${f.label}</button>`).join('')}
+            </div>
+            ${hasEn ? `
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    <button class="edit-btn" style="${lang === 'ru' ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftLang('${draft.id}', 'ru')">🇷🇺 RU</button>
+                    <button class="edit-btn" style="${lang === 'en' ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftLang('${draft.id}', 'en')">🇬🇧 EN</button>
+                </div>` : ''}
+            ${block ? `
+                <input type="text" class="form-input" value="${escapeHtml(block.title)}" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'title', this.value)">
+                <textarea class="form-textarea" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'desc', this.value)">${escapeHtml(block.desc)}</textarea>
+                <input type="text" class="form-input" placeholder="CTA" value="${escapeHtml(block.cta)}" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'cta', this.value)">
+            ` : ''}
+            <div class="action-btn-row">
+                ${!hasEn ? `<button class="edit-btn" ${isTranslating ? 'disabled' : ''} onclick="translateContentDraft('${draft.id}')">${isTranslating ? '⏳ Переводим...' : '🇬🇧 Перевести на английский'}</button>` : ''}
+                <button class="tg-btn" style="background:var(--accent-blue);" onclick="promoteContentDraftFormat('${draft.id}')">➕ Добавить в хранилище (${lang === 'en' ? 'RU+EN' : 'RU'})</button>
+            </div>
+        `}
+    </div>`;
+}
+
+// Всё в статусе 'idea' - и то, что написал агент Generator (source='agent'),
+// и любая идея, созданная вручную и ещё не добавленная в Хранилище (source=
+// 'manual' - включая идеи, заведённые ещё до этой страницы, которые иначе
+// стали бы невидимы: скрыты из Хранилище фильтром в renderBankView(), но не
+// на этой странице). idea.id - это строка из Date.now(), так что момент
+// создания читается прямо из него, без отдельного поля в API.
+function renderAgentContentDrafts() {
+    const list = document.getElementById('content-agent-drafts-list');
+    if (!list) return;
+    const drafts = ideasBank.filter(i => (i.status || 'idea') === 'idea');
+    if (drafts.length === 0) {
+        list.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Нет черновиков на проверке.</div>`;
+        return;
+    }
+    const todayStr = new Date().toDateString();
+    list.innerHTML = drafts.map(idea => {
+        const isAgent = idea.source === 'agent';
+        const isToday = new Date(Number(idea.id)).toDateString() === todayStr;
+        return `
+        <div class="idea-card" style="margin-bottom:14px;">
+            <div class="idea-header">
+                <div class="idea-title">${escapeHtml(idea.title)}</div>
+                <div>
+                    <span class="format-tag" style="background:${isAgent ? 'rgba(191,90,242,0.15)' : 'rgba(255,255,255,0.08)'}; color:${isAgent ? 'var(--accent-purple)' : 'var(--text-secondary)'};">${isAgent ? `🤖 От генератора${isToday ? ' · сегодня' : ''}` : '✍️ Черновик'}</span>
+                    <span class="format-tag">${escapeHtml(idea.format || 'TG Пост')}</span>
+                </div>
+            </div>
+            ${idea.desc ? `<div class="idea-desc-text">${escapeHtml(idea.desc)}</div>` : ''}
+            <div class="idea-cta">CTA: ${escapeHtml(idea.cta || '—')}</div>
+            <div class="action-btn-row">
+                <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
+                <button class="tg-btn" style="background:var(--accent-blue);" onclick="promoteAgentDraft('${idea.id}')">➕ Добавить в хранилище</button>
+                <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑 Отклонить</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function promoteAgentDraft(ideaId) {
+    try {
+        const updated = await api(`/api/ideas/${ideaId}`, { method: 'PUT', body: JSON.stringify({ status: 'ready' }) });
+        ideasBank = ideasBank.map(i => i.id === ideaId ? updated : i);
+        renderBankView();
+        renderContentCreationView();
+        showToast('Добавлено в хранилище');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+function renderContentCreationView() {
+    const list = document.getElementById('content-drafts-list');
+    if (list) {
+        list.innerHTML = contentDrafts.length === 0
+            ? `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Черновиков пока нет — нажмите «+ Новая тема».</div>`
+            : contentDrafts.map(renderContentDraftCard).join('');
+    }
+    renderAgentContentDrafts();
 }
 
 // КАНБАН-ДОСКА (DRAG AND DROP)
@@ -392,35 +614,6 @@ async function handleDrop(e, targetStatus) {
 }
 
 // AI ПРОМПТ ГЕНЕРАТОР
-function generateAIPrompt(ideaId) {
-    const idea = ideasBank.find(i => i.id === ideaId);
-    if (!idea) return;
-
-    const targetProduct = productsData.find(p => idea.targetGroups && idea.targetGroups.includes(p.id));
-    const productName = targetProduct ? targetProduct.title : "Alba Creation Studio";
-
-    const promptText = `Напиши готовый контент для ${idea.format} на тему: "${idea.title}".
-Продукт: ${productName}.
-Целевая аудитория и ценность: ${targetProduct ? targetProduct.value : 'B2B/B2C клиенты цифровой студии'}.
-Контекст и тезисы: ${idea.desc || 'Сфокусируйся на преимуществах и решении болей'}.
-Этап воронки: ${idea.funnel || 'TOFU (Охват)'}.
-Обязательный CTA в конце: ${idea.cta || 'Записаться на консультацию'}.
-Стиль: Лаконичный, экспертный, без лишней "воды", с четким форматированием списков и абзацев.`;
-
-    const pTitle = document.getElementById('ai-prompt-title');
-    const pText = document.getElementById('ai-prompt-text');
-    if (pTitle) pTitle.innerText = `Промпт: ${idea.title}`;
-    if (pText) pText.value = promptText;
-    openOverlay('ai-prompt-overlay');
-}
-
-function copyGeneratedPrompt() {
-    const text = document.getElementById('ai-prompt-text')?.value || '';
-    navigator.clipboard.writeText(text);
-    showToast('Промпт скопирован в буфер!');
-    closeOverlay('ai-prompt-overlay');
-}
-
 // ДАШБОРД И АНАЛИТИКА
 function renderAnalyticsView() {
     const container = document.getElementById('analytics-content');

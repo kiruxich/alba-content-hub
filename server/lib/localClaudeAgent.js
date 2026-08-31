@@ -65,6 +65,12 @@ export function generateScriptSection({ heading, prompt, nicheName, nicheSubtitl
     return callTask('script-section', { heading, prompt, nicheName, nicheSubtitle, toneOfVoice });
 }
 
+// Runs on Sonnet server-side (see local-claude-agent/server.js), longer
+// timeout than the other tasks - it writes 4 full pieces of copy in one call.
+export function generateContentDraft({ topic, productContext, toneOfVoice, postFormula }) {
+    return callTask('content-draft', { topic, productContext, toneOfVoice, postFormula }, { timeoutMs: 4 * 60 * 1000 });
+}
+
 // Short timeout (vs the 3-minute default) - reviewing a handful of short
 // legal findings is quick, and this is a nice-to-have enrichment on top of
 // the url-checker's static scan, not something the caller should wait long
