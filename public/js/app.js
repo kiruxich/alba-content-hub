@@ -410,6 +410,9 @@ async function suggestContentDraftTopic(id) {
     try {
         const result = await api('/api/content-drafts/suggest-topic', { method: 'POST', body: JSON.stringify({ productId: draft.productId || null, excludeTopics: draft.usedTopics }) });
         draft.topic = result.topic || '';
+        draft.topicSources = result.sources || [];
+        draft.topicWhyRelevant = result.whyRelevant || '';
+        draft.topicPublishSuggestion = result.publishSuggestion || '';
         showToast('Тема подобрана');
     } catch (e) {
         showToast('Не удалось подобрать тему: ' + e.message);
@@ -522,6 +525,14 @@ function renderContentDraftCard(draft) {
             </select>
             <button class="delete-btn" onclick="removeContentDraft('${draft.id}')">🗑</button>
         </div>
+
+        ${(!hasRu && (draft.topicWhyRelevant || (draft.topicSources && draft.topicSources.length))) ? `
+            <div class="info-box" style="font-size:12px; margin-bottom:10px;">
+                ${draft.topicWhyRelevant ? `<div><strong>Почему актуально:</strong> ${escapeHtml(draft.topicWhyRelevant)}</div>` : ''}
+                ${(draft.topicSources && draft.topicSources.length) ? `<div style="margin-top:4px;"><strong>Источники:</strong> ${draft.topicSources.map(s => escapeHtml(s)).join('; ')}</div>` : ''}
+                ${draft.topicPublishSuggestion ? `<div style="margin-top:4px;"><strong>Когда/как публиковать:</strong> ${escapeHtml(draft.topicPublishSuggestion)}</div>` : ''}
+            </div>
+        ` : ''}
 
         ${!hasRu ? `
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">

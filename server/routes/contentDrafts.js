@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { translateToEnglish } from '../lib/translateToEnglish.js';
 import { isLocalClaudeAgentConfigured, generateContentDraft, suggestContentTopic } from '../lib/localClaudeAgent.js';
+import { buildContentPlanContext } from './contentPlan.js';
 
 const router = Router();
 
@@ -70,14 +71,20 @@ router.post('/suggest-topic', async (req, res) => {
         : [];
 
     const productContext = await buildProductContext(productId);
+    const strategyContext = await buildContentPlanContext();
     const recentTitles = (await db.execute('SELECT title FROM ideas ORDER BY created_at DESC LIMIT 20')).rows
         .map(r => r.title).filter(Boolean);
     const usedTopics = [...new Set([...excludeTopics, ...recentTitles])];
 
     try {
-        const result = await suggestContentTopic({ productContext, usedTopics });
+        const result = await suggestContentTopic({ productContext, usedTopics, strategyContext });
         if (typeof result?.topic !== 'string' || !result.topic.trim()) throw new Error('agent did not return a topic');
-        res.json({ topic: result.topic.trim() });
+        res.json({
+            topic: result.topic.trim(),
+            sources: result.sources || [],
+            whyRelevant: result.whyRelevant || '',
+            publishSuggestion: result.publishSuggestion || '',
+        });
     } catch (e) {
         res.status(502).json({ error: e.message });
     }

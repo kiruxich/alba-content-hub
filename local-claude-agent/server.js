@@ -452,22 +452,38 @@ Respond with a JSON object: { ${schemaFields} }`;
 // looping on the same idea. Sonnet, same tier as content-draft - this is a
 // real pitch that gets typed straight into a publish-bound draft, not a
 // low-stakes labeling task.
+// body also accepts optional strategyContext (server/routes/contentPlan.js's
+// GET /content-plan/context, fetched by the caller) - folded into the prompt
+// so "why relevant" can genuinely reference the current business goal/
+// quarter focus instead of just restating the news item.
 app.post('/run/suggest-topic', requireToken, async (req, res) => {
     const productContext = (req.body?.productContext || '').trim();
+    const strategyContext = (req.body?.strategyContext || '').trim();
     const usedTopics = Array.isArray(req.body?.usedTopics)
         ? req.body.usedTopics.filter(t => typeof t === 'string' && t.trim()).slice(0, 40)
         : [];
 
     const prompt = `You are pitching ONE fresh, currently relevant social-media post topic for a content-marketing hub, in Russian.
-${productContext ? `Product/service/niche context: ${productContext}\n` : ''}
-Use web search to ground this in something genuinely current (a recent news item, trend, seasonal moment, or event relevant to the niche/context above) - do not invent a generic, timeless topic that could have been written on any day.
+${productContext ? `Product/service/niche context: ${productContext}\n` : ''}${strategyContext ? `Current content strategy context (goal, distribution model, this quarter's focus, today's focus): ${strategyContext}\n` : ''}
+Use web search to ground this in something genuinely current (a recent news item, trend, seasonal moment, or event relevant to the niche/context above) - do not invent a generic, timeless topic that could have been written on any day. Cite what you actually found (real, verifiable sources - name the publication/site, don't invent URLs you didn't see).
 ${usedTopics.length ? `Do NOT suggest any of these already-used/suggested topics, or close variants of them:\n${usedTopics.map(t => `- ${t}`).join('\n')}\n` : ''}
-Respond with a JSON object: { "topic": "one short, specific post topic in Russian, ready to write a post from" }`;
+Respond with a JSON object:
+{
+  "topic": "one short, specific post topic in Russian, ready to write a post from",
+  "sources": ["short source name/description in Russian - what you found and where, 1-3 items"],
+  "whyRelevant": "1-2 sentences in Russian: why this is timely right now, and how it connects to the strategy context above if one was given",
+  "publishSuggestion": "1 short sentence in Russian: best format/platform and rough timing to publish this (e.g. 'Reels на этой неделе, пока тема свежая' or 'TG-пост, можно в любое время в этом квартале')"
+}`;
 
     try {
         const result = await runClaudeForJson(prompt, { model: 'claude-sonnet-5' });
         if (typeof result?.topic !== 'string' || !result.topic.trim()) throw new Error('expected { topic }');
-        res.json({ topic: result.topic.trim() });
+        res.json({
+            topic: result.topic.trim(),
+            sources: Array.isArray(result.sources) ? result.sources.filter(s => typeof s === 'string') : [],
+            whyRelevant: typeof result.whyRelevant === 'string' ? result.whyRelevant : '',
+            publishSuggestion: typeof result.publishSuggestion === 'string' ? result.publishSuggestion : '',
+        });
     } catch (e) {
         res.status(502).json({ error: e.message, rawText: e.rawText });
     }

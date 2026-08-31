@@ -85,8 +85,8 @@ export function generateContentDraft({ topic, productContext, toneOfVoice, postF
 // gets typed straight into a publish-bound draft, using WebSearch to ground
 // it in something actually current. `usedTopics` lets the caller keep
 // re-rolling without getting the same suggestion twice.
-export function suggestContentTopic({ productContext, usedTopics }) {
-    return callTask('suggest-topic', { productContext, usedTopics }, { timeoutMs: 90 * 1000 });
+export function suggestContentTopic({ productContext, usedTopics, strategyContext }) {
+    return callTask('suggest-topic', { productContext, usedTopics, strategyContext }, { timeoutMs: 90 * 1000 });
 }
 
 // Short timeout (vs the 3-minute default) - reviewing a handful of short

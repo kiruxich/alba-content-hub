@@ -48,15 +48,10 @@ const QUARTER_MONTH_RANGES = [
     { months: [9, 10, 11], match: /октябр|ноябр|декабр/i },
 ];
 
-// GET /api/content-plan/context - a compact, always-current strategic
-// briefing assembled from this page's own data (goal/distribution notes +
-// whichever quarter matches today's month) plus agent_settings' weekly
-// schedule (today's day-of-week product focus). Meant to be fetched by the
-// Generator routine (a Claude Code routine, not this backend - see
-// server/routes/agentResearcher.js's similar comment) so that editing the
-// Контент-план page actually changes what Generator sees on its next run,
-// instead of requiring someone to manually copy text into generator_prompt.
-router.get('/context', async (req, res) => {
+// Shared by GET /context below and server/routes/contentDrafts.js's
+// suggest-topic (folds the same briefing into "Подобрать тему" so its
+// "why relevant" can reference the current goal/quarter, not just news).
+export async function buildContentPlanContext() {
     const [planResult, settingsResult] = await Promise.all([
         db.execute('SELECT blocks FROM content_plan WHERE id = 1'),
         db.execute('SELECT weekly_schedule FROM agent_settings WHERE id = 1'),
@@ -83,7 +78,20 @@ router.get('/context', async (req, res) => {
     if (currentQuarter) lines.push(`Текущий фокус квартала (${currentQuarter.period}) — ${currentQuarter.title}: ${currentQuarter.text}`);
     if (todayFocus?.focus) lines.push(`Фокус сегодняшнего дня (${todayFocus.label}): ${todayFocus.focus}`);
 
-    res.json({ context: lines.join('\n\n'), asOf: now.toISOString() });
+    return lines.join('\n\n');
+}
+
+// GET /api/content-plan/context - a compact, always-current strategic
+// briefing assembled from this page's own data (goal/distribution notes +
+// whichever quarter matches today's month) plus agent_settings' weekly
+// schedule (today's day-of-week product focus). Meant to be fetched by the
+// Generator routine (a Claude Code routine, not this backend - see
+// server/routes/agentResearcher.js's similar comment) so that editing the
+// Контент-план page actually changes what Generator sees on its next run,
+// instead of requiring someone to manually copy text into generator_prompt.
+router.get('/context', async (req, res) => {
+    const context = await buildContentPlanContext();
+    res.json({ context, asOf: new Date().toISOString() });
 });
 
 export default router;
