@@ -24,6 +24,10 @@ app.use(express.json({ limit: '256kb' }));
 const AGENT_TOKEN = process.env.AGENT_TOKEN || '';
 const PORT = process.env.PORT || 8790;
 const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000; // web search + writing can take a couple minutes
+// These are short, narrowly-scoped tasks (find some feeds, write a couple
+// sentences, turn a post into a script) - Haiku handles them fine and costs
+// far less of the account's usage than Sonnet/Opus would for the same work.
+const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
 
 function timingSafeEqual(a, b) {
     const bufA = Buffer.from(String(a));
@@ -48,6 +52,7 @@ function requireToken(req, res, next) {
 async function runClaude(prompt) {
     const args = [
         '-p', prompt,
+        '--model', MODEL,
         '--output-format', 'json',
         '--allowedTools', 'WebSearch',
         '--dangerously-skip-permissions',
@@ -124,15 +129,24 @@ Respond with a JSON array of objects: [{ "url": "...", "reason": "short reason t
 
 // task: niche-description
 // body: { category: string }
-// Writes a short description used by generateParserQueries() to build 2GIS
-// search queries for this niche.
+// Writes a description for generateParserQueries.js (server/lib) to build
+// 2GIS search queries from - IMPORTANT: that function does NOT read this as
+// prose. It lowercases `category + ' ' + description`, splits on whitespace/
+// punctuation, dedupes, and takes only the FIRST 8 unique words as the
+// actual keywords sent to 2GIS. A fluent sentence ("Ниша охватывает
+// компании, оказывающие услуги...") wastes those 8 slots on connector words
+// ("ниша", "охватывает", "в") instead of real search synonyms - so the
+// prompt below asks for a keyword list, not a description, even though the
+// field/response key stays "description" for compatibility with that code.
 app.post('/run/niche-description', requireToken, async (req, res) => {
     const category = (req.body?.category || '').trim();
     if (!category) return res.status(400).json({ error: 'category is required' });
 
-    const prompt = `Write a short (2-4 sentence) description in Russian for the business niche "${category}", meant as input for generating 2GIS (Russian business-directory) search queries. Describe what kind of businesses fall in this niche and what search terms/synonyms a person might use to find them on 2GIS in Russia. No preamble.
+    const prompt = `A downstream script will take your answer, lowercase it, split it into individual words, and use only the FIRST 8 unique words as literal search keywords for finding "${category}" businesses on 2ГИС (a Russian business directory). It does NOT read your answer as a sentence - only isolated words matter, in order.
 
-Respond with a JSON object: { "description": "..." }`;
+Write a comma-separated list of alternate names and search synonyms Russian users would actually type into 2ГИС to find this type of business - most common/important term first. Each item should be 1-2 words, no connecting words ("и", "а также", "включает" etc.), no sentence structure at all - just the terms themselves, e.g. for "барбершопы": "барбершоп, барбер, мужская парикмахерская, стрижка бороды, мужской салон, barbershop". Russian, unless a term is commonly searched in Latin script (e.g. brand-style words).
+
+Respond with a JSON object: { "description": "term one, term two, term three, ..." }`;
 
     try {
         const result = await runClaudeForJson(prompt);

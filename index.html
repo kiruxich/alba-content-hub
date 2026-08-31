@@ -424,10 +424,6 @@
                         <label class="form-label" style="margin-top:0;">URL сайта</label>
                         <input type="text" id="url-checker-input" class="form-input" placeholder="alba-creation.ru или https://example.com" style="margin-bottom:0;">
                     </div>
-                    <div style="width:150px;">
-                        <label class="form-label" style="margin-top:0;">Количество запросов</label>
-                        <input type="number" id="url-checker-requestcount-input" class="form-input" value="100" min="1" max="5000" step="1" title="Количество запросов для нагрузочного теста" style="margin-bottom:0;">
-                    </div>
                     <div style="width:230px;">
                         <label class="form-label" style="margin-top:0;">Режим проверки</label>
                         <select id="url-checker-mode-input" class="form-select" style="margin-bottom:0;">
@@ -437,15 +433,38 @@
                     </div>
                     <button class="schedule-btn" id="url-checker-scan-btn" onclick="runUrlCheck()" style="align-self:flex-end;">Проверить</button>
                 </div>
+
+                <!-- Full manual control over the load test - see runLoadTest()
+                     in server/lib/loadTest.js for what each maps to. Server
+                     still hard-clamps to MAX_CONCURRENCY/MAX_DURATION_MS
+                     regardless of what's entered here (a courtesy ceiling,
+                     not a UI bug if a huge number gets silently capped). -->
+                <div class="url-checker-input-row" style="margin-top:10px;">
+                    <div style="width:150px;">
+                        <label class="form-label" style="margin-top:0;">Количество запросов</label>
+                        <input type="number" id="url-checker-requestcount-input" class="form-input" value="100" min="1" max="5000" step="1" title="Количество запросов для нагрузочного теста" style="margin-bottom:0;">
+                    </div>
+                    <div style="width:150px;">
+                        <label class="form-label" style="margin-top:0;">Одновременных запросов</label>
+                        <input type="number" id="url-checker-concurrency-input" class="form-input" placeholder="авто" min="1" max="50" step="1" title="Сколько запросов идёт параллельно. Пусто = подберётся автоматически под число запросов" style="margin-bottom:0;">
+                    </div>
+                    <div style="width:190px;">
+                        <label class="form-label" style="margin-top:0;">Макс. время теста, сек</label>
+                        <input type="number" id="url-checker-duration-input" class="form-input" value="15" min="1" max="120" step="1" title="Жёсткий потолок по времени — тест остановится, даже не дойдя до заданного числа запросов" style="margin-bottom:0;">
+                    </div>
+                </div>
+
                 <!-- Live view of parser-worker's headed-Chromium session during
                      "Полная проверка" (mode:'live') - same noVNC endpoint the
                      Заказчики parser niches use for manual captcha-solving,
                      nginx-proxied at /vnc/ (see infra/ansible). Shown only while
                      a live-mode scan is in flight - see runUrlCheck() in app.js.
-                     noVNC is behind HTTP basic auth (see setup_parser_worker.yml);
-                     the browser may prompt for it once per session. -->
+                     noVNC is behind its own HTTP basic auth, separate from hub's
+                     own login on purpose (see setup_parser_worker.yml) - creds
+                     shown here so they're not lost/forgotten between sessions. -->
                 <div id="url-checker-live-view" style="display:none; margin-top:16px;">
                     <div class="p-section-title" style="margin-top:0;">ЧТО СЕЙЧАС ДЕЛАЕТ БРАУЗЕР</div>
+                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Если браузер спросит логин/пароль для noVNC — это отдельные креды, не от хаба: <strong>admin</strong> / <strong>AlbaVnc2026!</strong></p>
                     <div class="info-box" style="padding:0; overflow:hidden; border-radius:12px;">
                         <iframe id="url-checker-live-iframe" style="width:100%; height:420px; border:0; display:block; background:#000;"></iframe>
                     </div>
@@ -737,14 +756,26 @@
                 </div>
 
                 <div class="controls-row" style="margin-top:8px; align-items:flex-end;">
-                    <div class="p-section-title" style="margin:0;">RSS-ИСТОЧНИКИ RESEARCHER (по одному URL на строку)</div>
+                    <div class="p-section-title" style="margin:0;">RSS-ИСТОЧНИКИ RESEARCHER (по одному URL на строку) — <span id="as-sources-count">0</span></div>
                     <button class="edit-btn" id="as-discover-btn" onclick="discoverRssSources()" title="Найти новые источники через local-claude-agent на вашем ПК">✨ Обновить</button>
                 </div>
-                <textarea id="as-sources-input" class="form-textarea" style="min-height:90px;" placeholder="https://example.com/rss"></textarea>
+                <textarea id="as-sources-input" class="form-textarea" style="min-height:90px;" placeholder="https://example.com/rss" oninput="updateAgentSettingsCounts()"></textarea>
                 <div id="as-discover-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:-8px 0 12px;"></div>
+                <!-- Adds a single source directly server-side (POST /api/agent-settings/sources)
+                     without resaving the whole textarea, so there's no way this can touch/drop
+                     an existing entry - see addAgentSource() in app.js. -->
+                <div style="display:flex; gap:8px; margin:0 0 20px;">
+                    <input type="text" id="as-new-source-input" class="form-input" style="margin:0;" placeholder="https://example.com/rss">
+                    <button class="schedule-btn" style="white-space:nowrap;" onclick="addAgentSource()">+ Добавить</button>
+                </div>
 
-                <div class="p-section-title" style="margin-top:20px;">КЛЮЧЕВЫЕ СЛОВА (через запятую)</div>
-                <input type="text" id="as-keywords-input" class="form-input" placeholder="AI, SaaS, автоматизация">
+                <div class="p-section-title" style="margin-top:20px;">КЛЮЧЕВЫЕ СЛОВА (через запятую) — <span id="as-keywords-count">0</span></div>
+                <input type="text" id="as-keywords-input" class="form-input" placeholder="AI, SaaS, автоматизация" oninput="updateAgentSettingsCounts()">
+                <!-- Same "add one" pattern as sources above - POST /api/agent-settings/keywords. -->
+                <div style="display:flex; gap:8px; margin:0 0 20px;">
+                    <input type="text" id="as-new-keyword-input" class="form-input" style="margin:0;" placeholder="новое ключевое слово">
+                    <button class="schedule-btn" style="white-space:nowrap;" onclick="addAgentKeyword()">+ Добавить</button>
+                </div>
 
                 <div class="p-section-title" style="margin-top:20px;">ТОН ГОЛОСА</div>
                 <textarea id="as-tone-input" class="form-textarea" style="min-height:70px;" placeholder="Экспертный, без воды, с конкретными метриками..."></textarea>

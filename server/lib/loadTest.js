@@ -3,27 +3,28 @@
 // against real (client) production sites and the point is a quick health
 // snapshot, not maximum throughput. Only ever run this against sites you're
 // authorized to test.
-const MAX_CONCURRENCY = 20;
-const MAX_DURATION_MS = 15000;
-
-// Request-count mode still caps out at MAX_DURATION_MS - a user asking for a
-// huge requestCount must never hang longer than the existing worst case, the
-// duration cap is the safety net regardless of which mode is used.
+// Courtesy ceilings, not arbitrary - this hits real (often client) sites,
+// so there's still a hard cap on both knobs regardless of what's requested.
+// Raised from the original 20/15s to give "полный контроль" real headroom
+// (see index.html's url-checker concurrency/duration inputs) while still
+// refusing to become an actual stress-testing tool.
+const MAX_CONCURRENCY = 50;
+const MAX_DURATION_MS = 120000;
 const MAX_REQUEST_COUNT = 5000;
 
-export async function runLoadTest(url, { concurrency = 10, durationMs = 5000, requestCount } = {}) {
+export async function runLoadTest(url, { concurrency = 10, durationMs = 15000, requestCount } = {}) {
     const effectiveConcurrency = Math.max(1, Math.min(concurrency, MAX_CONCURRENCY));
     const useRequestCount = requestCount != null && Number.isFinite(Number(requestCount)) && Number(requestCount) > 0;
     const effectiveRequestCount = useRequestCount
         ? Math.max(1, Math.min(Math.floor(Number(requestCount)), MAX_REQUEST_COUNT))
         : null;
 
-    // In request-count mode the safety net is always the hard MAX_DURATION_MS
-    // cap (not the user-suppliable durationMs). In duration mode, behavior is
-    // unchanged from before requestCount existed.
-    const effectiveDuration = useRequestCount
-        ? MAX_DURATION_MS
-        : Math.max(1000, Math.min(durationMs, MAX_DURATION_MS));
+    // The duration cap is always in effect (both modes) - in request-count
+    // mode it's the safety net that stops a slow/huge count from hanging
+    // forever; in duration mode it's the actual target. Either way it's
+    // whatever the caller asked for (index.html's "Макс. время теста, сек"),
+    // clamped to MAX_DURATION_MS.
+    const effectiveDuration = Math.max(1000, Math.min(durationMs, MAX_DURATION_MS));
 
     const results = [];
     const loopStart = Date.now();

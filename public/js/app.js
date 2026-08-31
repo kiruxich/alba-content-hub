@@ -2431,12 +2431,19 @@ async function runUrlCheck() {
     const input = document.getElementById('url-checker-input');
     const btn = document.getElementById('url-checker-scan-btn');
     const requestCountInput = document.getElementById('url-checker-requestcount-input');
+    const concurrencyInput = document.getElementById('url-checker-concurrency-input');
+    const durationInput = document.getElementById('url-checker-duration-input');
     const modeInput = document.getElementById('url-checker-mode-input');
     const url = input.value.trim();
     if (!url) return showToast('Введите URL');
 
     const mode = modeInput?.value === 'live' ? 'live' : 'fast';
     const requestCount = Math.max(1, Math.min(5000, Number(requestCountInput?.value) || 100));
+    // Empty concurrency field = let the server auto-scale it to the request
+    // count (see urlChecker.js) - only send a value when the user actually
+    // typed one, to keep that auto behavior as the default.
+    const concurrency = concurrencyInput?.value ? Math.max(1, Math.min(50, Number(concurrencyInput.value))) : undefined;
+    const durationMs = Math.max(1000, Math.min(120000, (Number(durationInput?.value) || 15) * 1000));
 
     btn.disabled = true;
     btn.textContent = 'Проверяю...';
@@ -2457,7 +2464,7 @@ async function runUrlCheck() {
     }
 
     try {
-        const report = await api('/api/url-checker/scan', { method: 'POST', body: JSON.stringify({ url, mode, requestCount }) });
+        const report = await api('/api/url-checker/scan', { method: 'POST', body: JSON.stringify({ url, mode, requestCount, concurrency, durationMs }) });
         urlCheckerLastReport = report;
         renderUrlCheckReport(report);
     } catch (e) {
@@ -2594,7 +2601,7 @@ function renderUrlCheckReport(report) {
         <div class="uc-findings-list">${findingsHtml}</div>
 
         <div class="p-section-title" style="margin-top:24px;">НАГРУЗОЧНЫЙ ТЕСТ</div>
-        ${lt.hitDurationCap ? `<div class="warning-banner" style="margin-bottom:10px;">Остановлено по таймауту (15 сек, защита от зависания) — не дошли до заданного числа запросов (${lt.requestCount}), успели сделать ${lt.totalRequests}.</div>` : ''}
+        ${lt.hitDurationCap ? `<div class="warning-banner" style="margin-bottom:10px;">Остановлено по таймауту (${Math.round((lt.durationMs || 0) / 1000)} сек, задано в «Макс. время теста») — не дошли до заданного числа запросов (${lt.requestCount}), успели сделать ${lt.totalRequests}. При ${lt.concurrency} одновременных запросах это физический предел — увеличьте лимит времени или конкурентность, если нужно больше.</div>` : ''}
         ${loadTestHtml}
 
         <div class="controls-row" style="margin-top:24px;">
@@ -2695,9 +2702,10 @@ function drawParserNiches() {
                     placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
                 <span class="parser-niche-status ${n.status}">${statusLabels[n.status] || n.status}</span>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <input type="text" class="form-input" style="margin-bottom:0;" id="parser-desc-${n.id}" value="${escapeHtml(n.description)}"
-                    placeholder="Описание ниши (для генерации запросов)" onblur="saveParserNicheField('${n.id}','description',this.value)">
+            <div style="display:flex; gap:8px; align-items:flex-start;">
+                <textarea class="form-textarea" style="margin-bottom:0; min-height:52px;" id="parser-desc-${n.id}"
+                    placeholder="Ключевые слова/синонимы для 2ГИС через запятую (первые 8 уникальных слов реально используются в поиске — не пишите связным текстом)"
+                    onblur="saveParserNicheField('${n.id}','description',this.value)">${escapeHtml(n.description)}</textarea>
                 <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨</button>
             </div>
 
@@ -3345,7 +3353,55 @@ async function renderAgentSettingsForm() {
     document.getElementById('as-tone-input').value = agentSettings.toneOfVoice || '';
     document.getElementById('as-formula-input').value = agentSettings.postFormula || '';
     document.getElementById('as-generator-prompt-input').value = agentSettings.generatorPrompt || '';
+    updateAgentSettingsCounts();
     await loadContentRubrics();
+}
+
+// Live counters next to the RSS-sources/keywords section titles - just
+// counts non-empty lines/comma-items in whatever's currently in the fields
+// (including unsaved edits), not a server round-trip.
+function updateAgentSettingsCounts() {
+    const sourcesCount = document.getElementById('as-sources-input').value.split('\n').map(s => s.trim()).filter(Boolean).length;
+    const keywordsCount = document.getElementById('as-keywords-input').value.split(',').map(s => s.trim()).filter(Boolean).length;
+    document.getElementById('as-sources-count').innerText = sourcesCount || 'пока нет';
+    document.getElementById('as-keywords-count').innerText = keywordsCount || 'пока нет';
+}
+
+// "+ Добавить" next to each field - appends ONE new source/keyword directly
+// via a dedicated server endpoint (POST /api/agent-settings/sources|keywords)
+// that only ever adds, never resaves the whole list - so unlike editing the
+// textarea/input and hitting the page's "Сохранить", there's no way this can
+// accidentally drop an existing entry.
+async function addAgentSource() {
+    const input = document.getElementById('as-new-source-input');
+    const url = input.value.trim();
+    if (!url) return showToast('Укажите URL источника');
+    try {
+        const result = await api('/api/agent-settings/sources', { method: 'POST', body: JSON.stringify({ url }) });
+        agentSettings.sources = result.sources;
+        document.getElementById('as-sources-input').value = result.sources.join('\n');
+        updateAgentSettingsCounts();
+        input.value = '';
+        showToast('Источник добавлен');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function addAgentKeyword() {
+    const input = document.getElementById('as-new-keyword-input');
+    const keyword = input.value.trim();
+    if (!keyword) return showToast('Укажите ключевое слово');
+    try {
+        const result = await api('/api/agent-settings/keywords', { method: 'POST', body: JSON.stringify({ keyword }) });
+        agentSettings.keywords = result.keywords;
+        document.getElementById('as-keywords-input').value = result.keywords.join(', ');
+        updateAgentSettingsCounts();
+        input.value = '';
+        showToast('Ключевое слово добавлено');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
 }
 
 // РУБРИКИ КОНТЕНТА (реиспользуемые структуры постов, живут в этой же вкладке -
@@ -3535,6 +3591,7 @@ async function discoverRssSources() {
         if (result.added.length > 0) {
             document.getElementById('as-sources-input').value = result.sources.join('\n');
             agentSettings.sources = result.sources;
+            updateAgentSettingsCounts();
             statusEl.textContent = `Добавлено новых источников: ${result.added.length}.`;
             showToast(`Добавлено ${result.added.length} новых RSS-источников`);
         } else {

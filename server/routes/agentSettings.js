@@ -109,4 +109,36 @@ router.post('/discover-sources', async (req, res) => {
     res.json({ added, rejected, sources: added.length > 0 ? [...existingSources, ...added] : existingSources });
 });
 
+// Dedicated "add one" endpoints - deliberately separate from PUT / (which
+// replaces the whole sources/keywords array from whatever the textarea/input
+// holds client-side, so a stray edit there could lose an existing entry).
+// These only ever append a single new item server-side, never touching or
+// re-sending the rest of the list, so there's no way for them to drop
+// anything already saved.
+router.post('/sources', async (req, res) => {
+    const url = (req.body?.url || '').trim();
+    if (!url) return res.status(400).json({ error: 'Укажите URL источника' });
+
+    const current = (await db.execute('SELECT sources FROM agent_settings WHERE id = 1')).rows[0];
+    const sources = JSON.parse(current.sources || '[]');
+    if (sources.includes(url)) return res.status(409).json({ error: 'Такой источник уже есть в списке' });
+
+    const merged = [...sources, url];
+    await db.execute({ sql: 'UPDATE agent_settings SET sources = ? WHERE id = 1', args: [JSON.stringify(merged)] });
+    res.status(201).json({ sources: merged });
+});
+
+router.post('/keywords', async (req, res) => {
+    const keyword = (req.body?.keyword || '').trim();
+    if (!keyword) return res.status(400).json({ error: 'Укажите ключевое слово' });
+
+    const current = (await db.execute('SELECT keywords FROM agent_settings WHERE id = 1')).rows[0];
+    const keywords = JSON.parse(current.keywords || '[]');
+    if (keywords.includes(keyword)) return res.status(409).json({ error: 'Такое ключевое слово уже есть в списке' });
+
+    const merged = [...keywords, keyword];
+    await db.execute({ sql: 'UPDATE agent_settings SET keywords = ? WHERE id = 1', args: [JSON.stringify(merged)] });
+    res.status(201).json({ keywords: merged });
+});
+
 export default router;
