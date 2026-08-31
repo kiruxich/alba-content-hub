@@ -1175,36 +1175,10 @@
         </div>
     </div>
 
-    <!-- AUTO-GENERATE MEDIA MODAL ("✨ Сгенерировать" на карточке идеи) - выбор
-         провайдера озвучки перед запуском, лог хода генерации, результат
-         (обложка/озвучка/видео/сценарий) после завершения. См.
-         openAutoGenerateModal/confirmAutoGenerate в public/js/app.js. -->
-    <div id="autogen-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;">Генерация медиа</span>
-                <button class="back-btn" onclick="closeOverlay('autogen-overlay')">Закрыть ✕</button>
-            </div>
-            <div class="modal-body">
-                <h3 id="autogen-idea-title" style="margin-top:0;">Название идеи</h3>
-
-                <div id="autogen-options">
-                    <label class="form-label" style="margin-top:0;">Озвучка:</label>
-                    <select id="autogen-voiceover-provider" class="form-select">
-                        <option value="piper">Piper (бесплатно, self-hosted)</option>
-                        <option value="elevenlabs">ElevenLabs (платно, выше качество)</option>
-                    </select>
-                    <p style="color:var(--text-secondary); font-size:12px; margin:-8px 0 16px;">Если выбранный провайдер не настроен или упадёт с ошибкой — автоматически попробуем второй, если он доступен.</p>
-
-                    <button class="submit-btn" onclick="confirmAutoGenerate()">✨ Сгенерировать</button>
-                </div>
-
-                <div id="autogen-log" class="parser-niche-console" style="display:none; min-height:140px; margin-top:16px;"></div>
-
-                <div id="autogen-result" style="display:none; margin-top:16px;"></div>
-            </div>
-        </div>
-    </div>
+    <!-- "✨ Сгенерировать" (auto-generate media for an idea) now renders inline
+         under the idea card itself (#autogen-panel-<ideaId>, built in
+         renderIdeasBank in public/js/app.js) - see toggleAutogenPanel/
+         confirmAutoGenerate there. No modal for this anymore. -->
 </div>
 
 <script src="js/app.js"></script>
