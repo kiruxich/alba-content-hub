@@ -420,6 +420,21 @@ await ensureColumn('scheduled_events', 'metrics_synced_at', 'INTEGER');
 // page/lead-bot can report back which specific post a lead came from -
 // this is what makes the ROI numbers real instead of manually guessed.
 await ensureColumn('scheduled_events', 'utm_code', 'TEXT');
+// Auto-publish (see server/lib/calendarScheduler.js): publish_at is a unix
+// timestamp (date+time chosen in the schedule modal) distinct from raw_date
+// (a plain YYYY-MM-DD used for calendar display/grouping only). channel_id/
+// board_id/lang mirror what the manual "Опубликовать" modal already lets you
+// pick (publishModalState in app.js), just captured up front instead of on
+// the day itself. publish_status starts 'pending' and moves to 'published'
+// or 'failed' (with publish_error set) once the scheduler's had a shot at
+// it - a failed row is never retried automatically, only via the "Повторить"
+// button in the calendar UI, which just resets it back to 'pending'.
+await ensureColumn('scheduled_events', 'publish_at', 'INTEGER');
+await ensureColumn('scheduled_events', 'channel_id', 'INTEGER');
+await ensureColumn('scheduled_events', 'board_id', 'TEXT');
+await ensureColumn('scheduled_events', 'lang', "TEXT DEFAULT 'ru'");
+await ensureColumn('scheduled_events', 'publish_status', "TEXT DEFAULT 'pending'");
+await ensureColumn('scheduled_events', 'publish_error', 'TEXT');
 // Weekly day->product rotation and the required post structure ("Золотая
 // середина"), set by the founder. Stored here (not just as Content Plan
 // text) so the Generator can read it programmatically once built - the

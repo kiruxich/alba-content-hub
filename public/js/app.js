@@ -1298,12 +1298,10 @@ function pickLangFieldsClient(idea, lang) {
     };
 }
 
-async function openPublishModal(ideaId) {
-    const idea = ideasBank.find(i => i.id === ideaId);
-    if (!idea) return;
-
-    publishModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
-
+// Shared by the immediate-publish modal and the schedule (auto-publish)
+// modal - both need the same platform-configured flags and channel/board
+// lists to let the user pick where a post goes.
+async function loadPublishMeta() {
     try {
         const [telegram, vk, instagram, youtube, threads, pinterest] = await Promise.all([
             api('/api/settings/telegram'),
@@ -1318,8 +1316,16 @@ async function openPublishModal(ideaId) {
         showToast('Не удалось получить настройки публикаций: ' + e.message);
     }
     await loadTelegramChannels();
-    if (telegramChannels.length > 0) publishModalState.channelId = telegramChannels[0].id;
     await loadPinterestBoards();
+}
+
+async function openPublishModal(ideaId) {
+    const idea = ideasBank.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    publishModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
+    await loadPublishMeta();
+    if (telegramChannels.length > 0) publishModalState.channelId = telegramChannels[0].id;
     publishModalState.boardId = pinMeta.defaultBoardId || (pinterestBoards[0] && pinterestBoards[0].id) || null;
 
     document.getElementById('publish-idea-title').innerText = idea.title;
@@ -1739,7 +1745,10 @@ function renderProductDetailContent(productId) {
 }
 
 // ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ И ПИКЕР ИДЕЙ
-function openScheduleForIdea(ideaId) {
+let scheduleModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // matches Date.getDay(), see agentSettings.weeklySchedule's day field
+
+async function openScheduleForIdea(ideaId) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
 
@@ -1747,16 +1756,129 @@ function openScheduleForIdea(ideaId) {
     const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
 
     currentSelectedIdea = idea;
+    scheduleModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
 
     const sTitle = document.getElementById('schedule-title');
     const sCat = document.getElementById('schedule-category');
     if (sTitle) sTitle.innerText = idea.title;
     if (sCat) sCat.innerText = `Продукт: ${pTitle}`;
+    document.getElementById('schedule-date-input').value = '';
+    document.getElementById('schedule-time-input').value = '12:00';
+    document.getElementById('schedule-day-theme').textContent = '';
+
+    await loadPublishMeta();
+    if (telegramChannels.length > 0) scheduleModalState.channelId = telegramChannels[0].id;
+    scheduleModalState.boardId = pinMeta.defaultBoardId || (pinterestBoards[0] && pinterestBoards[0].id) || null;
+
     openOverlay('schedule-overlay');
+    renderScheduleModal();
+}
+
+// Shows the weekly-schedule's "Фокус дня" for whatever date is picked, so
+// the user can see at a glance whether this idea fits the day's planned
+// theme before confirming.
+function onScheduleDateChange() {
+    const chosenDate = document.getElementById('schedule-date-input').value;
+    const box = document.getElementById('schedule-day-theme');
+    if (!chosenDate || !box) return;
+    const weekday = WEEKDAY_KEYS[new Date(chosenDate + 'T00:00:00').getDay()];
+    const entry = (agentSettings.weeklySchedule || []).find(d => d.day === weekday);
+    box.textContent = entry ? `Тема дня (${entry.label}): ${entry.focus}` : '';
+}
+
+function setSchedulePlatform(platformId) {
+    scheduleModalState.platform = platformId;
+    if (platformId === 'telegram' && !scheduleModalState.channelId && telegramChannels.length > 0) {
+        scheduleModalState.channelId = telegramChannels[0].id;
+    }
+    renderScheduleModal();
+}
+
+function setScheduleLang(lang) {
+    if (lang === 'en' && (!currentSelectedIdea || !currentSelectedIdea.titleEn)) return;
+    scheduleModalState.lang = lang;
+    renderScheduleModal();
+}
+
+function onScheduleChannelChange() {
+    const select = document.getElementById('schedule-channel-select');
+    scheduleModalState.channelId = select.value ? Number(select.value) : null;
+}
+
+function onScheduleBoardChange() {
+    const select = document.getElementById('schedule-board-select');
+    scheduleModalState.boardId = select.value || null;
+}
+
+function renderScheduleModal() {
+    if (!currentSelectedIdea) return;
+
+    const platformRow = document.getElementById('schedule-platform-row');
+    platformRow.innerHTML = PUBLISH_PLATFORMS.map(p => {
+        const configured = p.isConfigured();
+        const active = scheduleModalState.platform === p.id;
+        const activeStyle = active ? 'background:var(--accent-blue); color:#fff;' : '';
+        const dimStyle = configured ? '' : 'opacity:0.55;';
+        return `<button class="edit-btn" style="${activeStyle}${dimStyle}" onclick="setSchedulePlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
+    }).join('');
+
+    const currentPlatform = PUBLISH_PLATFORMS.find(p => p.id === scheduleModalState.platform);
+    const configured = currentPlatform.isConfigured();
+
+    const channelRow = document.getElementById('schedule-channel-row');
+    const channelSelect = document.getElementById('schedule-channel-select');
+    if (scheduleModalState.platform === 'telegram') {
+        channelRow.style.display = '';
+        channelSelect.innerHTML = telegramChannels.length === 0
+            ? `<option value="">— нет каналов —</option>`
+            : telegramChannels.map(ch => `<option value="${ch.id}" ${ch.id === scheduleModalState.channelId ? 'selected' : ''}>${escapeHtml(ch.label)}</option>`).join('');
+    } else {
+        channelRow.style.display = 'none';
+    }
+
+    const boardRow = document.getElementById('schedule-board-row');
+    const boardSelect = document.getElementById('schedule-board-select');
+    if (scheduleModalState.platform === 'pinterest') {
+        boardRow.style.display = '';
+        boardSelect.innerHTML = pinterestBoards.length === 0
+            ? `<option value="">— нет досок —</option>`
+            : pinterestBoards.map(b => `<option value="${b.id}" ${b.id === scheduleModalState.boardId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('');
+    } else {
+        boardRow.style.display = 'none';
+    }
+
+    const warnBox = document.getElementById('schedule-not-configured-box');
+    let warnMsg = '';
+    if (!configured) {
+        warnMsg = currentPlatform.notConfiguredMsg;
+    } else if (scheduleModalState.platform === 'telegram' && telegramChannels.length === 0) {
+        warnMsg = 'Нет добавленных каналов для публикации. Добавьте хотя бы один канал в настройках публикаций.';
+    } else if (scheduleModalState.platform === 'pinterest' && pinterestBoards.length === 0) {
+        warnMsg = 'Нет ни одной доски в Pinterest. Создайте доску в настройках публикаций.';
+    }
+    warnBox.style.display = warnMsg ? '' : 'none';
+    warnBox.textContent = warnMsg;
+
+    const hasEn = Boolean(currentSelectedIdea.titleEn);
+    if (!hasEn && scheduleModalState.lang === 'en') scheduleModalState.lang = 'ru';
+    const ruBtn = document.getElementById('schedule-lang-ru-btn');
+    const enBtn = document.getElementById('schedule-lang-en-btn');
+    ruBtn.style.background = scheduleModalState.lang === 'ru' ? 'var(--accent-blue)' : '';
+    ruBtn.style.color = scheduleModalState.lang === 'ru' ? '#fff' : '';
+    enBtn.style.background = scheduleModalState.lang === 'en' ? 'var(--accent-blue)' : '';
+    enBtn.style.color = scheduleModalState.lang === 'en' ? '#fff' : '';
+    enBtn.disabled = !hasEn;
+    enBtn.style.opacity = hasEn ? '1' : '0.4';
+
+    const canConfirm = configured
+        && (scheduleModalState.platform !== 'telegram' || scheduleModalState.channelId)
+        && (scheduleModalState.platform !== 'pinterest' || scheduleModalState.boardId);
+    document.getElementById('schedule-confirm-btn').disabled = !canConfirm;
 }
 
 async function confirmSchedule() {
     const chosenDate = document.getElementById('schedule-date-input').value;
+    const chosenTime = document.getElementById('schedule-time-input').value || '12:00';
     if (!chosenDate || !currentSelectedIdea) return;
 
     const targetProduct = productsData.find(p => currentSelectedIdea.targetGroups && currentSelectedIdea.targetGroups.includes(p.id));
@@ -1767,6 +1889,7 @@ async function confirmSchedule() {
     const dayNames = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
     const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
     const dateStr = `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
+    const publishAt = Math.floor(new Date(`${chosenDate}T${chosenTime}:00`).getTime() / 1000);
 
     try {
         const created = await api('/api/events', { method: 'POST', body: JSON.stringify({
@@ -1778,6 +1901,11 @@ async function confirmSchedule() {
             format: currentSelectedIdea.format || 'TG Пост',
             cta: currentSelectedIdea.cta || 'Консультация Alba Creation',
             desc: currentSelectedIdea.desc || `Запланировано (${pTitle})`,
+            platform: scheduleModalState.platform,
+            channelId: scheduleModalState.channelId,
+            boardId: scheduleModalState.boardId,
+            lang: scheduleModalState.lang,
+            publishAt,
         }) });
 
         scheduledEvents.push(created);
@@ -1787,10 +1915,22 @@ async function confirmSchedule() {
         checkFunnelBalance();
 
         closeOverlay('schedule-overlay');
-        showToast(`Запланировано на ${d.getDate()} ${monthNames[d.getMonth()]}`);
+        showToast(`Запланировано на ${d.getDate()} ${monthNames[d.getMonth()]}, ${chosenTime}`);
         switchTab('calendar');
     } catch (e) {
         showToast('Не удалось запланировать публикацию: ' + e.message);
+    }
+}
+
+async function retryScheduledEvent(id) {
+    try {
+        const updated = await api(`/api/events/${id}/retry`, { method: 'POST' });
+        scheduledEvents = scheduledEvents.map(e => e.id === updated.id ? updated : e);
+        if (currentOpenDay) renderDayDetailPage(currentOpenDay);
+        else renderCalendar();
+        showToast('Публикация поставлена в очередь повторно');
+    } catch (e) {
+        showToast('Не удалось повторить: ' + e.message);
     }
 }
 
@@ -1899,6 +2039,11 @@ function renderDayDetailPage(dateStr) {
         html += `<div class="info-box" style="text-align:center; margin-bottom:24px;">На этот день публикаций пока нет.</div>`;
     } else {
         events.forEach(item => {
+            const statusInfo = {
+                pending: { label: `⏳ Автопубликация в ${item.publishAt ? new Date(item.publishAt * 1000).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—'}`, color: 'var(--text-secondary)' },
+                published: { label: '✅ Опубликовано', color: 'var(--accent-green)' },
+                failed: { label: '❌ Ошибка публикации', color: 'var(--accent-red)' },
+            }[item.publishStatus];
             html += `
             <div class="day-large-card" style="border-left: 4px solid ${item.color}; background: var(--bg-grouped); border-radius: 14px; padding: 16px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -1908,7 +2053,12 @@ function renderDayDetailPage(dateStr) {
                 <div style="font-size:16px; font-weight:600; margin-bottom:6px;">${item.title}</div>
                 <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">${item.desc}</div>
                 <div class="info-box" style="font-size:12px; margin-bottom:10px; padding:8px;"><strong>CTA:</strong> ${item.cta}</div>
-                <button class="delete-btn" style="width:100%; justify-content:center; padding:8px;" onclick="deleteEvent(${item.id}, '${dateStr}')">🗑 Удалить публикацию</button>
+                ${item.publishAt && statusInfo ? `<div style="font-size:12px; color:${statusInfo.color}; margin-bottom:8px;">${statusInfo.label} — ${(PUBLISH_PLATFORMS.find(p => p.id === item.platform) || {}).label || item.platform}</div>` : ''}
+                ${item.publishStatus === 'failed' && item.publishError ? `<div class="warning-banner" style="font-size:12px; margin-bottom:10px;">${escapeHtml(item.publishError)}</div>` : ''}
+                <div style="display:flex; gap:8px;">
+                    ${item.publishStatus === 'failed' ? `<button class="edit-btn" style="flex:1;" onclick="retryScheduledEvent(${item.id})">↻ Повторить</button>` : ''}
+                    <button class="delete-btn" style="flex:1; justify-content:center; padding:8px;" onclick="deleteEvent(${item.id}, '${dateStr}')">🗑 Удалить публикацию</button>
+                </div>
             </div>`;
         });
     }
@@ -1939,40 +2089,16 @@ function renderDayDetailPage(dateStr) {
     if (body) body.innerHTML = html;
 }
 
+// Opens the same schedule modal as "📅 В календарь" on an idea card
+// (openScheduleForIdea), pre-filled with the day already being viewed - so
+// every path into the calendar goes through one place that captures
+// platform/channel/lang/time, instead of this having its own separate
+// direct-POST shortcut that skipped all of that (and so never had a
+// publish_at, making auto-publish silently not apply to it).
 async function attachIdeaToDay(ideaId, dateStr) {
-    const idea = ideasBank.find(i => i.id === ideaId);
-    if (!idea) return;
-
-    const d = new Date(dateStr);
-    const dayNames = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
-    const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-    const dateDisplayStr = `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
-
-    const targetProduct = productsData.find(p => idea.targetGroups && idea.targetGroups.includes(p.id));
-    const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
-    const pColor = targetProduct ? targetProduct.badgeColor : "#0a84ff";
-
-    try {
-        const created = await api('/api/events', { method: 'POST', body: JSON.stringify({
-            ideaId: idea.id,
-            title: `${pTitle}: ${idea.title}`,
-            dateStr: dateDisplayStr,
-            rawDate: dateStr,
-            color: pColor,
-            format: idea.format || 'TG Пост',
-            cta: idea.cta || 'Ссылка на Alba Creation',
-            desc: idea.desc || `Запланировано из банка (${pTitle})`,
-        }) });
-
-        scheduledEvents.push(created);
-        scheduledEvents.sort((a,b) => new Date(a.rawDate) - new Date(b.rawDate));
-        updatePlanProgress();
-        checkFunnelBalance();
-        renderDayDetailPage(dateStr);
-        showToast(`Публикация добавлена на ${d.getDate()} ${monthNames[d.getMonth()]}`);
-    } catch (e) {
-        showToast('Не удалось добавить публикацию: ' + e.message);
-    }
+    await openScheduleForIdea(ideaId);
+    document.getElementById('schedule-date-input').value = dateStr;
+    onScheduleDateChange();
 }
 
 // УДАЛЕНИЕ ЗАПЛАНИРОВАННОЙ ПУБЛИКАЦИИ

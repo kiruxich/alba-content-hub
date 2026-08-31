@@ -26,6 +26,12 @@ function serialize(row) {
         },
         metricsSyncedAt: row.metrics_synced_at || null,
         utmCode: row.utm_code || null,
+        publishAt: row.publish_at || null,
+        channelId: row.channel_id || null,
+        boardId: row.board_id || null,
+        lang: row.lang || 'ru',
+        publishStatus: row.publish_status || 'pending',
+        publishError: row.publish_error || null,
     };
 }
 
@@ -45,15 +51,32 @@ router.post('/', async (req, res) => {
     const utmCode = `${b.ideaId ? `idea${b.ideaId}` : `pub${id}`}_${platform}`;
     await db.execute({
         sql: `
-            INSERT INTO scheduled_events (id, idea_id, title, date_str, raw_date, color, format, cta, desc, platform, external_post_id, utm_code)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO scheduled_events (id, idea_id, title, date_str, raw_date, color, format, cta, desc, platform, external_post_id, utm_code, publish_at, channel_id, board_id, lang, publish_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         args: [id, b.ideaId ?? null, b.title, b.dateStr || '', b.rawDate,
             b.color || '#0a84ff', b.format || 'TG Пост', b.cta || '', b.desc || '',
-            platform, b.externalPostId || null, utmCode],
+            platform, b.externalPostId || null, utmCode,
+            b.publishAt || null, b.channelId || null, b.boardId || null, b.lang || 'ru',
+            b.publishAt ? 'pending' : null],
     });
     const result = await db.execute({ sql: 'SELECT * FROM scheduled_events WHERE id = ?', args: [id] });
     res.status(201).json(serialize(result.rows[0]));
+});
+
+// Resets a failed auto-publish back to pending so the scheduler picks it up
+// again on its next tick - the scheduler itself never retries on its own.
+router.post('/:id/retry', async (req, res) => {
+    const existing = (await db.execute({ sql: 'SELECT * FROM scheduled_events WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!existing) return res.status(404).json({ error: 'event not found' });
+    if (!existing.publish_at) return res.status(400).json({ error: 'у этой записи нет времени автопубликации' });
+
+    await db.execute({
+        sql: `UPDATE scheduled_events SET publish_status = 'pending', publish_error = NULL WHERE id = ?`,
+        args: [req.params.id],
+    });
+    const result = await db.execute({ sql: 'SELECT * FROM scheduled_events WHERE id = ?', args: [req.params.id] });
+    res.json(serialize(result.rows[0]));
 });
 
 // Used by the future metrics-sync job to write back per-platform view/save/click

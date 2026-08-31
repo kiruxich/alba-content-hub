@@ -1008,13 +1008,41 @@
             <div class="modal-body">
                 <h3 id="schedule-title" style="margin-top:0;">Название идеи</h3>
                 <p style="color:var(--text-secondary); font-size:14px;" id="schedule-category">Категория</p>
-                
-                <div style="margin-top:20px;">
-                    <label class="form-label">Дата публикации:</label>
-                    <input type="date" id="schedule-date-input" class="date-picker-input">
+
+                <div style="margin-top:20px; display:flex; gap:12px;">
+                    <div style="flex:1;">
+                        <label class="form-label">Дата публикации:</label>
+                        <input type="date" id="schedule-date-input" class="date-picker-input" oninput="onScheduleDateChange()">
+                    </div>
+                    <div style="flex:1;">
+                        <label class="form-label">Время:</label>
+                        <input type="time" id="schedule-time-input" class="date-picker-input" value="12:00">
+                    </div>
+                </div>
+                <!-- Тема дня из недельного расписания (Центр агентов) для выбранной даты -->
+                <div id="schedule-day-theme" style="font-size:12px; color:var(--text-secondary); margin-top:6px;"></div>
+
+                <label class="form-label" style="margin-top:16px;">Платформа:</label>
+                <div id="schedule-platform-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
+
+                <div id="schedule-channel-row" style="display:none;">
+                    <label class="form-label">Канал Telegram:</label>
+                    <select id="schedule-channel-select" class="form-select" onchange="onScheduleChannelChange()"></select>
+                </div>
+                <div id="schedule-board-row" style="display:none;">
+                    <label class="form-label">Доска Pinterest:</label>
+                    <select id="schedule-board-select" class="form-select" onchange="onScheduleBoardChange()"></select>
                 </div>
 
-                <button class="submit-btn" onclick="confirmSchedule()">Подтвердить и добавить</button>
+                <label class="form-label" style="margin-top:8px;">Язык:</label>
+                <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <button id="schedule-lang-ru-btn" class="edit-btn" onclick="setScheduleLang('ru')">🇷🇺 RU</button>
+                    <button id="schedule-lang-en-btn" class="edit-btn" onclick="setScheduleLang('en')">🇬🇧 EN</button>
+                </div>
+                <div id="schedule-not-configured-box" class="warning-banner" style="display:none; margin-bottom:12px;"></div>
+
+                <p style="color:var(--text-secondary); font-size:11px; margin:0 0 12px;">Пост опубликуется автоматически в указанные дату и время. Если публикация не удастся — запись останется в календаре с пометкой ошибки и кнопкой «Повторить».</p>
+                <button class="submit-btn" id="schedule-confirm-btn" onclick="confirmSchedule()">Подтвердить и добавить</button>
             </div>
         </div>
     </div>
