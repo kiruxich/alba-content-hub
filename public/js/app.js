@@ -610,22 +610,125 @@ function renderContentCreationView() {
 }
 
 // КАНБАН-ДОСКА (DRAG AND DROP)
+// Не все 5 колонок читают ideas.status напрямую: "Запланировано" и
+// "Опубликовано" - производные от scheduled_events (см.
+// server/routes/events.js), см. getKanbanBucket() ниже. Только 'idea'
+// (туда же сваливается устаревший 'in_progress' - отдельной колонки для
+// него больше нет), 'ready' и новое 'done' остаются настоящими значениями
+// ideas.status и двигаются руками через drag-n-drop.
+const METRICS_COLLECTION_DAYS = 14; // столько дней после публикации собираем метрики, прежде чем считать сбор завершённым - легко поменять здесь
+
+// ideas.status не имеет CHECK-constraint в server/db.js и PUT /api/ideas/:id
+// уже принимает любое значение status как есть (см. server/routes/ideas.js) -
+// значению 'done' не нужна отдельная миграция/ensureColumn, оно просто
+// новая строка в существующей колонке.
+function ideaEvents(ideaId) {
+    return scheduledEvents.filter(e => e.ideaId === ideaId);
+}
+
+// Определяет, в какой колонке Канбана должна отображаться идея. Порядок
+// проверок важен: 'done' - финальный шаг руками, перекрывает всё
+// остальное; дальше - производные от событий колонки; и только в конце -
+// настоящие значения ideas.status.
+function getKanbanBucket(idea) {
+    if ((idea.status || 'idea') === 'done') return 'done';
+    const events = ideaEvents(idea.id);
+    if (events.some(e => e.publishStatus === 'sent')) return 'published';
+    if (events.some(e => e.publishStatus !== 'sent')) return 'scheduled';
+    if (idea.status === 'ready') return 'ready';
+    return 'idea';
+}
+
+function kanbanProductBadge(idea) {
+    if (!idea.targetGroups || !idea.targetGroups.length) return '';
+    const product = productsData.find(p => p.id === idea.targetGroups[0]);
+    if (!product) return '';
+    return `<span class="format-tag" style="background:${product.badgeBg}; color:${product.badgeColor};">${escapeHtml(product.title)}</span>`;
+}
+
+function kanbanSourceBadge(idea) {
+    return idea.source === 'agent'
+        ? `<span class="format-tag" style="background:rgba(191,90,242,0.15); color:var(--accent-purple);">🤖</span>`
+        : '';
+}
+
+function formatRuDateDMY(date) {
+    return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+}
+
+// Дата завершения сбора метрик = дата последней (по времени) реально
+// отправленной публикации этой идеи + METRICS_COLLECTION_DAYS. null, если
+// у идеи нет ни одного отправленного события с publishAt (не должно
+// случаться для колонки 'published', но на всякий случай).
+function metricsReadyInfo(idea) {
+    const sentEvents = ideaEvents(idea.id).filter(e => e.publishStatus === 'sent' && e.publishAt);
+    if (!sentEvents.length) return null;
+    const latestPublishAt = Math.max(...sentEvents.map(e => e.publishAt));
+    const readyDate = new Date((latestPublishAt + METRICS_COLLECTION_DAYS * 86400) * 1000);
+    return { readyDate, isPast: readyDate.getTime() <= Date.now() };
+}
+
+// Сводка метрик по идее (idea.metrics + метрики её отправленных событий)
+// плюс среднее по последним 5 опубликованным идеям того же формата -
+// целиком на фронте, без отдельного бэкенд-эндпоинта.
+function buildKanbanAnalysis(idea) {
+    const sentEvents = ideaEvents(idea.id).filter(e => e.publishStatus === 'sent');
+    const views = (idea.metrics?.views || 0) + sentEvents.reduce((s, e) => s + (e.metrics?.views || 0), 0);
+    const saves = (idea.metrics?.saves || 0) + sentEvents.reduce((s, e) => s + (e.metrics?.saves || 0), 0);
+    const clicks = (idea.metrics?.clicks || 0) + sentEvents.reduce((s, e) => s + (e.metrics?.clicks || 0), 0);
+    const leads = idea.metrics?.leads || 0;
+
+    const peers = ideasBank
+        .filter(i => i.id !== idea.id && i.format === idea.format && ideaEvents(i.id).some(e => e.publishStatus === 'sent'))
+        .sort((a, b) => Number(b.id) - Number(a.id))
+        .slice(0, 5);
+
+    let avgLine = '';
+    if (peers.length) {
+        const avg = key => Math.round(peers.reduce((s, i) => s + (i.metrics?.[key] || 0), 0) / peers.length);
+        avgLine = `<br><span style="color:var(--text-secondary);">Среднее по последним ${peers.length} (${escapeHtml(idea.format || '—')}): 👁 ${avg('views')} · 💾 ${avg('saves')} · 🖱 ${avg('clicks')} · 🎯 ${avg('leads')}</span>`;
+    }
+
+    return `Просмотры: ${views}, Сохранения: ${saves}, Клики: ${clicks}, Лиды: ${leads}${avgLine}`;
+}
+
+function toggleKanbanAnalysis(ideaId) {
+    const el = document.getElementById(`kanban-analysis-${ideaId}`);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// Колонки ниже, чьи id входят в этот список, двигаются руками
+// (drag-n-drop пишет ideas.status через PUT /api/ideas/:id). 'scheduled' и
+// 'published' - производные и намеренно не входят сюда, поэтому у их
+// колонок нет ondragover/ondrop: без preventDefault на dragover браузер
+// сам не даёт туда что-либо бросить - карточки при этом остаются
+// перетаскиваемыми (draggable="true") как обычно.
+const KANBAN_MANUAL_STATUSES = ['idea', 'ready', 'done'];
+
 function renderKanbanView() {
     const container = document.getElementById('kanban-board-container');
     if (!container) return;
 
     const columns = [
-        { id: 'idea', title: '💡 Идеи' },
-        { id: 'in_progress', title: '⚙️ В работе' },
-        { id: 'ready', title: '✅ Готово' },
-        { id: 'published', title: '🚀 Опубликовано' }
+        { id: 'idea', title: '💡 Идея' },
+        { id: 'ready', title: '✅ Готово к публикации' },
+        { id: 'scheduled', title: '🗓 Запланировано' },
+        { id: 'published', title: '🚀 Опубликовано (идёт сбор метрик)' },
+        { id: 'done', title: '🏁 Завершено' },
     ];
+
+    const buckets = Object.fromEntries(columns.map(c => [c.id, []]));
+    ideasBank.forEach(idea => {
+        const bucket = getKanbanBucket(idea);
+        (buckets[bucket] || buckets.idea).push(idea);
+    });
 
     let html = '';
     columns.forEach(col => {
-        const items = ideasBank.filter(i => (i.status || 'idea') === col.id);
+        const items = buckets[col.id];
+        const isManual = KANBAN_MANUAL_STATUSES.includes(col.id);
         html += `
-        <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, '${col.id}')">
+        <div class="kanban-column" ${isManual ? `ondragover="allowDrop(event)" ondrop="handleDrop(event, '${col.id}')"` : ''}>
             <div class="kanban-column-header">
                 <span>${col.title}</span>
                 <span class="kanban-count">${items.length}</span>
@@ -633,11 +736,27 @@ function renderKanbanView() {
             <div class="kanban-cards">`;
 
         items.forEach(idea => {
+            const badges = `${kanbanProductBadge(idea)}${kanbanSourceBadge(idea)}`;
+
+            let metricsBlock = '';
+            if (col.id === 'published') {
+                const info = metricsReadyInfo(idea);
+                if (info && info.isPast) {
+                    metricsBlock = `
+                <button class="edit-btn" style="width:100%; font-size:11px; margin-top:6px;" onclick="toggleKanbanAnalysis('${idea.id}')">🔍 Анализ</button>
+                <div id="kanban-analysis-${idea.id}" style="display:none; margin-top:6px; padding:8px; background:rgba(255,255,255,0.05); border-radius:8px; font-size:11px; line-height:1.5;">${buildKanbanAnalysis(idea)}</div>`;
+                } else if (info) {
+                    metricsBlock = `<div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">Сбор метрик до ${formatRuDateDMY(info.readyDate)}</div>`;
+                }
+            }
+
             html += `
             <div class="kanban-card" draggable="true" ondragstart="handleDragStart(event, '${idea.id}')">
-                <div style="font-weight:600; font-size:14px; margin-bottom:4px;">${idea.title}</div>
-                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">${idea.format} • ${idea.funnel || 'TOFU'}</div>
-                <button class="edit-btn" style="width:100%; font-size:11px;" onclick="openEditIdeaModal('${idea.id}')">Изменить</button>
+                <div style="font-weight:600; font-size:14px; margin-bottom:4px;">${escapeHtml(idea.title)}</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">${escapeHtml(idea.format || '')} • ${escapeHtml(idea.funnel || 'TOFU')}</div>
+                ${badges ? `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;">${badges}</div>` : ''}
+                ${metricsBlock}
+                <button class="edit-btn" style="width:100%; font-size:11px; margin-top:6px;" onclick="openEditIdeaModal('${idea.id}')">Изменить</button>
             </div>`;
         });
 
