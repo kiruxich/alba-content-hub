@@ -53,6 +53,10 @@ export function discoverKeywords(existingKeywords, niches) {
     return callTask('keyword-discovery', { existingKeywords, niches });
 }
 
+export function resolveCity(cityName) {
+    return callTask('resolve-city', { cityName }, { timeoutMs: 90 * 1000 });
+}
+
 export function generateNicheDescription(category) {
     return callTask('niche-description', { category });
 }

@@ -131,6 +131,38 @@ Respond with a JSON array of objects: [{ "url": "...", "reason": "short reason t
     }
 });
 
+// task: resolve-city
+// body: { cityName: string }
+// Determines the real 2GIS URL slug (https://2gis.ru/<slug>/search/...) and
+// a lat/lon bounding box for an arbitrary city the user typed - used by the
+// 2GIS parser (server/lib/resolveParserCity.js) to scrape any city, not
+// just a fixed pre-baked list. Uses WebSearch to actually confirm the slug
+// rather than guessing, since a wrong slug means the whole scrape finds
+// nothing.
+app.post('/run/resolve-city', requireToken, async (req, res) => {
+    const cityName = (req.body?.cityName || '').trim();
+    if (!cityName) return res.status(400).json({ error: 'cityName is required' });
+
+    const prompt = `Find the correct 2GIS (2gis.ru - a Russian/CIS business directory and maps service) URL slug for the city "${cityName}", and a lat/lon bounding box covering that city plus its immediate built-up suburbs.
+
+Use web search to confirm the exact URL 2GIS uses for this city - its search pages look like https://2gis.ru/<slug>/search/... (for reference, Moscow is "moscow", Saint Petersburg is "spb"). Do not guess the slug without checking - search for it. Also determine a bounding box (min/max latitude, min/max longitude) tight enough to stay centered on the city, not the whole surrounding region.
+
+If "${cityName}" isn't a real place you can find on 2GIS, or isn't in Russia/CIS where 2GIS operates, say so as an error instead of inventing values.
+
+Respond with a JSON object: { "slug": "...", "label": "${cityName}", "latMin": 00.000, "latMax": 00.000, "lonMin": 00.000, "lonMax": 00.000 }`;
+
+    try {
+        const result = await runClaudeForJson(prompt);
+        const nums = [result?.latMin, result?.latMax, result?.lonMin, result?.lonMax];
+        if (typeof result?.slug !== 'string' || !result.slug.trim() || nums.some(n => typeof n !== 'number')) {
+            throw new Error(`не удалось определить город «${cityName}» — проверьте название`);
+        }
+        res.json(result);
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
 // task: keyword-discovery
 // body: { existingKeywords: string[], niches: string[] }
 // Proposes new RSS-filter keywords - the agent keeps only feed articles that

@@ -21,10 +21,18 @@ async function workerFetch(path, options = {}) {
     return res;
 }
 
+// `city` is a resolved {slug, label, latMin, latMax, lonMin, lonMax} object
+// (see server/lib/resolveParserCity.js) - the worker itself has no city
+// list anymore, just the fields below in snake_case (its own convention).
 export async function createParserJob({ nicheId, category, description, queries, city }) {
+    const cityPayload = city ? {
+        slug: city.slug, label: city.label,
+        lat_min: city.latMin, lat_max: city.latMax,
+        lon_min: city.lonMin, lon_max: city.lonMax,
+    } : undefined;
     const res = await workerFetch('/jobs', {
         method: 'POST',
-        body: JSON.stringify({ niche_id: nicheId, category, description, queries, city: city || undefined }),
+        body: JSON.stringify({ niche_id: nicheId, category, description, queries, city: cityPayload }),
     });
     return res.json();
 }

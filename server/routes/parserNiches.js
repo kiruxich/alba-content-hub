@@ -6,6 +6,7 @@ import { db } from '../db.js';
 import { generateParserQueries } from '../lib/generateParserQueries.js';
 import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
 import { isLocalClaudeAgentConfigured, generateNicheDescription } from '../lib/localClaudeAgent.js';
+import { resolveParserCity } from '../lib/resolveParserCity.js';
 import { telegramApiBase } from '../lib/telegramApiBase.js';
 import { isObjectStorageConfigured, uploadBuffer, publicUrlForKey } from '../lib/objectStorage.js';
 
@@ -131,7 +132,7 @@ function serialize(row) {
         id: row.id,
         category: row.category,
         description: row.description || '',
-        city: row.city || 'moscow',
+        city: row.city || 'Москва',
         status: row.status,
         log: row.log || '',
         stats: row.stats_json ? JSON.parse(row.stats_json) : null,
@@ -191,7 +192,7 @@ router.put('/:id', async (req, res) => {
         args: [
             category !== undefined ? category : row.category,
             description !== undefined ? (description || '') : row.description,
-            city !== undefined ? (city || 'moscow') : (row.city || 'moscow'),
+            city !== undefined ? (city || 'Москва') : (row.city || 'Москва'),
             row.id,
         ],
     });
@@ -219,7 +220,13 @@ router.post('/:id/run', async (req, res) => {
 
     try {
         const queries = await generateParserQueries(row.category, row.description);
-        const job = await createParserJob({ nicheId: row.id, category: row.category, description: row.description, queries, city: row.city || 'moscow' });
+        // Resolves the free-text city name typed on the card to a real 2GIS
+        // slug + bounding box (cached after the first lookup per city) -
+        // see resolveParserCity.js. Throws a clear error (surfaced below)
+        // rather than silently falling back to Moscow if an unrecognized
+        // city can't be resolved.
+        const cityConfig = await resolveParserCity(row.city);
+        const job = await createParserJob({ nicheId: row.id, category: row.category, description: row.description, queries, city: cityConfig });
 
         // Archive whatever raw/dedup/archive this row currently holds before
         // the UPDATE below nulls all of it - row.job_id here is still the

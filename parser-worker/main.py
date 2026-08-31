@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from parser_core import Job, run_parser_job, dedupe_franchises, render_live_page, CITIES, DEFAULT_CITY
+from parser_core import Job, run_parser_job, dedupe_franchises, render_live_page
 
 DATA_DIR = os.environ.get("PARSER_DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 NOVNC_URL = os.environ.get("NOVNC_URL", "https://vnc.alba-creation.ru")
@@ -39,12 +39,24 @@ class QueryItem(BaseModel):
     keywords: list[str] = []
 
 
+class CityConfig(BaseModel):
+    slug: str
+    label: str = ""
+    lat_min: float
+    lat_max: float
+    lon_min: float
+    lon_max: float
+
+
 class CreateJobRequest(BaseModel):
     niche_id: str
     category: str
     description: str = ""
     queries: list[QueryItem]
-    city: str = DEFAULT_CITY
+    # Resolved server-side by the hub (local-claude-agent + WebSearch, cached
+    # in its own DB) - this worker no longer has its own city list, only the
+    # Moscow fallback for when the caller omits this entirely.
+    city: CityConfig | None = None
 
 
 class RenderRequest(BaseModel):
@@ -96,16 +108,12 @@ async def startup():
     asyncio.create_task(worker_loop())
 
 
-@app.get("/cities")
-async def list_cities():
-    return {"cities": [{"id": k, "label": v["label"]} for k, v in CITIES.items()], "default": DEFAULT_CITY}
-
-
 @app.post("/jobs")
 async def create_job(body: CreateJobRequest):
     job_id = str(uuid.uuid4())[:8]
     out_dir = os.path.join(DATA_DIR, job_id)
-    job = Job(job_id, body.category, body.description, [q.model_dump() for q in body.queries], out_dir, city=body.city)
+    city = body.city.model_dump() if body.city else None
+    job = Job(job_id, body.category, body.description, [q.model_dump() for q in body.queries], out_dir, city=city)
     jobs[job_id] = job
     await queue.put(job)
     job.log(f"Job поставлен в очередь (позиция: {queue.qsize()})")

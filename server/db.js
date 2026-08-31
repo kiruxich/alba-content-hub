@@ -330,6 +330,22 @@ CREATE TABLE IF NOT EXISTS parser_niches (
     updated_at INTEGER DEFAULT (strftime('%s','now'))
 );
 
+-- Cache for arbitrary-city 2GIS resolution (slug + bounding box), keyed by
+-- the lowercased city name the user typed on a parser niche card - see
+-- server/lib/resolveParserCity.js. Resolving a new city calls
+-- local-claude-agent (WebSearch), so this exists to make that a one-time
+-- cost per city rather than per run.
+CREATE TABLE IF NOT EXISTS parser_city_cache (
+    city_name TEXT PRIMARY KEY,
+    slug TEXT NOT NULL,
+    label TEXT NOT NULL,
+    lat_min REAL NOT NULL,
+    lat_max REAL NOT NULL,
+    lon_min REAL NOT NULL,
+    lon_max REAL NOT NULL,
+    resolved_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
 -- Durable, versioned copies of parser_niches' files (raw/dedup/archive),
 -- pushed to S3-compatible object storage right before parser_niches' own
 -- raw_file/dedup_file/archive_file/raw_upload_data columns would be
@@ -468,10 +484,11 @@ await ensureColumn('parser_niches', 'raw_upload_name', 'TEXT');
 // so the deduped bytes are stored directly, same reasoning as
 // raw_upload_data above.
 await ensureColumn('parser_niches', 'dedup_upload_data', 'TEXT');
-// 2GIS city to scrape - see parser-worker/parser_core.py's CITIES dict for
-// the matching slug/bounding-box; must be one of those keys or the worker
-// falls back to 'moscow'.
-await ensureColumn('parser_niches', 'city', "TEXT DEFAULT 'moscow'");
+// Free-text city name to scrape (any city, not a fixed list) - resolved to
+// a real 2GIS slug + bounding box at run time via resolveParserCity.js,
+// which caches the result in parser_city_cache. Empty/'Москва' short-
+// circuits to the worker's built-in Moscow default without calling anything.
+await ensureColumn('parser_niches', 'city', "TEXT DEFAULT 'Москва'");
 // The script text a voiceover was generated from - generate-voiceover only
 // ever used it to call ElevenLabs/Piper and threw it away afterwards, so a
 // voiceover's media_assets row had no readable content at all (the card
