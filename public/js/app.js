@@ -2543,9 +2543,17 @@ function renderUrlCheckReport(report) {
     const severityColor = { high: 'var(--accent-red)', medium: 'var(--accent-orange)', low: 'var(--text-secondary)' };
     const severityBg = { high: 'rgba(255,69,58,0.15)', medium: 'rgba(255,159,10,0.15)', low: 'rgba(255,255,255,0.08)' };
 
+    const verdictInfoFor = (v) => ({
+        confirm: { label: 'ИИ подтверждает нарушение', color: 'var(--accent-red)' },
+        reject: { label: 'ИИ считает ложным срабатыванием', color: 'var(--text-secondary)' },
+        ask_human: { label: 'ИИ рекомендует проверить вручную', color: 'var(--accent-orange)' },
+    }[v]);
+
     const findingsHtml = findings.length === 0
         ? `<div class="info-box" style="color:var(--text-secondary);">Находок не обнаружено статическим анализом HTML.</div>`
-        : findings.map(f => `
+        : findings.map(f => {
+            const verdictInfo = verdictInfoFor(f.verdict);
+            return `
             <div class="uc-finding">
                 <div class="uc-finding-head">
                     <span class="format-tag" style="background:${severityBg[f.severity] || severityBg.low}; color:${severityColor[f.severity] || severityColor.low}">${escapeHtml(String(f.severity || '').toUpperCase())}</span>
@@ -2553,7 +2561,10 @@ function renderUrlCheckReport(report) {
                 </div>
                 <div class="idea-desc-text">${escapeHtml(f.message || '')}</div>
                 ${f.fix ? `<div style="color:var(--accent-green); font-size:12px;">Исправление: ${escapeHtml(f.fix)}</div>` : ''}
-            </div>`).join('');
+                ${f.legalExcerpt ? `<div style="color:var(--text-secondary); font-size:11px; margin-top:4px;">${escapeHtml(f.legalExcerpt.law || '')}${f.legalExcerpt.article ? ' ' + escapeHtml(f.legalExcerpt.article) : ''}: «${escapeHtml(f.legalExcerpt.text || '')}»</div>` : ''}
+                ${verdictInfo ? `<div style="color:${verdictInfo.color}; font-size:11px; margin-top:4px;">${verdictInfo.label}${f.verdictReason ? ': ' + escapeHtml(f.verdictReason) : ''}</div>` : ''}
+            </div>`;
+        }).join('');
 
     const loadTestHtml = lt.error
         ? `<div class="info-box" style="color:var(--accent-red);">Ошибка нагрузочного теста: ${escapeHtml(lt.error)}</div>`
@@ -2598,6 +2609,7 @@ function renderUrlCheckReport(report) {
             <div class="uc-stat"><span class="uc-stat-label">Средне</span><span class="uc-stat-value" style="color:var(--accent-orange)">${summary.medium || 0}</span></div>
             <div class="uc-stat"><span class="uc-stat-label">Низко</span><span class="uc-stat-value">${summary.low || 0}</span></div>
         </div>
+        ${report.legalReview?.available ? `<div style="color:var(--text-secondary); font-size:11px; margin-bottom:8px;">✓ Находки проверены ИИ (снижает число ложных срабатываний)</div>` : ''}
         <div class="uc-findings-list">${findingsHtml}</div>
 
         <div class="p-section-title" style="margin-top:24px;">НАГРУЗОЧНЫЙ ТЕСТ</div>

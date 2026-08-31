@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scanSources, defaultCatalog, dedupeFindings } from '@legit-agent/core';
+import { scanSources, defaultCatalog, dedupeFindings, explainRule } from '@legit-agent/core';
 import PDFDocument from 'pdfkit';
 import { runLoadTest } from '../lib/loadTest.js';
 import { renderLivePage } from '../lib/parserWorkerClient.js';
+import { isLocalClaudeAgentConfigured, reviewLegalFindings } from '../lib/localClaudeAgent.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FONT_REGULAR = path.join(__dirname, '..', 'fonts', 'Roboto-Regular.ttf');
@@ -87,12 +88,46 @@ router.post('/scan', async (req, res) => {
         report.health = { ok: false, error: mode === 'live' ? `Полная проверка (браузер) недоступна: ${e.message}` : e.message };
     }
 
+    const catalog = defaultCatalog();
     report.findings = html
-        ? dedupeFindings(scanSources([{ relativePath: 'index.html', source: html }], defaultCatalog()))
+        ? dedupeFindings(scanSources([{ relativePath: 'index.html', source: html }], catalog))
         : [];
     report.findingsSummary = { high: 0, medium: 0, low: 0 };
     for (const f of report.findings) {
         report.findingsSummary[f.severity] = (report.findingsSummary[f.severity] || 0) + 1;
+        // Attaches the actual statute text (152-ФЗ/38-ФЗ/ЗоЗПП article the
+        // rule is based on), not just our own generated message - catalog
+        // ships this via explainRule() but urlChecker.js wasn't using it.
+        try {
+            const { excerpt } = explainRule(f.ruleId, catalog);
+            if (excerpt) f.legalExcerpt = { law: excerpt.law, article: excerpt.article, text: excerpt.text, sourceUrl: excerpt.sourceUrl };
+        } catch { /* unknown rule id - skip */ }
+    }
+
+    // Optional AI second pass over the regex findings, via the user's own
+    // local-claude-agent (see local-claude-agent/server.js's /run/legal-review)
+    // - reduces false positives a pure regex scan can't avoid. Best-effort:
+    // the scan itself is already complete and useful without this, so a
+    // failure here (agent's PC/tunnel off) is not surfaced as a scan error.
+    report.legalReview = { available: false };
+    if (report.findings.length > 0 && isLocalClaudeAgentConfigured()) {
+        try {
+            const snippets = { 'index.html': html.slice(0, 6000) };
+            const { reviewed } = await reviewLegalFindings(
+                report.findings.map(f => ({ ruleId: f.ruleId, file: f.file, message: f.message, excerpt: f.excerpt })),
+                snippets
+            );
+            for (const f of report.findings) {
+                const row = Array.isArray(reviewed) ? reviewed.find(r => r.ruleId === f.ruleId && r.file === f.file) : null;
+                if (row && ['confirm', 'reject', 'ask_human'].includes(row.verdict)) {
+                    f.verdict = row.verdict;
+                    f.verdictReason = String(row.reason || '');
+                }
+            }
+            report.legalReview = { available: true };
+        } catch (e) {
+            report.legalReview = { available: false, error: e.message };
+        }
     }
 
     try {
@@ -164,10 +199,18 @@ router.post('/pdf', async (req, res) => {
     if (findings.length === 0) {
         doc.fontSize(10).fillColor('#333').text('Находок не обнаружено статическим анализом HTML.');
     } else {
+        const verdictLabels = { confirm: 'ИИ подтверждает нарушение', reject: 'ИИ считает ложным срабатыванием', ask_human: 'ИИ рекомендует проверить вручную' };
+        const verdictColors = { confirm: '#c00', reject: '#888', ask_human: '#a60' };
         for (const f of findings) {
             doc.font('Bold').fontSize(10).fillColor('#000').text(`[${String(f.severity).toUpperCase()}] ${f.ruleId}`);
             doc.font('Regular').fontSize(9).fillColor('#333').text(f.message);
             if (f.fix) doc.fillColor('#0a5').text(`Исправление: ${f.fix}`);
+            if (f.legalExcerpt) {
+                doc.fillColor('#666').fontSize(8).text(`${f.legalExcerpt.law}${f.legalExcerpt.article ? ' ' + f.legalExcerpt.article : ''}: «${f.legalExcerpt.text}»`, { width: 480 });
+            }
+            if (f.verdict) {
+                doc.fontSize(9).fillColor(verdictColors[f.verdict] || '#333').text(`${verdictLabels[f.verdict] || f.verdict}${f.verdictReason ? ': ' + f.verdictReason : ''}`);
+            }
             doc.moveDown(0.4);
         }
     }

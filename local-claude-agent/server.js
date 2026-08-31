@@ -179,6 +179,46 @@ Respond with a JSON object: { "shotList": ["scene 1 description", "scene 2 descr
     }
 });
 
+// task: legal-review
+// body: { findings: {ruleId,file,message,excerpt}[], snippets: Record<string,string> }
+// Second-opinion pass over legitAgent's regex-based legal findings (see
+// server/routes/urlChecker.js) - a rule like "ADV.ERID.MISSING" fires on any
+// page with the word "реклама" and no erid attribute nearby, which can't
+// distinguish a real undisclosed ad from a false-positive text match. This
+// gives each finding a verdict using the page snippet as evidence, same as
+// legitAgent's own optional reviewFindings() step, just running on the
+// user's own Claude subscription instead of requiring a separate OpenAI-
+// compatible API key. Structured input only (findings/snippets), never a
+// raw prompt string from the caller - same bounded-task design as the rest
+// of this file.
+app.post('/run/legal-review', requireToken, async (req, res) => {
+    const findings = Array.isArray(req.body?.findings) ? req.body.findings : [];
+    const snippets = req.body?.snippets && typeof req.body.snippets === 'object' ? req.body.snippets : {};
+    if (findings.length === 0) return res.json({ reviewed: [] });
+
+    const items = findings.slice(0, 30).map(f => ({
+        ruleId: String(f?.ruleId || ''),
+        file: String(f?.file || ''),
+        message: String(f?.message || ''),
+        excerpt: String(f?.excerpt || ''),
+        snippet: String(snippets[f?.file] || '').slice(0, 4000),
+    }));
+
+    const prompt = `Review compliance findings from a Russian legal-compliance scanner (152-ФЗ personal data law, 38-ФЗ advertising law, ЗоЗПП consumer protection law). Each finding was flagged by a regex-based rule and may be a false positive - use the snippet (the page's actual HTML/text) to judge whether it really confirms the violation described in "message".
+
+Reply with a JSON array only, one object per finding, in the same order: { "ruleId", "file", "verdict", "reason" }. Verdict must be exactly one of: "confirm" (snippet clearly confirms the violation), "reject" (snippet shows this is a false positive / doesn't apply), "ask_human" (can't tell for certain from the snippet alone). Reason: one short sentence in Russian explaining the verdict.
+
+${JSON.stringify(items, null, 2)}`;
+
+    try {
+        const result = await runClaudeForJson(prompt);
+        if (!Array.isArray(result)) throw new Error('expected a JSON array');
+        res.json({ reviewed: result });
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`local-claude-agent listening on :${PORT}`);
     if (!AGENT_TOKEN) console.warn('WARNING: AGENT_TOKEN is not set - every request will be rejected with 500 until it is.');

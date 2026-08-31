@@ -56,3 +56,11 @@ export function generateNicheDescription(category) {
 export function generateReelsScript(title, postText) {
     return callTask('reels-script', { title, postText });
 }
+
+// Short timeout (vs the 3-minute default) - reviewing a handful of short
+// legal findings is quick, and this is a nice-to-have enrichment on top of
+// the url-checker's static scan, not something the caller should wait long
+// for if the user's PC/tunnel happens to be slow to respond right now.
+export function reviewLegalFindings(findings, snippets) {
+    return callTask('legal-review', { findings, snippets }, { timeoutMs: 60 * 1000 });
+}
