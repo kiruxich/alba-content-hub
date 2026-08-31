@@ -51,8 +51,8 @@ function serialize(row) {
 }
 
 const upsertSql = `
-    INSERT INTO ideas (id, title, desc, format, funnel, status, cta, target_groups, metrics_views, metrics_saves, metrics_clicks, metrics_leads, source, agent_meta, draft_text, content_type, expires_at, rubric_id, quality_flags, cover_asset_id, title_en, desc_en, cta_en)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO ideas (id, title, desc, format, funnel, status, cta, target_groups, metrics_views, metrics_saves, metrics_clicks, metrics_leads, source, agent_meta, draft_text, content_type, expires_at, rubric_id, quality_flags, cover_asset_id, voiceover_asset_id, title_en, desc_en, cta_en)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         title = excluded.title, desc = excluded.desc, format = excluded.format,
         funnel = excluded.funnel, status = excluded.status, cta = excluded.cta,
@@ -62,7 +62,7 @@ const upsertSql = `
         source = excluded.source, agent_meta = excluded.agent_meta, draft_text = excluded.draft_text,
         content_type = excluded.content_type, expires_at = excluded.expires_at,
         rubric_id = excluded.rubric_id, quality_flags = excluded.quality_flags,
-        cover_asset_id = excluded.cover_asset_id,
+        cover_asset_id = excluded.cover_asset_id, voiceover_asset_id = excluded.voiceover_asset_id,
         title_en = excluded.title_en, desc_en = excluded.desc_en, cta_en = excluded.cta_en
 `;
 
@@ -70,7 +70,7 @@ function upsertArgs(row) {
     return [row.id, row.title, row.desc, row.format, row.funnel, row.status, row.cta,
         row.target_groups, row.metrics_views, row.metrics_saves, row.metrics_clicks, row.metrics_leads,
         row.source, row.agent_meta, row.draft_text,
-        row.content_type, row.expires_at, row.rubric_id, row.quality_flags, row.cover_asset_id,
+        row.content_type, row.expires_at, row.rubric_id, row.quality_flags, row.cover_asset_id, row.voiceover_asset_id,
         row.title_en ?? null, row.desc_en ?? null, row.cta_en ?? null];
 }
 
@@ -181,6 +181,7 @@ router.post('/', async (req, res) => {
             rubric_id: b.rubricId || null,
             quality_flags: JSON.stringify(qualityFlags),
             cover_asset_id: b.coverAssetId || null,
+            voiceover_asset_id: b.voiceoverAssetId || null,
             title_en: null, desc_en: null, cta_en: null,
         }),
     });
@@ -266,6 +267,7 @@ router.put('/:id', async (req, res) => {
         rubric_id: b.rubricId !== undefined ? b.rubricId : existing.rubric_id,
         quality_flags: JSON.stringify(qualityFlags),
         cover_asset_id: b.coverAssetId !== undefined ? b.coverAssetId : existing.cover_asset_id,
+        voiceover_asset_id: b.voiceoverAssetId !== undefined ? b.voiceoverAssetId : existing.voiceover_asset_id,
         title_en: b.titleEn !== undefined ? b.titleEn : existing.title_en,
         desc_en: b.descEn !== undefined ? b.descEn : existing.desc_en,
         cta_en: b.ctaEn !== undefined ? b.ctaEn : existing.cta_en,
@@ -332,6 +334,12 @@ router.delete('/:id', async (req, res) => {
 router.post('/import', async (req, res) => {
     const items = req.body;
     if (!Array.isArray(items)) return res.status(400).json({ error: 'expected an array of ideas' });
+    // An empty/malformed import used to still run `DELETE FROM ideas` below,
+    // silently wiping every idea for nothing - require at least one real
+    // (titled) item before touching the table at all.
+    if (!items.some(item => item && item.title)) {
+        return res.status(400).json({ error: 'Файл не содержит ни одной идеи с названием — импорт отменён' });
+    }
 
     const tx = await db.transaction('write');
     try {
@@ -359,7 +367,7 @@ router.post('/import', async (req, res) => {
                     // Imported JSON files are always human-curated exports, never agent drafts.
                     source: 'manual', agent_meta: null, draft_text: null,
                     content_type: item.contentType || 'evergreen', expires_at: null,
-                    rubric_id: null, quality_flags: '[]', cover_asset_id: null,
+                    rubric_id: null, quality_flags: '[]', cover_asset_id: null, voiceover_asset_id: null,
                     title_en: item.titleEn || null, desc_en: item.descEn || null, cta_en: item.ctaEn || null,
                 }),
             });

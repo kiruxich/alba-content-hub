@@ -98,7 +98,6 @@ async function initApp() {
         if (weeklyInput) weeklyInput.value = planSettings.weekly;
 
         renderProductsGrid();
-        renderMatrixView();
         renderCalendar();
         renderKanbanView();
         renderAnalyticsView();
@@ -120,7 +119,7 @@ function switchTab(tabName) {
     const targetView = document.getElementById(`view-${tabName}`);
     if (targetView) targetView.classList.add('active');
 
-    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'kanban': 3, 'analytics': 4, 'graph': 5, 'calendar': 6, 'contentplan': 7, 'clients': 8, 'customers': 9, 'mediaassets': 10, 'urlchecker': 11, 'systeminfo': 12, 'agentcenter': 13 };
+    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'kanban': 3, 'analytics': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'mediaassets': 9, 'urlchecker': 10, 'systeminfo': 11, 'agentcenter': 12 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
@@ -1054,6 +1053,7 @@ function openEditIdeaModal(ideaId) {
     document.getElementById('edit-idea-cta-en-input').value = idea.ctaEn || '';
 
     setCoverAssetField(idea.coverAssetId || '');
+    setVoiceoverAssetField(idea.voiceoverAssetId || '');
 
     validateLimits();
     openOverlay('edit-idea-overlay');
@@ -1073,6 +1073,7 @@ function openNewIdeaModal() {
     document.getElementById('edit-idea-en-section').style.display = 'none';
 
     setCoverAssetField('');
+    setVoiceoverAssetField('');
 
     validateLimits();
     openOverlay('edit-idea-overlay');
@@ -1133,6 +1134,56 @@ async function selectCoverAsset(assetId) {
     closeOverlay('cover-picker-overlay');
 }
 
+function setVoiceoverAssetField(assetId) {
+    document.getElementById('edit-idea-voiceover-asset-id').value = assetId || '';
+    const preview = document.getElementById('edit-idea-voiceover-preview');
+    if (!assetId) {
+        preview.innerHTML = 'Не выбрана';
+        return;
+    }
+    const asset = mediaAssets.find(a => a.id === assetId);
+    preview.innerHTML = asset
+        ? `<div style="display:flex; align-items:center; gap:8px;">${mediaAssetPreviewHtml(asset)}<span style="overflow-wrap:break-word; min-width:0;">${escapeHtml(asset.url)}</span></div>`
+        : `выбрано: ${escapeHtml(assetId)}`;
+    const audio = preview.querySelector('audio');
+    if (audio) { audio.style.maxWidth = '220px'; }
+}
+
+function clearVoiceoverAsset() {
+    setVoiceoverAssetField('');
+}
+
+async function openVoiceoverPickerModal() {
+    const grid = document.getElementById('voiceover-picker-grid');
+    grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
+    openOverlay('voiceover-picker-overlay');
+    try {
+        mediaAssets = await api('/api/media-assets');
+    } catch (e) {
+        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    const audioAssets = mediaAssets.filter(a => a.type === 'audio');
+    if (audioAssets.length === 0) {
+        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">В медиатеке пока нет аудио — сгенерируйте озвучку или добавьте её вручную во вкладке «Медиатека».</div>`;
+        return;
+    }
+    grid.innerHTML = audioAssets.map(asset => `
+        <div class="media-asset-card" style="cursor:pointer;" onclick="selectVoiceoverAsset('${asset.id}')">
+            ${mediaAssetPreviewHtml(asset)}
+            <div class="media-asset-body">
+                <div class="media-asset-meta-row"><span class="format-tag">${escapeHtml(asset.type)}</span></div>
+                ${mediaAssetSubtextHtml(asset)}
+            </div>
+        </div>
+    `).join('');
+}
+
+async function selectVoiceoverAsset(assetId) {
+    setVoiceoverAssetField(assetId);
+    closeOverlay('voiceover-picker-overlay');
+}
+
 async function saveIdeaChanges() {
     const id = document.getElementById('edit-idea-id').value;
     const title = document.getElementById('edit-idea-title-input').value.trim();
@@ -1143,6 +1194,7 @@ async function saveIdeaChanges() {
     const cta = document.getElementById('edit-idea-cta-input').value.trim();
     const rubricId = document.getElementById('edit-idea-rubric-input').value || null;
     const coverAssetId = document.getElementById('edit-idea-cover-asset-id').value || null;
+    const voiceoverAssetId = document.getElementById('edit-idea-voiceover-asset-id').value || null;
 
     if (!title) return alert('Укажите название идеи');
 
@@ -1154,11 +1206,11 @@ async function saveIdeaChanges() {
             const titleEn = document.getElementById('edit-idea-title-en-input').value.trim();
             const descEn = document.getElementById('edit-idea-desc-en-input').value.trim();
             const ctaEn = document.getElementById('edit-idea-cta-en-input').value.trim();
-            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta, titleEn, descEn, ctaEn, rubricId, coverAssetId }) });
+            const updated = await api(`/api/ideas/${id}`, { method: 'PUT', body: JSON.stringify({ title, desc, format, funnel, status, cta, titleEn, descEn, ctaEn, rubricId, coverAssetId, voiceoverAssetId }) });
             ideasBank = ideasBank.map(item => item.id === id ? updated : item);
             showToast('Идея обновлена!');
         } else {
-            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ title, desc, format, funnel, status, cta, rubricId, coverAssetId }) });
+            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ title, desc, format, funnel, status, cta, rubricId, coverAssetId, voiceoverAssetId }) });
             ideasBank.unshift(created);
             showToast('Новая идея создана!');
         }
@@ -1720,41 +1772,6 @@ async function confirmPublish() {
 }
 
 // МАТРИЦА СИНЕРГИИ И СТРУКТУРА ПРОДУКТОВ
-function renderMatrixView() {
-    const container = document.getElementById('matrix-grid');
-    if (!container) return;
-    let html = '';
-
-    productsData.forEach(p => {
-        html += `
-        <div class="matrix-card">
-            <div class="card-header">
-                <span class="card-title" style="font-size:18px;">${p.title}</span>
-                <span class="card-badge" style="background:${p.badgeBg}; color:${p.badgeColor}">${p.badge}</span>
-            </div>
-            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">${p.desc}</p>
-            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-top:14px;">Синергия и лиды:</div>`;
-
-        if (p.synergies && p.synergies.length > 0) {
-            p.synergies.forEach(syn => {
-                html += `
-                <div class="matrix-flow-item">
-                    <span class="matrix-flow-arrow">→</span>
-                    <div>
-                        <strong>${syn.target}</strong> <span style="font-size:10px; color:${p.badgeColor}; border:1px solid ${p.badgeColor}; border-radius:4px; padding:1px 4px; margin-left:4px;">${syn.type}</span>
-                        <div style="color:var(--text-secondary); font-size:12px; margin-top:2px;">${syn.text}</div>
-                    </div>
-                </div>`;
-            });
-        } else {
-            html += `<div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Конечный хаб студии.</div>`;
-        }
-        html += `</div>`;
-    });
-
-    container.innerHTML = html;
-}
-
 // Reads one project_info field for a product, preferring the DB-backed value
 // once it's loaded and falling back to the hardcoded productsData value only
 // when there's no DB row yet (or the initial fetch hasn't completed) - see
@@ -1995,6 +2012,22 @@ function renderProductDetailContent(productId) {
     }
 
     html += `</div>`;
+
+    if (product.synergies && product.synergies.length > 0) {
+        html += `
+        <div class="p-section-title" style="margin-top:28px;">СИНЕРГИЯ И ЛИДЫ</div>
+        <div class="roadmap-list">
+            ${product.synergies.map(syn => `
+                <div class="matrix-flow-item">
+                    <span class="matrix-flow-arrow">→</span>
+                    <div>
+                        <strong>${escapeHtml(syn.target)}</strong> <span style="font-size:10px; color:${product.badgeColor}; border:1px solid ${product.badgeColor}; border-radius:4px; padding:1px 4px; margin-left:4px;">${escapeHtml(syn.type)}</span>
+                        <div style="color:var(--text-secondary); font-size:12px; margin-top:2px;">${escapeHtml(syn.text)}</div>
+                    </div>
+                </div>`).join('')}
+        </div>`;
+    }
+
     const body = document.getElementById('product-detail-body');
     if (body) body.innerHTML = html;
 }
@@ -3665,6 +3698,7 @@ function drawMediaAssetsGrid() {
                 ${mediaAssetSubtextHtml(asset)}
                 <div class="parser-niche-actions">
                     <button class="edit-btn" onclick="openMediaLightbox('${asset.id}')">Открыть</button>
+                    <button class="schedule-btn" onclick="openUseAssetModal('${asset.id}')">▶ Использовать</button>
                     <button class="delete-btn" onclick="deleteMediaAsset('${asset.id}')">Удалить</button>
                 </div>
             </div>
@@ -3836,6 +3870,43 @@ async function deleteMediaAsset(id) {
         drawMediaAssetsGrid();
     } catch (e) {
         showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+// "▶ Использовать" на карточке Медиатеки - прикрепляет этот ассет к идее
+// напрямую, без похода через "Хранилище → Изменить → Выбрать обложку".
+// Аудио идёт в voiceoverAssetId, всё остальное (картинка/видео/gif) - в
+// coverAssetId, как и везде в приложении.
+async function openUseAssetModal(assetId) {
+    document.getElementById('use-asset-id').value = assetId;
+    const select = document.getElementById('use-asset-idea-select');
+    if (ideasBank.length === 0) {
+        select.innerHTML = '<option value="">— нет идей в Хранилище —</option>';
+    } else {
+        select.innerHTML = ideasBank.map(idea => {
+            const label = idea.title.length > 60 ? idea.title.slice(0, 60) + '…' : idea.title;
+            return `<option value="${escapeHtml(idea.id)}">${escapeHtml(label)}</option>`;
+        }).join('');
+    }
+    openOverlay('use-asset-overlay');
+}
+
+async function confirmUseAsset() {
+    const assetId = document.getElementById('use-asset-id').value;
+    const ideaId = document.getElementById('use-asset-idea-select').value;
+    if (!ideaId) return showToast('Сначала выберите идею');
+
+    const asset = mediaAssets.find(a => a.id === assetId);
+    const field = asset && asset.type === 'audio' ? 'voiceoverAssetId' : 'coverAssetId';
+
+    try {
+        const updated = await api(`/api/ideas/${ideaId}`, { method: 'PUT', body: JSON.stringify({ [field]: assetId }) });
+        ideasBank = ideasBank.map(i => i.id === ideaId ? updated : i);
+        try { await api(`/api/media-assets/${assetId}/use`, { method: 'POST' }); } catch (_) {}
+        closeOverlay('use-asset-overlay');
+        showToast(field === 'voiceoverAssetId' ? 'Озвучка прикреплена к идее' : 'Обложка прикреплена к идее');
+    } catch (e) {
+        showToast('Не удалось прикрепить: ' + e.message);
     }
 }
 
