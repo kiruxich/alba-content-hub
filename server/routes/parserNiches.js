@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { db } from '../db.js';
 import { generateParserQueries } from '../lib/generateParserQueries.js';
 import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
-import { isLocalClaudeAgentConfigured, generateNicheDescription } from '../lib/localClaudeAgent.js';
+import { isLocalClaudeAgentConfigured, generateNicheDescription, generateColdCallPitch } from '../lib/localClaudeAgent.js';
 import { resolveParserCity } from '../lib/resolveParserCity.js';
 import { telegramApiBase } from '../lib/telegramApiBase.js';
 import { isObjectStorageConfigured, uploadBuffer, publicUrlForKey } from '../lib/objectStorage.js';
@@ -132,6 +132,7 @@ function serialize(row) {
         id: row.id,
         category: row.category,
         description: row.description || '',
+        coldCallPitch: row.cold_call_pitch || '',
         city: row.city || 'Москва',
         status: row.status,
         log: row.log || '',
@@ -183,16 +184,40 @@ router.post('/:id/generate-description', async (req, res) => {
     }
 });
 
+// "✨ Сгенерировать" next to the cold-call pitch field - writes the
+// Telegram outreach message sent to a lead who's still considering the
+// offer (see local-claude-agent's cold-call-pitch task). Same
+// review-before-save shape as generate-description above.
+router.post('/:id/generate-pitch', async (req, res) => {
+    if (!isLocalClaudeAgentConfigured()) {
+        return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
+    }
+    const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'niche not found' });
+    if (!row.category || !row.category.trim()) return res.status(400).json({ error: 'Сначала укажите название ниши' });
+
+    const prompt = (req.body?.prompt || '').trim();
+    const settingsRow = (await db.execute('SELECT tone_of_voice FROM agent_settings WHERE id = 1')).rows[0];
+
+    try {
+        const result = await generateColdCallPitch({ category: row.category, prompt, toneOfVoice: settingsRow?.tone_of_voice || '' });
+        res.json({ text: result.text });
+    } catch (e) {
+        res.status(502).json({ error: e.message });
+    }
+});
+
 router.put('/:id', async (req, res) => {
     const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
     if (!row) return res.status(404).json({ error: 'niche not found' });
-    const { category, description, city } = req.body || {};
+    const { category, description, city, coldCallPitch } = req.body || {};
     await db.execute({
-        sql: `UPDATE parser_niches SET category = ?, description = ?, city = ?, updated_at = strftime('%s','now') WHERE id = ?`,
+        sql: `UPDATE parser_niches SET category = ?, description = ?, city = ?, cold_call_pitch = ?, updated_at = strftime('%s','now') WHERE id = ?`,
         args: [
             category !== undefined ? category : row.category,
             description !== undefined ? (description || '') : row.description,
             city !== undefined ? (city || 'Москва') : (row.city || 'Москва'),
+            coldCallPitch !== undefined ? (coldCallPitch || '') : (row.cold_call_pitch || ''),
             row.id,
         ],
     });

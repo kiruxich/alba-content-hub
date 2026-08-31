@@ -3025,6 +3025,7 @@ let parserPollTimers = {};
 // every single poll tick for the common case.
 let parserNicheVersions = {};     // niche id -> array of version rows, once fetched
 let parserNicheVersionsOpen = {}; // niche id -> bool, whether the section is expanded
+let parserNichePitchOpen = {}; // niche id -> bool, whether the cold-call pitch section is expanded
 
 async function renderParserNiches() {
     const container = document.getElementById('parser-niches-grid');
@@ -3095,6 +3096,25 @@ function drawParserNiches() {
                     📜 История версий ${parserNicheVersionsOpen[n.id] ? '▴' : '▾'}
                 </button>
                 ${parserNicheVersionsOpen[n.id] ? renderParserNicheVersionsList(n.id) : ''}
+            </div>
+
+            <div class="parser-niche-versions">
+                <button type="button" class="parser-niche-versions-toggle" onclick="toggleParserNichePitch('${n.id}')">
+                    💬 Предложение для холодных звонков ${parserNichePitchOpen[n.id] ? '▴' : '▾'}
+                </button>
+                ${parserNichePitchOpen[n.id] ? `
+                    <div style="margin-top:8px;">
+                        <div style="display:flex; gap:8px; margin-bottom:6px;">
+                            <input type="text" class="form-input" style="margin:0;" id="parser-pitch-prompt-${n.id}" placeholder="Что учесть при генерации (кейс из портфолио, акцент)...">
+                            <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateParserNichePitch('${n.id}')">✨</button>
+                        </div>
+                        <div id="parser-pitch-status-${n.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-bottom:4px;"></div>
+                        <textarea class="form-textarea" style="min-height:160px; font-size:12.5px;" id="parser-pitch-text-${n.id}"
+                            placeholder="Текст сообщения, которое отправляете лиду в Telegram, если он ещё думает..."
+                            onblur="saveParserNicheField('${n.id}','coldCallPitch',this.value)">${escapeHtml(n.coldCallPitch || '')}</textarea>
+                        <button class="edit-btn" style="margin-top:6px;" onclick="copyParserNichePitch('${n.id}')">📋 Скопировать</button>
+                    </div>
+                ` : ''}
             </div>
 
             <div class="parser-niche-actions">
@@ -3173,6 +3193,42 @@ async function generateNicheDescription(id) {
         if (btn) { btn.disabled = false; btn.textContent = '✨'; }
         if (status) setTimeout(() => { status.textContent = ''; }, 4000);
     }
+}
+
+function toggleParserNichePitch(id) {
+    parserNichePitchOpen[id] = !parserNichePitchOpen[id];
+    drawParserNiches();
+}
+
+async function generateParserNichePitch(id) {
+    const textarea = document.getElementById(`parser-pitch-text-${id}`);
+    if (!textarea) return;
+    const promptInput = document.getElementById(`parser-pitch-prompt-${id}`);
+    const prompt = promptInput ? promptInput.value.trim() : '';
+    const btn = event && event.target;
+    const status = document.getElementById(`parser-pitch-status-${id}`);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    if (status) status.textContent = 'Генерируем через ИИ на вашем ПК (Sonnet)...';
+    try {
+        const result = await api(`/api/parser-niches/${id}/generate-pitch`, { method: 'POST', body: JSON.stringify({ prompt }) });
+        textarea.value = result.text;
+        await saveParserNicheField(id, 'coldCallPitch', result.text);
+        if (status) status.textContent = 'Готово.';
+        showToast('Предложение сгенерировано');
+    } catch (e) {
+        if (status) status.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось сгенерировать: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✨'; }
+        if (status) setTimeout(() => { status.textContent = ''; }, 4000);
+    }
+}
+
+function copyParserNichePitch(id) {
+    const textarea = document.getElementById(`parser-pitch-text-${id}`);
+    if (!textarea || !textarea.value.trim()) return showToast('Сначала сгенерируйте или напишите текст');
+    navigator.clipboard.writeText(textarea.value);
+    showToast('Скопировано в буфер обмена');
 }
 
 async function runParserNiche(id) {

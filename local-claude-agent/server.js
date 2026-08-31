@@ -222,6 +222,73 @@ Respond with a JSON object: { "description": "term one, term two, term three, ..
     }
 });
 
+// task: cold-call-pitch
+// body: { category: string, prompt?: string, toneOfVoice?: string }
+// Writes the cold-outreach pitch text sent over Telegram to a lead who's
+// still considering the offer (see "Заказчики" tab) - real, publish-ready
+// copy, so this runs on Sonnet, not the container's Haiku default. The
+// example below is the user's own real, working pitch for hookah lounges -
+// used as a structural template (two numbered service pillars, a free
+// first-step offer, a contact block), not something to copy verbatim for
+// every niche.
+app.post('/run/cold-call-pitch', requireToken, async (req, res) => {
+    const category = (req.body?.category || '').trim();
+    const prompt = (req.body?.prompt || '').trim();
+    const toneOfVoice = (req.body?.toneOfVoice || '').trim();
+    if (!category) return res.status(400).json({ error: 'category is required' });
+
+    const fullPrompt = `Write a cold-outreach pitch message in Russian, from Alba Creation (a web/software studio), for a business in the "${category}" niche. This gets sent over Telegram to a lead who's still deciding whether to work with the studio - it needs to read as a real, personal message, not a mass-market ad.
+
+Here is a real, working pitch (for hookah lounges) to use as a STRUCTURAL TEMPLATE - match its shape (short personal intro, two numbered service offerings each with a bolded benefit-driven subheading and bullet points, a "what I propose as a first step" free-trial-style CTA, then a contact block with Telegram/phone/site), but write NEW, niche-appropriate substance for "${category}" - do not reuse hookah-specific details unless they're genuinely relevant:
+
+---
+Добрый день! Меня зовут Кирилл, владелец IT-студии Alba Creation.
+
+Предлагаю связку из двух инструментов, которая закроет две главные бизнес-задачи: привлечение новых гостей и превращение их в постоянников.
+
+1. запуск сайта: захват трафика с Яндекс Карт и победа над конкурентами
+
+Простой прайс-лист не передает обновленную атмосферу и не конвертирует входящий поток. Сайт решит эту проблему:
+• Приоритет на Яндекс Картах: Яндекс автоматически поднимает выше карточки заведений с полноценным сайтом.
+• Забор «молчаливого» трафика: До 40% пользователей принципиально не любят звонить в шумное заведение. Сайт позволяет им за 5 секунд оценить новый интерьер, посмотреть актуальное меню и забронировать стол в 1 клик.
+• Перелив трафика в ваш Telegram-канал: Сайт станет хабом, который дополнительно генерирует подписки в ваши соцсети.
+
+2. Telegram бот для роста числа постоянников:
+
+Если сайт приводит гостя первый раз, то бот делает так, чтобы он возвращался снова и снова. В портфолио у нас есть релевантный кейс для кальянной Blisski — там мы реализовывали полноценную экосистему:
+• Интерактивная бронь по схеме зала: гость сам кликает на конкретный столик, а не заполняет слепую форму.
+• История забивок и конструктор миксов: гость больше не забывает, что курил в прошлый раз, и может легко повторить свой любимый сет.
+• Вызов кальянщика в 1 клик: кнопка прямо из бота к конкретному столику (не нужно искать персонал в темном зале).
+• Управляемая база: удобная админка с изменением цен/табаков за 1 минуту, картой лояльности и рассылками анонсов без риска бана от Telegram.
+
+Результат Blisski: за счет такого сервиса заведение сформировало сильное ядро постоянников и существенно увеличило процент повторных визитов.
+
+Что предлагаю в качестве первого шага:
+
+Чтобы вы не оценивали идею на словах, я могу на днях бесплатно сделать концепт главной страницы конкретно под ваше заведение — с вашей новой атмосферой и меню. Заодно пришлю демо-бота Blisski, чтобы вы сами его протестировали.
+
+Как вам предложение? Если заинтересованы — дайте знать сюда в чат или пишите напрямую:
+
+Telegram: @KirillSklemin
+Тел.: +7 (915) 495-42-93
+Ссылка на наш сайт: alba-creation.ru
+---
+
+${toneOfVoice ? `Tone of voice to follow: ${toneOfVoice}\n` : ''}${prompt ? `Specific instructions for this niche/pitch: ${prompt}` : 'No specific instructions given - use your best judgment for what pain points and service angle fit this niche.'}
+
+If the demo-bot line ("Заодно пришлю демо-бота Blisski") doesn't make sense for this niche, adapt or drop it - only keep it if there's a genuinely relevant portfolio case to reference (mention it generically as "готовый пример из портфолио" if you don't have a specific product name to use).
+
+Respond with a JSON object: { "text": "..." } - the full pitch message as one string with real line breaks (\\n), ready to paste into Telegram as-is.`;
+
+    try {
+        const result = await runClaudeForJson(fullPrompt, { model: 'claude-sonnet-5' });
+        if (typeof result?.text !== 'string' || !result.text.trim()) throw new Error('expected { text }');
+        res.json(result);
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
 // task: script-section
 // body: { heading: string, prompt: string, nicheName: string, nicheSubtitle?: string, toneOfVoice?: string }
 // Writes the text for ONE section of a live cold-call sales script (see

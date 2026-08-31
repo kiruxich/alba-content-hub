@@ -489,6 +489,11 @@ await ensureColumn('parser_niches', 'dedup_upload_data', 'TEXT');
 // which caches the result in parser_city_cache. Empty/'Москва' short-
 // circuits to the worker's built-in Moscow default without calling anything.
 await ensureColumn('parser_niches', 'city', "TEXT DEFAULT 'Москва'");
+// The cold-outreach pitch text sent over Telegram to a lead once they're
+// considering the offer (see server/routes/parserNiches.js's
+// /generate-pitch) - separate from `description`, which is 2ГИС search
+// keywords, not prose.
+await ensureColumn('parser_niches', 'cold_call_pitch', "TEXT DEFAULT ''");
 // The script text a voiceover was generated from - generate-voiceover only
 // ever used it to call ElevenLabs/Piper and threw it away afterwards, so a
 // voiceover's media_assets row had no readable content at all (the card
