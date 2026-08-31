@@ -21,10 +21,10 @@ async function workerFetch(path, options = {}) {
     return res;
 }
 
-export async function createParserJob({ nicheId, category, description, queries }) {
+export async function createParserJob({ nicheId, category, description, queries, city }) {
     const res = await workerFetch('/jobs', {
         method: 'POST',
-        body: JSON.stringify({ niche_id: nicheId, category, description, queries }),
+        body: JSON.stringify({ niche_id: nicheId, category, description, queries, city: city || undefined }),
     });
     return res.json();
 }

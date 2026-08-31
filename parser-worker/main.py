@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from parser_core import Job, run_parser_job, dedupe_franchises, render_live_page
+from parser_core import Job, run_parser_job, dedupe_franchises, render_live_page, CITIES, DEFAULT_CITY
 
 DATA_DIR = os.environ.get("PARSER_DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 NOVNC_URL = os.environ.get("NOVNC_URL", "https://vnc.alba-creation.ru")
@@ -44,6 +44,7 @@ class CreateJobRequest(BaseModel):
     category: str
     description: str = ""
     queries: list[QueryItem]
+    city: str = DEFAULT_CITY
 
 
 class RenderRequest(BaseModel):
@@ -95,15 +96,20 @@ async def startup():
     asyncio.create_task(worker_loop())
 
 
+@app.get("/cities")
+async def list_cities():
+    return {"cities": [{"id": k, "label": v["label"]} for k, v in CITIES.items()], "default": DEFAULT_CITY}
+
+
 @app.post("/jobs")
 async def create_job(body: CreateJobRequest):
     job_id = str(uuid.uuid4())[:8]
     out_dir = os.path.join(DATA_DIR, job_id)
-    job = Job(job_id, body.category, body.description, [q.model_dump() for q in body.queries], out_dir)
+    job = Job(job_id, body.category, body.description, [q.model_dump() for q in body.queries], out_dir, city=body.city)
     jobs[job_id] = job
     await queue.put(job)
     job.log(f"Job поставлен в очередь (позиция: {queue.qsize()})")
-    return {"job_id": job_id, "status": job.status}
+    return {"job_id": job_id, "status": job.status, "city": job.city}
 
 
 @app.get("/jobs/{job_id}")
@@ -114,6 +120,7 @@ async def get_job(job_id: str):
     return {
         "job_id": job.id,
         "status": job.status,
+        "city": job.city,
         "log": "\n".join(job.log_lines[-200:]),
         "stats": job.stats,
         "files": {

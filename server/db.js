@@ -468,6 +468,10 @@ await ensureColumn('parser_niches', 'raw_upload_name', 'TEXT');
 // so the deduped bytes are stored directly, same reasoning as
 // raw_upload_data above.
 await ensureColumn('parser_niches', 'dedup_upload_data', 'TEXT');
+// 2GIS city to scrape - see parser-worker/parser_core.py's CITIES dict for
+// the matching slug/bounding-box; must be one of those keys or the worker
+// falls back to 'moscow'.
+await ensureColumn('parser_niches', 'city', "TEXT DEFAULT 'moscow'");
 // The script text a voiceover was generated from - generate-voiceover only
 // ever used it to call ElevenLabs/Piper and threw it away afterwards, so a
 // voiceover's media_assets row had no readable content at all (the card

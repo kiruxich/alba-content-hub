@@ -13,8 +13,32 @@ SAVE_EVERY_N = 5
 CONCURRENCY_LIMIT = 4
 GRID_STEPS = 7
 ZOOM = 13
-LAT_MIN, LAT_MAX = 55.1, 56.2
-LON_MIN, LON_MAX = 36.7, 38.4
+
+# 2GIS city slug (used as https://2gis.ru/{slug}/search/...) plus a lat/lon
+# bounding box the search grid gets spread across (generate_grid below) -
+# roughly city + immediate suburbs, same scale as Moscow's original box.
+# Only Moscow's slug/box have actually been exercised against real traffic;
+# the others are best-effort from known 2GIS URL conventions - if a city
+# comes back with 0 results where the niche clearly has businesses there,
+# spot-check its slug against a real https://2gis.ru/<slug> URL in a browser
+# first (city coverage from a wrong slug fails as "found nothing", not as
+# silently wrong data, so this is safe to get wrong, just wasteful).
+CITIES = {
+    "moscow": {"label": "Москва", "slug": "moscow", "lat_min": 55.1, "lat_max": 56.2, "lon_min": 36.7, "lon_max": 38.4},
+    "spb": {"label": "Санкт-Петербург", "slug": "spb", "lat_min": 59.6, "lat_max": 60.3, "lon_min": 29.6, "lon_max": 30.9},
+    "novosibirsk": {"label": "Новосибирск", "slug": "novosibirsk", "lat_min": 54.8, "lat_max": 55.2, "lon_min": 82.7, "lon_max": 83.3},
+    "ekaterinburg": {"label": "Екатеринбург", "slug": "ekaterinburg", "lat_min": 56.6, "lat_max": 56.95, "lon_min": 60.4, "lon_max": 60.85},
+    "kazan": {"label": "Казань", "slug": "kazan", "lat_min": 55.6, "lat_max": 55.9, "lon_min": 48.9, "lon_max": 49.3},
+    "nnovgorod": {"label": "Нижний Новгород", "slug": "nnovgorod", "lat_min": 56.15, "lat_max": 56.45, "lon_min": 43.7, "lon_max": 44.15},
+    "chelyabinsk": {"label": "Челябинск", "slug": "chelyabinsk", "lat_min": 55.05, "lat_max": 55.35, "lon_min": 61.2, "lon_max": 61.6},
+    "samara": {"label": "Самара", "slug": "samara", "lat_min": 53.1, "lat_max": 53.35, "lon_min": 50.0, "lon_max": 50.3},
+    "rostov": {"label": "Ростов-на-Дону", "slug": "rostov", "lat_min": 47.1, "lat_max": 47.35, "lon_min": 39.5, "lon_max": 39.85},
+    "ufa": {"label": "Уфа", "slug": "ufa", "lat_min": 54.6, "lat_max": 54.9, "lon_min": 55.8, "lon_max": 56.2},
+    "krasnoyarsk": {"label": "Красноярск", "slug": "krasnoyarsk", "lat_min": 55.9, "lat_max": 56.15, "lon_min": 92.7, "lon_max": 93.1},
+    "voronezh": {"label": "Воронеж", "slug": "voronezh", "lat_min": 51.55, "lat_max": 51.8, "lon_min": 39.05, "lon_max": 39.35},
+    "perm": {"label": "Пермь", "slug": "perm", "lat_min": 57.9, "lat_max": 58.15, "lon_min": 55.9, "lon_max": 56.4},
+}
+DEFAULT_CITY = "moscow"
 
 CAPTCHA_MARKERS = [
     "подтвердите, что вы не робот", "капча", "captcha", "unusual traffic", "доступ ограничен",
@@ -84,11 +108,12 @@ async def page_looks_like_captcha(page):
 class Job:
     """In-memory state for one parser run - one instance per niche card click."""
 
-    def __init__(self, job_id, category, description, queries, out_dir):
+    def __init__(self, job_id, category, description, queries, out_dir, city=DEFAULT_CITY):
         self.id = job_id
         self.category = category
         self.description = description
         self.queries = queries  # [{"query": str, "keywords": [str]}]
+        self.city = city if city in CITIES else DEFAULT_CITY
         self.out_dir = out_dir
         self.status = "queued"  # queued|running|captcha|done|error
         self.log_lines = []
@@ -235,7 +260,8 @@ async def run_parser_job(job: Job):
     pauses (awaiting resume) if a CAPTCHA page is detected."""
     os.makedirs(job.out_dir, exist_ok=True)
     job.status = "running"
-    job.log(f"Старт парсинга ниши «{job.category}», запросов: {len(job.queries)}")
+    city = CITIES[job.city]
+    job.log(f"Старт парсинга ниши «{job.category}» ({city['label']}), запросов: {len(job.queries)}")
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -246,7 +272,7 @@ async def run_parser_job(job: Job):
     saved_ids = set()
     lock = asyncio.Lock()
     semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
-    grid_points = generate_grid(LAT_MIN, LAT_MAX, LON_MIN, LON_MAX, GRID_STEPS)
+    grid_points = generate_grid(city["lat_min"], city["lat_max"], city["lon_min"], city["lon_max"], GRID_STEPS)
 
     display = os.environ.get("DISPLAY", ":99")
     async with async_playwright() as p:
@@ -272,7 +298,7 @@ async def run_parser_job(job: Job):
                     page_num = 1
                     duplicate_pages = 0
                     while True:
-                        search_url = f"https://2gis.ru/moscow/search/{encoded_query}/page/{page_num}?m={lon}%2C{lat}%2F{ZOOM}"
+                        search_url = f"https://2gis.ru/{city['slug']}/search/{encoded_query}/page/{page_num}?m={lon}%2C{lat}%2F{ZOOM}"
                         try:
                             nav_response = await main_page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
                             await main_page.wait_for_timeout(1200)

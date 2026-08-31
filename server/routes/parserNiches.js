@@ -131,6 +131,7 @@ function serialize(row) {
         id: row.id,
         category: row.category,
         description: row.description || '',
+        city: row.city || 'moscow',
         status: row.status,
         log: row.log || '',
         stats: row.stats_json ? JSON.parse(row.stats_json) : null,
@@ -184,10 +185,15 @@ router.post('/:id/generate-description', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const row = (await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
     if (!row) return res.status(404).json({ error: 'niche not found' });
-    const { category, description } = req.body || {};
+    const { category, description, city } = req.body || {};
     await db.execute({
-        sql: `UPDATE parser_niches SET category = ?, description = ?, updated_at = strftime('%s','now') WHERE id = ?`,
-        args: [category !== undefined ? category : row.category, description !== undefined ? (description || '') : row.description, row.id],
+        sql: `UPDATE parser_niches SET category = ?, description = ?, city = ?, updated_at = strftime('%s','now') WHERE id = ?`,
+        args: [
+            category !== undefined ? category : row.category,
+            description !== undefined ? (description || '') : row.description,
+            city !== undefined ? (city || 'moscow') : (row.city || 'moscow'),
+            row.id,
+        ],
     });
     const result = await db.execute({ sql: 'SELECT * FROM parser_niches WHERE id = ?', args: [row.id] });
     res.json(serialize(result.rows[0]));
@@ -213,7 +219,7 @@ router.post('/:id/run', async (req, res) => {
 
     try {
         const queries = await generateParserQueries(row.category, row.description);
-        const job = await createParserJob({ nicheId: row.id, category: row.category, description: row.description, queries });
+        const job = await createParserJob({ nicheId: row.id, category: row.category, description: row.description, queries, city: row.city || 'moscow' });
 
         // Archive whatever raw/dedup/archive this row currently holds before
         // the UPDATE below nulls all of it - row.job_id here is still the

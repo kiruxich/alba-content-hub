@@ -3026,6 +3026,25 @@ let parserPollTimers = {};
 let parserNicheVersions = {};     // niche id -> array of version rows, once fetched
 let parserNicheVersionsOpen = {}; // niche id -> bool, whether the section is expanded
 
+// Mirrors parser-worker/parser_core.py's CITIES dict (id -> slug/bbox) -
+// only the label is needed client-side, the id is what gets saved and sent
+// to the worker at run time.
+const PARSER_CITIES = [
+    { id: 'moscow', label: 'Москва' },
+    { id: 'spb', label: 'Санкт-Петербург' },
+    { id: 'novosibirsk', label: 'Новосибирск' },
+    { id: 'ekaterinburg', label: 'Екатеринбург' },
+    { id: 'kazan', label: 'Казань' },
+    { id: 'nnovgorod', label: 'Нижний Новгород' },
+    { id: 'chelyabinsk', label: 'Челябинск' },
+    { id: 'samara', label: 'Самара' },
+    { id: 'rostov', label: 'Ростов-на-Дону' },
+    { id: 'ufa', label: 'Уфа' },
+    { id: 'krasnoyarsk', label: 'Красноярск' },
+    { id: 'voronezh', label: 'Воронеж' },
+    { id: 'perm', label: 'Пермь' },
+];
+
 async function renderParserNiches() {
     const container = document.getElementById('parser-niches-grid');
     if (!container) return;
@@ -3069,6 +3088,9 @@ function drawParserNiches() {
             <div class="parser-niche-head">
                 <input type="text" class="form-input" style="font-weight:700;" value="${escapeHtml(n.category)}"
                     placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
+                <select class="form-select" style="margin:0; max-width:180px;" title="Город для поиска в 2ГИС" onchange="saveParserNicheField('${n.id}','city',this.value)">
+                    ${PARSER_CITIES.map(c => `<option value="${c.id}" ${(n.city || 'moscow') === c.id ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}
+                </select>
                 <span class="parser-niche-status ${n.status}">${statusLabels[n.status] || n.status}</span>
             </div>
             <div style="display:flex; gap:8px; align-items:flex-start;">
