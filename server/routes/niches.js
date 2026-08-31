@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { isLocalClaudeAgentConfigured, generateScriptSection } from '../lib/localClaudeAgent.js';
+import { isLocalClaudeAgentConfigured, generateScriptSection, generateColdCallPitch } from '../lib/localClaudeAgent.js';
 
 const router = Router();
 
@@ -10,6 +10,7 @@ function serialize(row) {
         name: row.name,
         subtitle: row.subtitle,
         sections: JSON.parse(row.sections || '[]'),
+        coldCallPitch: row.cold_call_pitch || '',
     };
 }
 
@@ -39,10 +40,11 @@ router.put('/:id', async (req, res) => {
     const name = b.name !== undefined ? String(b.name).trim() : existing.name;
     const subtitle = b.subtitle !== undefined ? b.subtitle : existing.subtitle;
     const sections = b.sections !== undefined ? JSON.stringify(b.sections) : existing.sections;
+    const coldCallPitch = b.coldCallPitch !== undefined ? (b.coldCallPitch || '') : (existing.cold_call_pitch || '');
 
     await db.execute({
-        sql: 'UPDATE niches SET name = ?, subtitle = ?, sections = ? WHERE id = ?',
-        args: [name, subtitle, sections, existing.id],
+        sql: 'UPDATE niches SET name = ?, subtitle = ?, sections = ?, cold_call_pitch = ? WHERE id = ?',
+        args: [name, subtitle, sections, coldCallPitch, existing.id],
     });
     const result = await db.execute({ sql: 'SELECT * FROM niches WHERE id = ?', args: [existing.id] });
     res.json(serialize(result.rows[0]));
@@ -77,6 +79,29 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
             nicheSubtitle: row.subtitle || '',
             toneOfVoice: settingsRow?.tone_of_voice || '',
         });
+        res.json({ text: result.text });
+    } catch (e) {
+        res.status(502).json({ error: e.message });
+    }
+});
+
+// "✨ Сгенерировать" next to the cold-call pitch field - writes the
+// Telegram outreach message sent to a lead who's still considering the
+// offer (see local-claude-agent's cold-call-pitch task). Same
+// review-before-save shape as the section generator above - the client
+// still needs "Сохранить скрипт" (PUT /:id) to persist it.
+router.post('/:id/generate-pitch', async (req, res) => {
+    if (!isLocalClaudeAgentConfigured()) {
+        return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
+    }
+    const row = (await db.execute({ sql: 'SELECT * FROM niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'niche not found' });
+
+    const prompt = (req.body?.prompt || '').trim();
+    const settingsRow = (await db.execute('SELECT tone_of_voice FROM agent_settings WHERE id = 1')).rows[0];
+
+    try {
+        const result = await generateColdCallPitch({ category: row.name, prompt, toneOfVoice: settingsRow?.tone_of_voice || '' });
         res.json({ text: result.text });
     } catch (e) {
         res.status(502).json({ error: e.message });

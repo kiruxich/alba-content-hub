@@ -2717,6 +2717,16 @@ function renderEditModeHtml(niche) {
         <div class="info-box" style="margin-top:16px; font-size:12px; color:var(--text-secondary);">
             Генерация каждого раздела использует общий «Тон голоса» из настроек Центра агентов плюс промпт, который вы укажете для конкретного раздела — так стиль остаётся единым по всему скрипту, даже если разделы генерируются по отдельности.
         </div>
+
+        <div class="p-section-title" style="margin-top:24px;">ПРЕДЛОЖЕНИЕ ДЛЯ ХОЛОДНЫХ ЗВОНКОВ</div>
+        <div style="display:flex; gap:8px; margin-bottom:6px;">
+            <input type="text" class="form-input" style="margin:0;" id="niche-pitch-prompt" placeholder="Что учесть при генерации (кейс из портфолио, акцент)...">
+            <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNichePitchText()">✨</button>
+        </div>
+        <div id="niche-pitch-status" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-bottom:4px;"></div>
+        <textarea class="form-textarea script-section-text" id="niche-pitch-input" placeholder="Текст сообщения, которое отправляете лиду в Telegram, если он ещё думает..." oninput="setNichePitchField(this.value)">${escapeHtml(niche.coldCallPitch || '')}</textarea>
+        <button class="edit-btn" style="margin-top:6px;" onclick="copyNichePitch()">📋 Скопировать</button>
+
         <button class="submit-btn" style="margin-top:16px;" onclick="saveNicheDetail()">Сохранить скрипт</button>
         <button class="delete-btn" style="width:100%; margin-top:8px; justify-content:center;" onclick="deleteNiche('${niche.id}')">🗑 Удалить нишу</button>`;
 
@@ -2769,6 +2779,43 @@ async function generateNicheSectionText(idx, sectionId) {
     }
 }
 
+function setNichePitchField(value) {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (niche) niche.coldCallPitch = value;
+}
+
+// Same shape as generateNicheSectionText - in-memory only, "Сохранить
+// скрипт" still needs to be clicked to persist it.
+async function generateNichePitchText() {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (!niche) return;
+    const promptInput = document.getElementById('niche-pitch-prompt');
+    const prompt = promptInput ? promptInput.value.trim() : '';
+
+    const btn = event && event.target;
+    const status = document.getElementById('niche-pitch-status');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    if (status) status.textContent = 'Генерируем через ИИ на вашем ПК (Sonnet)...';
+    try {
+        const result = await api(`/api/niches/${niche.id}/generate-pitch`, { method: 'POST', body: JSON.stringify({ prompt }) });
+        niche.coldCallPitch = result.text;
+        renderNicheDetailContent(currentOpenNicheId);
+        showToast('Предложение сгенерировано — не забудьте сохранить скрипт');
+    } catch (e) {
+        if (status) status.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось сгенерировать: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✨'; }
+    }
+}
+
+function copyNichePitch() {
+    const textarea = document.getElementById('niche-pitch-input');
+    if (!textarea || !textarea.value.trim()) return showToast('Сначала сгенерируйте или напишите текст');
+    navigator.clipboard.writeText(textarea.value);
+    showToast('Скопировано в буфер обмена');
+}
+
 function addNicheSection() {
     const niche = niches.find(n => n.id === currentOpenNicheId);
     if (!niche) return;
@@ -2795,7 +2842,7 @@ async function saveNicheDetail() {
     if (!name) return alert('Укажите название ниши');
 
     try {
-        const updated = await api(`/api/niches/${niche.id}`, { method: 'PUT', body: JSON.stringify({ name, subtitle, sections: niche.sections }) });
+        const updated = await api(`/api/niches/${niche.id}`, { method: 'PUT', body: JSON.stringify({ name, subtitle, sections: niche.sections, coldCallPitch: niche.coldCallPitch || '' }) });
         niches = niches.map(n => n.id === niche.id ? updated : n);
         const titleEl = document.getElementById('niche-detail-title');
         if (titleEl) titleEl.innerText = updated.name;
@@ -3087,7 +3134,6 @@ let parserPollTimers = {};
 // every single poll tick for the common case.
 let parserNicheVersions = {};     // niche id -> array of version rows, once fetched
 let parserNicheVersionsOpen = {}; // niche id -> bool, whether the section is expanded
-let parserNichePitchOpen = {}; // niche id -> bool, whether the cold-call pitch section is expanded
 
 async function renderParserNiches() {
     const container = document.getElementById('parser-niches-grid');
@@ -3104,101 +3150,123 @@ async function renderParserNiches() {
     });
 }
 
+const PARSER_STATUS_LABELS = {
+    idle: 'Не запущено', queued: 'В очереди', running: 'Парсинг идёт',
+    captcha: 'Ждёт капчу', dedupe_running: 'Чистка дублей', done: 'Готово', error: 'Ошибка', cancelled: 'Остановлено',
+};
+const isParserNicheActive = n => ['queued', 'running', 'captcha', 'dedupe_running'].includes(n);
+
+let currentOpenParserNicheId = null;
+
+// Simple card, just like "Скрипты" - name + status, click opens the full
+// detail page. The old version crammed every field (city, keywords,
+// generation, log, files, version history, cold-call pitch) into one card
+// shown 2-3-up, which made none of it readable - see openParserNicheDetail.
 function drawParserNiches() {
     const container = document.getElementById('parser-niches-grid');
-    if (!container) return;
-
-    // Polling ticks re-run this every 4s while any niche is active - skip the
-    // rebuild if the user is mid-edit in any card's text input, otherwise a
-    // status refresh wipes their unsaved keystrokes and steals focus.
-    const activeEl = document.activeElement;
-    if (activeEl && container.contains(activeEl) && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-        return;
-    }
-
-    if (parserNiches.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую кнопкой выше.</div>`;
-        return;
-    }
-
-    const statusLabels = {
-        idle: 'Не запущено', queued: 'В очереди', running: 'Парсинг идёт',
-        captcha: 'Ждёт капчу', dedupe_running: 'Чистка дублей', done: 'Готово', error: 'Ошибка', cancelled: 'Остановлено',
-    };
-    const isActive = n => ['queued', 'running', 'captcha', 'dedupe_running'].includes(n);
-
-    container.innerHTML = parserNiches.map(n => `
-        <div class="parser-niche-card" id="parser-card-${n.id}">
-            <div class="parser-niche-head">
-                <input type="text" class="form-input" style="font-weight:700;" value="${escapeHtml(n.category)}"
-                    placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
-                <input type="text" class="form-input" style="margin:0; max-width:180px;" value="${escapeHtml(n.city || 'Москва')}"
-                    placeholder="Город (любой)" title="Город для поиска в 2ГИС — определяется автоматически при первом запуске для этого города"
-                    onblur="saveParserNicheField('${n.id}','city',this.value)">
-                <span class="parser-niche-status ${n.status}">${statusLabels[n.status] || n.status}</span>
-            </div>
-            <div style="display:flex; gap:8px; align-items:flex-start;">
-                <textarea class="form-textarea" style="margin-bottom:0; min-height:52px;" id="parser-desc-${n.id}"
-                    placeholder="Ключевые слова/синонимы для 2ГИС через запятую (первые 8 уникальных слов реально используются в поиске — не пишите связным текстом)"
-                    onblur="saveParserNicheField('${n.id}','description',this.value)">${escapeHtml(n.description)}</textarea>
-                <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨</button>
-            </div>
-            <div id="parser-desc-status-${n.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-top:2px;"></div>
-
-            <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log || '')}</div>
-
-            <div class="parser-niche-files">
-                ${n.files.raw ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','raw')">📊 raw.xlsx</div>` : ''}
-                ${n.files.dedup ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','dedup')">✨ dedup.xlsx</div>` : ''}
-                ${n.files.archive ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','archive')">🗄 archive.zip</div>` : ''}
-            </div>
-
-            <div class="parser-niche-versions">
-                <button type="button" class="parser-niche-versions-toggle" onclick="toggleParserNicheVersions('${n.id}')">
-                    📜 История версий ${parserNicheVersionsOpen[n.id] ? '▴' : '▾'}
-                </button>
-                ${parserNicheVersionsOpen[n.id] ? renderParserNicheVersionsList(n.id) : ''}
-            </div>
-
-            <div class="parser-niche-versions">
-                <button type="button" class="parser-niche-versions-toggle" onclick="toggleParserNichePitch('${n.id}')">
-                    💬 Предложение для холодных звонков ${parserNichePitchOpen[n.id] ? '▴' : '▾'}
-                </button>
-                ${parserNichePitchOpen[n.id] ? `
-                    <div style="margin-top:8px;">
-                        <div style="display:flex; gap:8px; margin-bottom:6px;">
-                            <input type="text" class="form-input" style="margin:0;" id="parser-pitch-prompt-${n.id}" placeholder="Что учесть при генерации (кейс из портфолио, акцент)...">
-                            <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateParserNichePitch('${n.id}')">✨</button>
+    if (container) {
+        if (parserNiches.length === 0) {
+            container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую кнопкой выше.</div>`;
+        } else {
+            container.innerHTML = parserNiches.map(n => `
+                <div class="product-card" onclick="openParserNicheDetail('${n.id}')">
+                    <div>
+                        <div class="card-header">
+                            <div class="card-title">${escapeHtml(n.category || 'Без названия')}</div>
+                            <span class="parser-niche-status ${n.status}">${PARSER_STATUS_LABELS[n.status] || n.status}</span>
                         </div>
-                        <div id="parser-pitch-status-${n.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-bottom:4px;"></div>
-                        <textarea class="form-textarea" style="min-height:160px; font-size:12.5px;" id="parser-pitch-text-${n.id}"
-                            placeholder="Текст сообщения, которое отправляете лиду в Telegram, если он ещё думает..."
-                            onblur="saveParserNicheField('${n.id}','coldCallPitch',this.value)">${escapeHtml(n.coldCallPitch || '')}</textarea>
-                        <button class="edit-btn" style="margin-top:6px;" onclick="copyParserNichePitch('${n.id}')">📋 Скопировать</button>
+                        <div class="card-desc">${escapeHtml(n.city || 'Москва')}</div>
                     </div>
-                ` : ''}
-            </div>
+                    <div class="card-footer">
+                        <span>Открыть карточку ниши</span>
+                        <span>→</span>
+                    </div>
+                </div>`).join('');
+        }
+    }
+    if (currentOpenParserNicheId) renderParserNicheDetailContent(currentOpenParserNicheId);
+}
 
-            <div class="parser-niche-actions">
-                <button class="schedule-btn" onclick="runParserNiche('${n.id}')" ${isActive(n.status) ? 'disabled' : ''}>▶ Обновить парсер</button>
-                ${isActive(n.status) ? `<button class="delete-btn" onclick="cancelParserNiche('${n.id}')">⏹ Стоп</button>` : ''}
-                ${n.status === 'captcha' ? `<a class="edit-btn" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
-                <label class="edit-btn parser-upload-btn" ${isActive(n.status) ? 'style="opacity:.5; pointer-events:none;"' : ''}>
-                    📤 Загрузить Excel
-                    <input type="file" accept=".xlsx" style="display:none;" onchange="uploadParserNicheFile('${n.id}', this)">
-                </label>
-                ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
-                ${n.canDedupeUpload && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNicheUpload('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
-                ${n.files.raw && n.jobId ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
-                <button class="delete-btn" onclick="removeParserNiche('${n.id}')">Удалить</button>
-            </div>
+function openParserNicheDetail(id) {
+    currentOpenParserNicheId = id;
+    const titleEl = document.getElementById('parser-niche-detail-title');
+    const niche = parserNiches.find(n => n.id === id);
+    if (titleEl) titleEl.innerText = niche?.category || 'Ниша';
+    renderParserNicheDetailContent(id);
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-parser-niche-detail').classList.add('active');
+}
+
+function closeParserNicheDetailPage() {
+    currentOpenParserNicheId = null;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-customers').classList.add('active');
+}
+
+function renderParserNicheDetailContent(id) {
+    const body = document.getElementById('parser-niche-detail-body');
+    if (!body) return;
+    const n = parserNiches.find(x => x.id === id);
+    if (!n) return;
+
+    const titleEl = document.getElementById('parser-niche-detail-title');
+    if (titleEl) titleEl.innerText = n.category || 'Ниша';
+
+    // Same mid-edit guard as before, scoped to this one detail page instead
+    // of a whole grid of cards.
+    const activeEl = document.activeElement;
+    if (activeEl && body.contains(activeEl) && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+    }
+
+    body.innerHTML = `
+        <div class="parser-niche-head">
+            <input type="text" class="form-input" style="font-weight:700;" value="${escapeHtml(n.category)}"
+                placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
+            <input type="text" class="form-input" style="margin:0; max-width:180px;" value="${escapeHtml(n.city || 'Москва')}"
+                placeholder="Город (любой)" title="Город для поиска в 2ГИС — определяется автоматически при первом запуске для этого города"
+                onblur="saveParserNicheField('${n.id}','city',this.value)">
         </div>
-    `).join('');
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+            <textarea class="form-textarea" style="margin-bottom:0; min-height:52px;" id="parser-desc-${n.id}"
+                placeholder="Ключевые слова/синонимы для 2ГИС через запятую (первые 8 уникальных слов реально используются в поиске — не пишите связным текстом)"
+                onblur="saveParserNicheField('${n.id}','description',this.value)">${escapeHtml(n.description)}</textarea>
+            <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨</button>
+        </div>
+        <div id="parser-desc-status-${n.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-top:2px;"></div>
 
-    parserNiches.forEach(n => {
-        const logEl = document.getElementById(`parser-log-${n.id}`);
-        if (logEl) logEl.scrollTop = logEl.scrollHeight;
-    });
+        <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log || '')}</div>
+
+        <div class="parser-niche-files">
+            ${n.files.raw ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','raw')">📊 raw.xlsx</div>` : ''}
+            ${n.files.dedup ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','dedup')">✨ dedup.xlsx</div>` : ''}
+            ${n.files.archive ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','archive')">🗄 archive.zip</div>` : ''}
+        </div>
+
+        <div class="parser-niche-versions">
+            <button type="button" class="parser-niche-versions-toggle" onclick="toggleParserNicheVersions('${n.id}')">
+                📜 История версий ${parserNicheVersionsOpen[n.id] ? '▴' : '▾'}
+            </button>
+            ${parserNicheVersionsOpen[n.id] ? renderParserNicheVersionsList(n.id) : ''}
+        </div>
+
+        <div class="parser-niche-actions">
+            <button class="schedule-btn" onclick="runParserNiche('${n.id}')" ${isParserNicheActive(n.status) ? 'disabled' : ''}>▶ Обновить парсер</button>
+            ${isParserNicheActive(n.status) ? `<button class="delete-btn" onclick="cancelParserNiche('${n.id}')">⏹ Стоп</button>` : ''}
+            ${n.status === 'captcha' ? `<a class="edit-btn" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
+            <label class="edit-btn parser-upload-btn" ${isParserNicheActive(n.status) ? 'style="opacity:.5; pointer-events:none;"' : ''}>
+                📤 Загрузить Excel
+                <input type="file" accept=".xlsx" style="display:none;" onchange="uploadParserNicheFile('${n.id}', this)">
+            </label>
+            ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
+            ${n.canDedupeUpload && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNicheUpload('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
+            ${n.files.raw && n.jobId ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
+            <button class="delete-btn" onclick="removeParserNiche('${n.id}')">Удалить</button>
+        </div>
+    `;
+
+    const logEl = document.getElementById(`parser-log-${n.id}`);
+    if (logEl) logEl.scrollTop = logEl.scrollHeight;
 }
 
 async function addParserNicheCard() {
@@ -3208,7 +3276,7 @@ async function addParserNicheCard() {
             body: JSON.stringify({ category: 'Новая ниша', description: '' }),
         });
         parserNiches.push(created);
-        drawParserNiches();
+        openParserNicheDetail(created.id);
     } catch (e) {
         showToast('Не удалось создать нишу: ' + e.message);
     }
@@ -3255,42 +3323,6 @@ async function generateNicheDescription(id) {
         if (btn) { btn.disabled = false; btn.textContent = '✨'; }
         if (status) setTimeout(() => { status.textContent = ''; }, 4000);
     }
-}
-
-function toggleParserNichePitch(id) {
-    parserNichePitchOpen[id] = !parserNichePitchOpen[id];
-    drawParserNiches();
-}
-
-async function generateParserNichePitch(id) {
-    const textarea = document.getElementById(`parser-pitch-text-${id}`);
-    if (!textarea) return;
-    const promptInput = document.getElementById(`parser-pitch-prompt-${id}`);
-    const prompt = promptInput ? promptInput.value.trim() : '';
-    const btn = event && event.target;
-    const status = document.getElementById(`parser-pitch-status-${id}`);
-    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
-    if (status) status.textContent = 'Генерируем через ИИ на вашем ПК (Sonnet)...';
-    try {
-        const result = await api(`/api/parser-niches/${id}/generate-pitch`, { method: 'POST', body: JSON.stringify({ prompt }) });
-        textarea.value = result.text;
-        await saveParserNicheField(id, 'coldCallPitch', result.text);
-        if (status) status.textContent = 'Готово.';
-        showToast('Предложение сгенерировано');
-    } catch (e) {
-        if (status) status.textContent = 'Ошибка: ' + e.message;
-        showToast('Не удалось сгенерировать: ' + e.message);
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = '✨'; }
-        if (status) setTimeout(() => { status.textContent = ''; }, 4000);
-    }
-}
-
-function copyParserNichePitch(id) {
-    const textarea = document.getElementById(`parser-pitch-text-${id}`);
-    if (!textarea || !textarea.value.trim()) return showToast('Сначала сгенерируйте или напишите текст');
-    navigator.clipboard.writeText(textarea.value);
-    showToast('Скопировано в буфер обмена');
 }
 
 async function runParserNiche(id) {
@@ -3459,7 +3491,11 @@ async function removeParserNiche(id) {
     try {
         await api(`/api/parser-niches/${id}`, { method: 'DELETE' });
         parserNiches = parserNiches.filter(n => n.id !== id);
-        drawParserNiches();
+        if (currentOpenParserNicheId === id) {
+            closeParserNicheDetailPage();
+        } else {
+            drawParserNiches();
+        }
     } catch (e) {
         showToast('Не удалось удалить: ' + e.message);
     }

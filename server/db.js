@@ -493,7 +493,10 @@ await ensureColumn('parser_niches', 'city', "TEXT DEFAULT 'Москва'");
 // considering the offer (see server/routes/parserNiches.js's
 // /generate-pitch) - separate from `description`, which is 2ГИС search
 // keywords, not prose.
-await ensureColumn('parser_niches', 'cold_call_pitch', "TEXT DEFAULT ''");
+// Moved to `niches` (Скрипты) below - the cold-call pitch belongs with the
+// call script for a niche, not the 2ГИС scraper card. Column left here
+// unused rather than dropped (libSQL DROP COLUMN support is inconsistent).
+await ensureColumn('niches', 'cold_call_pitch', "TEXT DEFAULT ''");
 // The script text a voiceover was generated from - generate-voiceover only
 // ever used it to call ElevenLabs/Piper and threw it away afterwards, so a
 // voiceover's media_assets row had no readable content at all (the card
