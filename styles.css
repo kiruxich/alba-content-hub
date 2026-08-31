@@ -140,7 +140,7 @@ html, body {
 .content-block { flex: 1; min-width: 0; margin-left: 16px; }
 .item-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; margin-bottom: 4px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
-.item-desc { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-desc { font-size: 13px; color: var(--text-secondary); }
 
 .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(10px); z-index: 200; display: flex; justify-content: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
 .overlay.active { opacity: 1; pointer-events: auto; }
@@ -318,10 +318,10 @@ html, body {
 .plan-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .plan-card-title {
     flex: 1; min-width: 0; background: none; border: none; color: var(--text-primary);
-    font-size: 15px; font-weight: 700; padding: 4px 0; border-bottom: 1px solid transparent;
-    text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+    font-family: inherit; font-size: 15px; font-weight: 700; padding: 4px 0; border-bottom: 1px solid transparent;
+    white-space: normal; overflow-wrap: break-word; resize: none; overflow: hidden; line-height: 1.3;
 }
-.plan-card-title:focus { outline: none; border-bottom-color: var(--card-accent, var(--accent-blue)); text-overflow: clip; }
+.plan-card-title:focus { outline: none; border-bottom-color: var(--card-accent, var(--accent-blue)); }
 .plan-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .icon-btn {
     background: rgba(255,255,255,0.06); border: none; color: var(--text-secondary);
@@ -383,10 +383,10 @@ html, body {
 .timeline-card-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .timeline-card-title {
     flex: 1 1 200px; min-width: 0; background: none; border: none; color: var(--text-primary);
-    font-size: 18px; font-weight: 700; padding: 4px 0; border-bottom: 1px solid transparent;
-    text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+    font-family: inherit; font-size: 18px; font-weight: 700; padding: 4px 0; border-bottom: 1px solid transparent;
+    white-space: normal; overflow-wrap: break-word; resize: none; overflow: hidden; line-height: 1.3;
 }
-.timeline-card-title:focus { outline: none; border-bottom-color: var(--card-accent, var(--accent-blue)); text-overflow: clip; }
+.timeline-card-title:focus { outline: none; border-bottom-color: var(--card-accent, var(--accent-blue)); }
 .timeline-card-period {
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.09);
     border-radius: 8px; padding: 7px 11px; font-size: 12px; font-weight: 600; color: var(--text-secondary);
@@ -558,7 +558,7 @@ html, body {
 }
 .parser-niche-version-row:hover { border-color: var(--accent-blue); }
 .parser-niche-version-kind { flex-shrink: 0; font-weight: 700; color: var(--text-secondary); }
-.parser-niche-version-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.parser-niche-version-name { flex: 1; min-width: 0; overflow-wrap: break-word; }
 .parser-niche-version-date { flex-shrink: 0; color: var(--text-secondary); }
 
 /* ЦЕНТР АГЕНТОВ */

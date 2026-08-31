@@ -7,7 +7,7 @@ const productsData = [
     { id: 'insights', title: 'InSights', badge: 'Аналитика', badgeBg: 'rgba(10,132,255,0.15)', badgeColor: '#0a84ff', target: 'B2B, Маркетологи', value: 'Поиск блогеров и AI-скоринг', desc: 'SaaS платформа для анализа соцсетей с ИИ', synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'B2B-клиенты InSights, которым нужна кастомная доработка платформы, ведутся на full-stack услуги студии' }] },
     { id: 'hranitel', title: 'Хранитель', badge: 'Документооборот', badgeBg: 'rgba(48,209,88,0.15)', badgeColor: '#30d158', target: 'Enterprise, Госсектор', value: 'Поиск по сканам в закрытом контуре', desc: 'RAG-система для работы с архивами', synergies: [{ target: 'Alba Creation', type: 'Апсейл', text: 'Enterprise-клиенты Хранителя конвертируются в контракты на доп. интеграции и поддержку от студии' }] },
     { id: 'duet', title: 'ДУЭТ', badge: 'Event Tech', badgeBg: 'rgba(191,90,242,0.15)', badgeColor: '#bf5af2', target: 'Молодожёны, ивент-агентства', value: 'Генерация сайтов и приглашений', desc: 'SaaS-конструктор сайтов-приглашений для свадеб и мероприятий', synergies: [{ target: 'legitAgent', type: 'Кросс-промо', text: 'Разработчики ДУЭТ используют open-source инструментарий legitAgent для проверки шаблонов сайтов на юридическое соответствие' }] },
-    { id: 'crista', title: 'Crista', badge: 'Travel Tech', badgeBg: 'rgba(255,159,10,0.15)', badgeColor: '#ff9f0a', target: 'Путешественники, B2C', value: 'Геймификация планирования поездок', desc: 'Геймифицированное приложение для планирования путешествий', synergies: [] },
+    { id: 'crista', title: 'Crista', badge: 'Travel Tech', badgeBg: 'rgba(255,159,10,0.15)', badgeColor: '#ff9f0a', target: 'Путешественники, поклонники геймификации', value: '«Duolingo для путешествий» — ежедневные 2-мин квесты', desc: 'Мобильное приложение: квесты по городам, стрики, XP, штампы в тревел-паспорт', synergies: [] },
     { id: 'fantaziya', title: 'Фантазия', badge: 'Gamedev', badgeBg: 'rgba(255,55,95,0.15)', badgeColor: '#ff375f', target: 'Игроки, поклонники Pyrokinesis', value: 'Нарративный экшен-RPG по мотивам Pyrokinesis', desc: 'Сюжетная игра от первого лица на Godot: детектив Керриган, теневое измерение Изанка, 75+ квестов', synergies: [] },
     { id: 'legitagent', title: 'legitAgent', badge: 'Open Source', badgeBg: 'rgba(100,210,255,0.15)', badgeColor: '#64d2ff', target: 'Разработчики, веб-студии', value: 'Автопроверка сайта на 152-ФЗ/38-ФЗ/ЗоЗПП', desc: 'Сканер юридического соответствия сайтов + нагрузочное тестирование', synergies: [{ target: 'Alba Creation', type: 'Лид-магнит', text: 'Разработчики, познакомившиеся с open-source инструментами, заказывают кастомную разработку у студии' }] },
     { id: 'alba-creation', title: 'Alba Creation', badge: 'Студия', badgeBg: 'rgba(94,92,230,0.15)', badgeColor: '#5e5ce6', target: 'Все клиенты', value: 'Full-stack разработка', desc: 'Цифровая веб-студия полного цикла', synergies: [] }
@@ -1089,7 +1089,7 @@ function setCoverAssetField(assetId) {
     }
     const asset = mediaAssets.find(a => a.id === assetId);
     preview.innerHTML = asset
-        ? `<div style="display:flex; align-items:center; gap:8px;">${mediaAssetPreviewHtml(asset)}<span style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(asset.url)}</span></div>`
+        ? `<div style="display:flex; align-items:center; gap:8px;">${mediaAssetPreviewHtml(asset)}<span style="overflow-wrap:break-word; min-width:0;">${escapeHtml(asset.url)}</span></div>`
         : `выбрано: ${escapeHtml(assetId)}`;
     // The inline preview above is small - cap it with a style override rather
     // than a second CSS class just for the 40px thumbnail case.
@@ -2473,7 +2473,7 @@ function renderPlanNotes() {
     container.innerHTML = notes.map(block => `
         <div class="plan-card" style="--card-accent:${block.color || '#0a84ff'}">
             <div class="plan-card-head">
-                <input type="text" class="plan-card-title" value="${escapeHtml(block.title)}" title="${escapeHtml(block.title)}" placeholder="Заголовок заметки" oninput="setPlanBlockField('${block.id}','title',this.value)">
+                <textarea class="plan-card-title" rows="1" placeholder="Заголовок заметки" oninput="autoGrowTextarea(this); setPlanBlockField('${block.id}','title',this.value)">${escapeHtml(block.title)}</textarea>
                 <div class="plan-card-actions">
                     <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
                     <button class="icon-btn" title="Удалить" onclick="removePlanBlock('${block.id}')">🗑</button>
@@ -2506,7 +2506,7 @@ function renderPlanTimeline() {
             </div>
             <div class="timeline-card" style="--card-accent:${accent}">
                 <div class="timeline-card-head">
-                    <input type="text" class="timeline-card-title" value="${escapeHtml(block.title)}" title="${escapeHtml(block.title)}" placeholder="Продукт квартала" oninput="setPlanBlockField('${block.id}','title',this.value)">
+                    <textarea class="timeline-card-title" rows="1" placeholder="Продукт квартала" oninput="autoGrowTextarea(this); setPlanBlockField('${block.id}','title',this.value)">${escapeHtml(block.title)}</textarea>
                     <input type="text" class="timeline-card-period" value="${escapeHtml(block.period || '')}" placeholder="Например: Январь — Март" oninput="setPlanBlockField('${block.id}','period',this.value)">
                     <div class="plan-card-actions">
                         <button class="icon-btn" title="Копировать" onclick="copyPlanBlock('${block.id}')">📋</button>
