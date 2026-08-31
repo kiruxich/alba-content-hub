@@ -12,109 +12,96 @@ CLI itself is invoked with `--allowedTools WebSearch` only (no Bash/Edit/Write),
 so even a leaked tunnel URL/token can't be used to run arbitrary commands
 against your machine or account.
 
-## 1. Build the image
+Runs as two containers via Docker Compose - the agent itself, and an `ngrok`
+sidecar that tunnels it to a fixed public URL. Both have `restart:
+unless-stopped`, so once set up, `docker compose up -d` is the only manual
+step you ever need - both come back automatically whenever Docker Desktop
+starts (including after a reboot), no LaunchAgent or manual relaunch required.
+
+## 1. One-time setup
+
+**a) A Claude Code auth token** (needs a Claude subscription) - run once,
+anywhere you have the `claude` CLI (doesn't have to be in the container):
+
+```bash
+claude setup-token
+```
+
+Follow the prompts (opens a browser login, or prints a URL to open manually -
+if pasting the URL doesn't work because your terminal wrapped it across
+lines, press `c` in the prompt to copy the unwrapped URL to your clipboard
+instead of selecting the text by hand). It prints a long-lived (1-year)
+token starting `sk-ant-oat01-...` at the end - **copy it, you won't see it
+again**.
+
+**b) A free ngrok account + reserved domain** (stays constant across
+restarts, unlike a random one-off tunnel URL):
+
+1. Sign up at [ngrok.com](https://dashboard.ngrok.com/signup) (free)
+2. Copy your authtoken from the dashboard
+3. Go to [dashboard.ngrok.com/domains](https://dashboard.ngrok.com/domains) →
+   "New Domain" - the free tier includes one reserved `*.ngrok-free.app`
+   domain that's yours permanently, no configuration needed on renewal
+
+## 2. Configure
+
+Create `local-claude-agent/.env` (gitignored - never commit this):
+
+```
+AGENT_TOKEN=<random secret - e.g. output of: openssl rand -hex 24>
+CLAUDE_CODE_OAUTH_TOKEN=<the sk-ant-oat01-... token from step 1a>
+NGROK_AUTHTOKEN=<your ngrok authtoken from step 1b>
+NGROK_DOMAIN=https://<your-reserved-domain>.ngrok-free.app
+```
+
+## 3. Run it
 
 ```bash
 cd local-claude-agent
-docker build -t local-claude-agent .
+docker compose up -d --build
 ```
-
-## 2. Run it with a persistent auth volume
-
-```bash
-docker volume create claude-agent-auth
-docker run -d --name local-claude-agent \
-  -p 8790:8790 \
-  -e AGENT_TOKEN=$(openssl rand -hex 24) \
-  -v claude-agent-auth:/home/agent \
-  local-claude-agent
-```
-
-Save the `AGENT_TOKEN` value it printed (or `docker inspect local-claude-agent`
-to see it again) - you'll paste it into hub's env vars later.
-
-## 3. Authenticate once (needs a Claude subscription)
-
-```bash
-docker exec -it local-claude-agent claude setup-token
-```
-
-This needs a real terminal (TTY) - it won't produce output piped/backgrounded.
-Follow the prompts (opens a browser login, or prints a URL to open manually -
-if pasting the URL doesn't work because your terminal wrapped it across lines,
-press `c` in the prompt to copy the unwrapped URL to your clipboard instead of
-selecting the text by hand). It prints a long-lived (1-year) token starting
-`sk-ant-oat01-...` at the end - **copy it, you won't see it again**.
-
-Set it as an env var on the container so it doesn't need to be re-entered on
-every rebuild/recreate (`claude setup-token`'s own on-disk config only
-persists via the mounted volume, but re-passing the token directly is
-simpler and survives even a `docker volume rm`):
-
-```bash
-docker rm -f local-claude-agent
-docker run -d --name local-claude-agent \
-  -p 8790:8790 \
-  -e AGENT_TOKEN=<your AGENT_TOKEN from step 2> \
-  -e CLAUDE_CODE_OAUTH_TOKEN=<the sk-ant-oat01-... token> \
-  -v claude-agent-auth:/home/agent \
-  local-claude-agent
-```
-
-To get a fresh token later (e.g. it expires after a year, or you revoke it),
-just repeat this whole step - you don't need to touch the image or volume.
 
 Verify it worked:
 
 ```bash
-curl -s -X POST http://localhost:8790/run/niche-description \
+curl -s https://<your-domain>.ngrok-free.app/health -H "ngrok-skip-browser-warning: true"
+# {"ok":true}
+
+curl -s -X POST https://<your-domain>.ngrok-free.app/run/niche-description \
   -H "X-Agent-Token: <your AGENT_TOKEN>" \
+  -H "ngrok-skip-browser-warning: true" \
   -H "Content-Type: application/json" \
   -d '{"category":"кальянные"}'
+# {"description": "..."} within ~15 seconds
 ```
 
-Should return `{"description": "..."}` within ~15 seconds.
-
-## 4. Expose it to the internet with a tunnel
-
-The container only makes an *outbound* connection to the tunnel provider -
-you don't need to open any port on your router.
-
-[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
-(free, no Cloudflare-managed domain required for a quick tunnel):
-
-```bash
-# one-time
-brew install cloudflared   # or the equivalent for your OS
-
-# quick tunnel (URL changes every time you restart it - fine to start with)
-cloudflared tunnel --url http://localhost:8790
-```
-
-It prints a `https://<random>.trycloudflare.com` URL - that's what hub will
-call. For a stable URL across restarts, set up a named tunnel with your own
-domain instead (see Cloudflare's docs) - not required to get started.
-
-## 5. Wire it into hub
+## 4. Wire it into hub
 
 On hub's Coolify env vars, set:
 
 ```
-LOCAL_CLAUDE_AGENT_URL=https://<your-tunnel-url>
-LOCAL_CLAUDE_AGENT_TOKEN=<the AGENT_TOKEN from step 2>
+LOCAL_CLAUDE_AGENT_URL=https://<your-domain>.ngrok-free.app
+LOCAL_CLAUDE_AGENT_TOKEN=<your AGENT_TOKEN>
 ```
 
 Same graceful-no-op pattern as every other optional integration in this app -
 the "Обновить"/"Сгенерировать" buttons that use this will just show a normal
-"не настроен" error until both are set, and again whenever your PC/container/
-tunnel happens to be off (a normal network-error toast, not a crash).
+"не настроен" error until both are set, and again whenever your PC/Docker
+happens to be off (a normal network-error toast, not a crash).
 
 ## Notes
 
 - **Must be running when you click the button.** This isn't a background
-  service on the VPS - if your PC is off or the container/tunnel isn't up,
-  the request just fails like any other unreachable server.
-- **Quick tunnel URLs change on restart** - if you use `cloudflared tunnel --url`
-  (not a named tunnel), update `LOCAL_CLAUDE_AGENT_URL` on hub each time you
-  restart the tunnel.
-- To re-authenticate (e.g. token revoked), just re-run step 3.
+  service on the VPS - if your PC/Docker Desktop is off, the request just
+  fails like any other unreachable server. Because both containers are
+  `restart: unless-stopped`, simply having Docker Desktop running is enough -
+  no manual relaunch after a reboot.
+- **The reserved ngrok domain never changes** - `LOCAL_CLAUDE_AGENT_URL` on
+  hub only needs to be set once.
+- To re-authenticate (e.g. the Claude token expires or is revoked), rerun
+  `claude setup-token`, update `CLAUDE_CODE_OAUTH_TOKEN` in `.env`, then
+  `docker compose up -d --build` again.
+- ngrok's free tier serves an interstitial "you're about to visit..." page to
+  plain browser visits - the `ngrok-skip-browser-warning` header (already
+  sent by hub's client, see `server/lib/localClaudeAgent.js`) skips it for
+  API calls.

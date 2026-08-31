@@ -1,0 +1,34 @@
+# Runs local-claude-agent + its ngrok tunnel together, both with
+# restart:unless-stopped, so `docker compose up -d` (once) is the only manual
+# step ever needed - both come back automatically whenever Docker Desktop
+# itself starts (including after a reboot), no LaunchAgent/manual relaunch
+# required. See README.md for one-time setup (claude setup-token, ngrok
+# authtoken + reserved domain).
+services:
+  agent:
+    build: .
+    container_name: local-claude-agent
+    restart: unless-stopped
+    environment:
+      - AGENT_TOKEN=${AGENT_TOKEN}
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+    volumes:
+      - claude-agent-auth:/home/agent
+    # No host port mapping needed - only the ngrok service (on the same
+    # docker network) talks to this, hub reaches it through ngrok's tunnel.
+
+  tunnel:
+    image: ngrok/ngrok:latest
+    container_name: local-claude-agent-tunnel
+    restart: unless-stopped
+    depends_on:
+      - agent
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command:
+      - "http"
+      - "--url=${NGROK_DOMAIN}"
+      - "agent:8790"
+
+volumes:
+  claude-agent-auth:
