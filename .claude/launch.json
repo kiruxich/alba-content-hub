@@ -2,9 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "alba-hub-worktree",
-      "port": 8100,
-      "url": "http://localhost:8100"
+      "name": "alba-hub",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8000
     }
   ]
 }

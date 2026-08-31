@@ -167,6 +167,18 @@ CREATE TABLE IF NOT EXISTS threads_settings (
 );
 INSERT OR IGNORE INTO threads_settings (id, access_token, user_id) VALUES (1, '', '');
 
+-- Pinterest: a user access token (pins:read, pins:write, boards:read,
+-- boards:write scopes) plus an optional default board id - unlike the other
+-- platforms every Pin must belong to a board, so the publish flow lets a
+-- board be picked per-post (falling back to this default) rather than baking
+-- one board in at settings time. See server/lib/socialPublishers/pinterest.js.
+CREATE TABLE IF NOT EXISTS pinterest_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    access_token TEXT DEFAULT '',
+    default_board_id TEXT DEFAULT ''
+);
+INSERT OR IGNORE INTO pinterest_settings (id, access_token, default_board_id) VALUES (1, '', '');
+
 -- Two-way approval workflow: one row per idea sent to Telegram for review,
 -- keyed by the sendMessage-returned message_id so an incoming reply (whose
 -- reply_to_message.message_id points back at it) can be correlated to the

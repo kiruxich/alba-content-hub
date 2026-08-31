@@ -557,6 +557,10 @@
                         <div class="parser-niche-head"><b>Threads</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Отдельный API Meta (graph.threads.net), не тот же что у Instagram. Ждёт App Review от Meta.</p>
                     </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Pinterest</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <p class="idea-desc-text">API v5, каждый пин обязательно на доску (board_id) — доска выбирается при публикации или задаётся по умолчанию в настройках. Требует обложку, текст-онли пины не поддерживаются.</p>
+                    </div>
                 </div>
 
                 <!-- Layer: agents -->
@@ -988,6 +992,7 @@
                     <button class="edit-btn ps-tab-btn" data-ps-tab="ig" onclick="switchPublishSettingsTab('ig')">📸 Instagram</button>
                     <button class="edit-btn ps-tab-btn" data-ps-tab="yt" onclick="switchPublishSettingsTab('yt')">▶️ YouTube</button>
                     <button class="edit-btn ps-tab-btn" data-ps-tab="th" onclick="switchPublishSettingsTab('th')">🧵 Threads</button>
+                    <button class="edit-btn ps-tab-btn" data-ps-tab="pin" onclick="switchPublishSettingsTab('pin')">📌 Pinterest</button>
                 </div>
 
                 <!-- TELEGRAM TAB -->
@@ -1065,6 +1070,26 @@
 
                     <button class="submit-btn" onclick="saveThSettings()">Сохранить настройки</button>
                 </div>
+
+                <!-- PINTEREST TAB -->
+                <div id="ps-tab-pin" class="ps-tab-content" style="display:none;">
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">User access token из приложения Pinterest Developers со скоупами pins:read, pins:write, boards:read, boards:write. Каждый пин обязательно публикуется на доску — выберите доску по умолчанию или создайте новую ниже; конкретную доску можно также выбрать прямо при публикации идеи.</p>
+                    <label class="form-label">Access Token:</label>
+                    <input type="text" id="pin-token-input" class="form-input" placeholder="pina_xxxxxxxx...">
+
+                    <label class="form-label">Доска по умолчанию:</label>
+                    <select id="pin-board-select" class="form-select"></select>
+
+                    <button class="submit-btn" onclick="savePinSettings()">Сохранить настройки</button>
+
+                    <div class="info-box" style="margin-top:20px;">
+                        <strong>Создать новую доску</strong>
+                        <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-start;">
+                            <input type="text" id="pin-new-board-name" class="form-input" style="margin:0;" placeholder="Название доски">
+                            <button class="schedule-btn" style="white-space:nowrap;" onclick="createPinterestBoard()">+ Создать</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1088,6 +1113,11 @@
                 <div id="publish-channel-row" style="display:none;">
                     <label class="form-label">Канал:</label>
                     <select id="publish-channel-select" class="form-select" onchange="onPublishChannelChange()"></select>
+                </div>
+
+                <div id="publish-board-row" style="display:none;">
+                    <label class="form-label">Доска Pinterest:</label>
+                    <select id="publish-board-select" class="form-select" onchange="onPublishBoardChange()"></select>
                 </div>
 
                 <div id="publish-not-configured-box" class="info-box" style="display:none; margin-bottom:16px; border-color: rgba(255,69,58,0.35);"></div>

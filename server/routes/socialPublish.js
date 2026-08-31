@@ -4,6 +4,7 @@ import { publish as publishToVk } from '../lib/socialPublishers/vk.js';
 import { publish as publishToInstagram } from '../lib/socialPublishers/instagram.js';
 import { publish as publishToYoutube } from '../lib/socialPublishers/youtube.js';
 import { publish as publishToThreads } from '../lib/socialPublishers/threads.js';
+import { publish as publishToPinterest } from '../lib/socialPublishers/pinterest.js';
 import { resolveLangError } from '../lib/resolveIdeaLang.js';
 
 const router = Router();
@@ -116,6 +117,32 @@ router.post('/threads', async (req, res) => {
     const coverAsset = await loadCoverAsset(idea);
     const result = await publishToThreads(idea, { accessToken: settings.access_token, userId: settings.user_id }, coverAsset, lang);
     if (!result.success) return res.status(502).json({ error: result.error || 'Threads publish failed' });
+    res.json({ ok: true, externalPostId: result.externalPostId });
+});
+
+router.post('/pinterest', async (req, res) => {
+    const { ideaId, boardId } = req.body || {};
+    if (!ideaId) return res.status(400).json({ error: 'ideaId is required' });
+    const idea = await loadIdea(ideaId);
+    if (!idea) return res.status(404).json({ error: 'idea not found' });
+
+    const lang = normalizeLang(req.body);
+    const langError = resolveLangError(idea, lang);
+    if (langError) return res.status(400).json({ error: langError });
+
+    const settingsRes = await db.execute('SELECT access_token, default_board_id FROM pinterest_settings WHERE id = 1');
+    const settings = settingsRes.rows[0];
+    if (!settings.access_token) {
+        return res.status(400).json({ error: 'Pinterest не настроен' });
+    }
+    const resolvedBoardId = boardId || settings.default_board_id;
+    if (!resolvedBoardId) {
+        return res.status(400).json({ error: 'Не выбрана доска для публикации' });
+    }
+
+    const coverAsset = await loadCoverAsset(idea);
+    const result = await publishToPinterest(idea, { accessToken: settings.access_token }, coverAsset, lang, resolvedBoardId);
+    if (!result.success) return res.status(502).json({ error: result.error || 'Pinterest publish failed' });
     res.json({ ok: true, externalPostId: result.externalPostId });
 });
 

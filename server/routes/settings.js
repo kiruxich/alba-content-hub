@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { listBoards, createBoard } from '../lib/socialPublishers/pinterest.js';
 
 const router = Router();
 
@@ -187,6 +188,59 @@ router.put('/threads', async (req, res) => {
         hasToken: Boolean(nextToken),
         tokenPreview: nextToken ? `••••${nextToken.slice(-4)}` : '',
     });
+});
+
+// Pinterest follows the same write-mostly pattern as VK/Instagram/Threads
+// above, plus a saved default board id (every Pin needs one - see
+// server/lib/socialPublishers/pinterest.js). /pinterest/boards proxies
+// Pinterest's own boards list/create so the frontend never needs the raw
+// access token to populate the board picker.
+router.get('/pinterest', async (req, res) => {
+    const result = await db.execute('SELECT access_token, default_board_id FROM pinterest_settings WHERE id = 1');
+    const row = result.rows[0];
+    const hasToken = Boolean(row.access_token);
+    res.json({
+        defaultBoardId: row.default_board_id || '',
+        hasToken,
+        tokenPreview: hasToken ? `••••${row.access_token.slice(-4)}` : '',
+    });
+});
+
+router.put('/pinterest', async (req, res) => {
+    const { accessToken, defaultBoardId } = req.body || {};
+    const currentRes = await db.execute('SELECT access_token, default_board_id FROM pinterest_settings WHERE id = 1');
+    const current = currentRes.rows[0];
+    const nextToken = accessToken !== undefined && accessToken !== '' ? accessToken.trim() : current.access_token;
+    const nextBoardId = defaultBoardId !== undefined ? String(defaultBoardId).trim() : current.default_board_id;
+    await db.execute({ sql: 'UPDATE pinterest_settings SET access_token = ?, default_board_id = ? WHERE id = 1', args: [nextToken, nextBoardId] });
+    res.json({
+        defaultBoardId: nextBoardId,
+        hasToken: Boolean(nextToken),
+        tokenPreview: nextToken ? `••••${nextToken.slice(-4)}` : '',
+    });
+});
+
+router.get('/pinterest/boards', async (req, res) => {
+    const result = await db.execute('SELECT access_token FROM pinterest_settings WHERE id = 1');
+    const accessToken = result.rows[0]?.access_token;
+    if (!accessToken) return res.status(400).json({ error: 'Pinterest не настроен' });
+    try {
+        res.json(await listBoards(accessToken));
+    } catch (e) {
+        res.status(502).json({ error: e.message || 'Не удалось получить список досок' });
+    }
+});
+
+router.post('/pinterest/boards', async (req, res) => {
+    const result = await db.execute('SELECT access_token FROM pinterest_settings WHERE id = 1');
+    const accessToken = result.rows[0]?.access_token;
+    if (!accessToken) return res.status(400).json({ error: 'Pinterest не настроен' });
+    try {
+        const board = await createBoard(accessToken, req.body?.name, req.body?.description);
+        res.status(201).json(board);
+    } catch (e) {
+        res.status(502).json({ error: e.message || 'Не удалось создать доску' });
+    }
 });
 
 export default router;

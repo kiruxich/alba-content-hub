@@ -20,8 +20,10 @@ let vkMeta = { groupId: '', hasToken: false, tokenPreview: '' };
 let igMeta = { businessAccountId: '', hasToken: false, tokenPreview: '' };
 let ytMeta = { clientId: '', channelTitle: '', hasClientSecret: false, hasRefreshToken: false, configured: false };
 let thMeta = { userId: '', hasToken: false, tokenPreview: '' };
+let pinMeta = { defaultBoardId: '', hasToken: false, tokenPreview: '' };
 let telegramChannels = []; // [{ id, label, chatId }] - see server/routes/settings.js /telegram-channels
-let publishModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null };
+let pinterestBoards = []; // [{ id, name }] - see server/routes/settings.js /pinterest/boards
+let publishModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
 let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
@@ -907,14 +909,15 @@ function processImportJSON(event) {
 // for the write-mostly PUT pattern each save*Settings function below hits.
 async function openPublishSettingsModal() {
     try {
-        const [telegram, vk, instagram, youtube, threads] = await Promise.all([
+        const [telegram, vk, instagram, youtube, threads, pinterest] = await Promise.all([
             api('/api/settings/telegram'),
             api('/api/settings/vk'),
             api('/api/settings/instagram'),
             api('/api/settings/youtube'),
             api('/api/settings/threads'),
+            api('/api/settings/pinterest'),
         ]);
-        tgMeta = telegram; vkMeta = vk; igMeta = instagram; ytMeta = youtube; thMeta = threads;
+        tgMeta = telegram; vkMeta = vk; igMeta = instagram; ytMeta = youtube; thMeta = threads; pinMeta = pinterest;
     } catch (e) {
         showToast('Не удалось получить настройки публикаций: ' + e.message);
     }
@@ -974,13 +977,73 @@ async function openPublishSettingsModal() {
     }
     if (thUserInput) thUserInput.value = thMeta.userId || '';
 
+    const pinTokenInput = document.getElementById('pin-token-input');
+    if (pinTokenInput) {
+        pinTokenInput.value = '';
+        pinTokenInput.placeholder = pinMeta.hasToken
+            ? `Сохранён токен ${pinMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'pina_xxxxxxxx...';
+    }
+    await loadPinterestBoards();
+    renderPinterestBoardSelect('pin-board-select', pinMeta.defaultBoardId);
+
     await loadTelegramChannels();
     switchPublishSettingsTab('tg');
     openOverlay('publish-settings-overlay');
 }
 
+// Pinterest boards - shared between the settings tab's "default board" select
+// and the publish modal's per-post board select. Silently empties the list
+// (rather than toasting) when Pinterest isn't configured yet, since this is
+// called eagerly every time either modal opens.
+async function loadPinterestBoards() {
+    if (!pinMeta.hasToken) { pinterestBoards = []; return; }
+    try {
+        pinterestBoards = await api('/api/settings/pinterest/boards');
+    } catch (e) {
+        pinterestBoards = [];
+    }
+}
+
+function renderPinterestBoardSelect(selectId, selectedId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    select.innerHTML = pinterestBoards.length === 0
+        ? `<option value="">— нет досок —</option>`
+        : pinterestBoards.map(b => `<option value="${b.id}" ${b.id === selectedId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('');
+}
+
+async function savePinSettings() {
+    const accessToken = document.getElementById('pin-token-input').value.trim();
+    const defaultBoardId = document.getElementById('pin-board-select').value;
+    try {
+        pinMeta = await api('/api/settings/pinterest', { method: 'PUT', body: JSON.stringify({ accessToken, defaultBoardId }) });
+        await loadPinterestBoards();
+        renderPinterestBoardSelect('pin-board-select', pinMeta.defaultBoardId);
+        showToast('Настройки Pinterest сохранены');
+        renderBankView();
+    } catch (e) {
+        showToast('Не удалось сохранить настройки Pinterest: ' + e.message);
+    }
+}
+
+async function createPinterestBoard() {
+    const nameInput = document.getElementById('pin-new-board-name');
+    const name = nameInput.value.trim();
+    if (!name) { showToast('Укажите название доски'); return; }
+    try {
+        await api('/api/settings/pinterest/boards', { method: 'POST', body: JSON.stringify({ name }) });
+        nameInput.value = '';
+        await loadPinterestBoards();
+        renderPinterestBoardSelect('pin-board-select', pinMeta.defaultBoardId);
+        showToast('Доска создана');
+    } catch (e) {
+        showToast('Не удалось создать доску: ' + e.message);
+    }
+}
+
 function switchPublishSettingsTab(tab) {
-    ['tg', 'vk', 'ig', 'yt', 'th'].forEach(t => {
+    ['tg', 'vk', 'ig', 'yt', 'th', 'pin'].forEach(t => {
         const content = document.getElementById(`ps-tab-${t}`);
         if (content) content.style.display = t === tab ? '' : 'none';
         const btn = document.querySelector(`.ps-tab-btn[data-ps-tab="${t}"]`);
@@ -1123,6 +1186,7 @@ const PUBLISH_PLATFORMS = [
     { id: 'instagram', label: '📸 Instagram', isConfigured: () => igMeta.hasToken, notConfiguredMsg: 'Instagram не настроен. Укажите Page Access Token и Business Account ID в настройках публикаций.' },
     { id: 'youtube', label: '▶️ YouTube', isConfigured: () => ytMeta.configured, notConfiguredMsg: 'YouTube не настроен. Укажите Client ID, Client Secret и Refresh Token в настройках публикаций.' },
     { id: 'threads', label: '🧵 Threads', isConfigured: () => thMeta.hasToken, notConfiguredMsg: 'Threads не настроен. Укажите Access Token и User ID в настройках публикаций.' },
+    { id: 'pinterest', label: '📌 Pinterest', isConfigured: () => pinMeta.hasToken, notConfiguredMsg: 'Pinterest не настроен. Укажите Access Token в настройках публикаций.' },
 ];
 
 function getPublishModalIdea() {
@@ -1145,22 +1209,25 @@ async function openPublishModal(ideaId) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
 
-    publishModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null };
+    publishModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
 
     try {
-        const [telegram, vk, instagram, youtube, threads] = await Promise.all([
+        const [telegram, vk, instagram, youtube, threads, pinterest] = await Promise.all([
             api('/api/settings/telegram'),
             api('/api/settings/vk'),
             api('/api/settings/instagram'),
             api('/api/settings/youtube'),
             api('/api/settings/threads'),
+            api('/api/settings/pinterest'),
         ]);
-        tgMeta = telegram; vkMeta = vk; igMeta = instagram; ytMeta = youtube; thMeta = threads;
+        tgMeta = telegram; vkMeta = vk; igMeta = instagram; ytMeta = youtube; thMeta = threads; pinMeta = pinterest;
     } catch (e) {
         showToast('Не удалось получить настройки публикаций: ' + e.message);
     }
     await loadTelegramChannels();
     if (telegramChannels.length > 0) publishModalState.channelId = telegramChannels[0].id;
+    await loadPinterestBoards();
+    publishModalState.boardId = pinMeta.defaultBoardId || (pinterestBoards[0] && pinterestBoards[0].id) || null;
 
     document.getElementById('publish-idea-title').innerText = idea.title;
     openOverlay('publish-overlay');
@@ -1185,6 +1252,11 @@ function setPublishLang(lang) {
 function onPublishChannelChange() {
     const select = document.getElementById('publish-channel-select');
     publishModalState.channelId = select.value ? Number(select.value) : null;
+}
+
+function onPublishBoardChange() {
+    const select = document.getElementById('publish-board-select');
+    publishModalState.boardId = select.value || null;
 }
 
 function renderPublishModal() {
@@ -1214,12 +1286,27 @@ function renderPublishModal() {
         channelRow.style.display = 'none';
     }
 
+    const boardRow = document.getElementById('publish-board-row');
+    const boardSelect = document.getElementById('publish-board-select');
+    if (publishModalState.platform === 'pinterest') {
+        boardRow.style.display = '';
+        boardSelect.innerHTML = pinterestBoards.length === 0
+            ? `<option value="">— нет досок —</option>`
+            : pinterestBoards.map(b => `<option value="${b.id}" ${b.id === publishModalState.boardId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('');
+    } else {
+        boardRow.style.display = 'none';
+    }
+
     const warnBox = document.getElementById('publish-not-configured-box');
     let warnMsg = '';
     if (!configured) {
         warnMsg = currentPlatform.notConfiguredMsg;
     } else if (publishModalState.platform === 'telegram' && telegramChannels.length === 0) {
         warnMsg = 'Нет добавленных каналов для публикации. Добавьте хотя бы один канал в настройках публикаций.';
+    } else if (publishModalState.platform === 'pinterest' && pinterestBoards.length === 0) {
+        warnMsg = 'Нет ни одной доски в Pinterest. Создайте доску в настройках публикаций.';
+    } else if (publishModalState.platform === 'pinterest' && !idea.coverAssetId) {
+        warnMsg = 'У этой идеи нет обложки — Pinterest требует изображение для каждого пина. Сгенерируйте или добавьте обложку.';
     }
     if (warnMsg) {
         warnBox.style.display = '';
@@ -1249,19 +1336,24 @@ function renderPublishModal() {
     document.getElementById('publish-preview-desc').innerText = desc || '';
     document.getElementById('publish-preview-cta').innerText = cta ? `👉 ${cta}` : '';
 
-    const canPublish = configured && (publishModalState.platform !== 'telegram' || publishModalState.channelId);
+    const canPublish = configured
+        && (publishModalState.platform !== 'telegram' || publishModalState.channelId)
+        && (publishModalState.platform !== 'pinterest' || (publishModalState.boardId && idea.coverAssetId));
     document.getElementById('publish-confirm-btn').disabled = !canPublish;
 }
 
 async function confirmPublish() {
     const idea = getPublishModalIdea();
     if (!idea) return;
-    const { platform, lang, channelId, ideaId } = publishModalState;
+    const { platform, lang, channelId, boardId, ideaId } = publishModalState;
 
     try {
         if (platform === 'telegram') {
             if (!channelId) { showToast('Выберите канал для публикации'); return; }
             await api('/api/telegram/post', { method: 'POST', body: JSON.stringify({ ideaId, channelId, lang }) });
+        } else if (platform === 'pinterest') {
+            if (!boardId) { showToast('Выберите доску для публикации'); return; }
+            await api('/api/publish/pinterest', { method: 'POST', body: JSON.stringify({ ideaId, boardId, lang }) });
         } else {
             await api(`/api/publish/${platform}`, { method: 'POST', body: JSON.stringify({ ideaId, lang }) });
         }
