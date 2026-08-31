@@ -66,6 +66,14 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 </body>
 </html>`;
 
+// Not sensitive, and browsers request these before/without any session
+// (a fresh tab, the login page itself, Safari's separate cookie jar, ...) -
+// serving the login-page HTML instead of the real file for these specific
+// paths is what made the favicon silently break for anyone not already
+// authenticated in that browser. Every other static asset (styles.css,
+// js/app.js, ...) is correctly still gated - this is a narrow bypass.
+const PUBLIC_PATHS = new Set(['/favicon.svg', '/favicon-192.png', '/favicon-32.png']);
+
 // Gates every request. Left permanently open (no-op) if auth isn't
 // configured (ADMIN_EMAIL/ADMIN_PASSWORD_HASH/SESSION_SECRET unset), so the
 // app keeps working exactly as before for local dev where nobody's set
@@ -73,7 +81,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 // production.
 export function requireAuth(req, res, next) {
     if (!isAuthConfigured()) return next();
-    if (req.path === '/api/auth/login') return next();
+    if (req.path === '/api/auth/login' || PUBLIC_PATHS.has(req.path)) return next();
     if (isRequestAuthenticated(req)) return next();
 
     if (req.path.startsWith('/api/')) {
