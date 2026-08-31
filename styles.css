@@ -530,6 +530,22 @@ html, body {
 .parser-file-badge:hover { border-color: var(--accent-blue); }
 .parser-niche-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .parser-upload-btn { display: inline-flex; align-items: center; }
+.parser-niche-versions-toggle {
+    background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+    font-size: 12px; font-weight: 600; color: var(--text-secondary); font-family: inherit;
+}
+.parser-niche-versions-toggle:hover { color: var(--accent-blue); }
+.parser-niche-versions-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.parser-niche-versions-empty { font-size: 12px; color: var(--text-secondary); padding: 4px 0; }
+.parser-niche-version-row {
+    display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 6px 10px;
+    font-size: 11.5px; cursor: pointer; transition: border-color 0.15s ease;
+}
+.parser-niche-version-row:hover { border-color: var(--accent-blue); }
+.parser-niche-version-kind { flex-shrink: 0; font-weight: 700; color: var(--text-secondary); }
+.parser-niche-version-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.parser-niche-version-date { flex-shrink: 0; color: var(--text-secondary); }
 
 /* ЦЕНТР АГЕНТОВ */
 .ac-run-status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 7px; text-transform: uppercase; flex-shrink: 0; }
