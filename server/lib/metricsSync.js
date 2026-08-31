@@ -264,11 +264,68 @@ async function fetchYoutubeMetrics(rows) {
     return { updated, skipped: rows.length - updated, reason: updated < rows.length ? 'not_found_or_api_error' : null };
 }
 
+// --- Pinterest -----------------------------------------------------------
+// Pinterest API v5's pin analytics endpoint (GET /pins/{id}/analytics) needs
+// a date range and returns per-day buckets, not a single running total -
+// this sums across a wide window (since well before this app existed) so
+// the result reads as a cumulative total, same shape as the other
+// platforms' metrics_views/saves/clicks. Credentials live in their own
+// pinterest_settings table (server/routes/settings.js), not the generic
+// platform_connections table the other three platforms share - Pinterest's
+// publish flow was built with its own settings table for board_id, so this
+// reads from the same place rather than introducing a second source of truth.
+//
+// Metric mapping:
+//   metrics_views  <- IMPRESSION  (literal match - times the Pin was shown)
+//   metrics_saves  <- SAVE        (literal match - Pinterest's own "save"
+//                                   concept, not a proxy like on other platforms)
+//   metrics_clicks <- PIN_CLICK   (literal match - clicks on the Pin itself)
+async function fetchPinterestMetrics(rows) {
+    const conn = (await db.execute('SELECT access_token FROM pinterest_settings WHERE id = 1')).rows[0];
+    if (!conn?.access_token) {
+        console.debug('metricsSync: skipping Pinterest sync - no access_token in pinterest_settings');
+        return { updated: 0, skipped: rows.length, reason: 'missing_credentials' };
+    }
+
+    const endDate = new Date().toISOString().slice(0, 10);
+    const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    let updated = 0;
+    for (const row of rows) {
+        try {
+            const url = new URL(`https://api.pinterest.com/v5/pins/${row.external_post_id}/analytics`);
+            url.searchParams.set('start_date', startDate);
+            url.searchParams.set('end_date', endDate);
+            url.searchParams.set('metric_types', 'IMPRESSION,SAVE,PIN_CLICK');
+            const resp = await fetch(url, { headers: { Authorization: `Bearer ${conn.access_token}` } });
+            const data = await resp.json();
+            if (!resp.ok) {
+                console.debug(`metricsSync: Pinterest analytics error for ${row.external_post_id}:`, data.message || data.error || resp.status);
+                continue;
+            }
+            const sumMetric = name => {
+                const daily = data.all?.daily_metrics || [];
+                return daily.reduce((sum, day) => sum + (day.data_status === 'READY' ? (day.metrics?.[name] || 0) : 0), 0);
+            };
+            await updateEventMetrics(row.id, {
+                views: sumMetric('IMPRESSION') || row.metrics_views,
+                saves: sumMetric('SAVE') || row.metrics_saves,
+                clicks: sumMetric('PIN_CLICK') || row.metrics_clicks,
+            });
+            updated++;
+        } catch (e) {
+            console.debug(`metricsSync: Pinterest fetch failed for ${row.external_post_id}:`, e.message);
+        }
+    }
+    return { updated, skipped: rows.length - updated, reason: updated < rows.length ? 'not_found_or_api_error' : null };
+}
+
 const FETCHERS = {
     telegram: fetchTelegramMetrics,
     vk: fetchVkMetrics,
     instagram: fetchInstagramMetrics,
     youtube: fetchYoutubeMetrics,
+    pinterest: fetchPinterestMetrics,
 };
 
 // Pulls metrics for every scheduled_events row that has an external_post_id
