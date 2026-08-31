@@ -318,6 +318,29 @@ CREATE TABLE IF NOT EXISTS parser_niches (
     updated_at INTEGER DEFAULT (strftime('%s','now'))
 );
 
+-- Durable, versioned copies of parser_niches' files (raw/dedup/archive),
+-- pushed to S3-compatible object storage right before parser_niches' own
+-- raw_file/dedup_file/archive_file/raw_upload_data columns would be
+-- overwritten or cleared - see server/routes/parserNiches.js. Those columns
+-- (and parser-worker's own job_id-keyed temp files) are NOT durable: a
+-- re-run of "▶ Обновить парсер" wipes them, and once job_id changes or
+-- parser-worker cleans up old job dirs, worker-produced files become
+-- unreachable even though the DB still shows the file badge as available.
+-- This table is the only durable copy. Writing to it is best-effort and
+-- entirely skipped when isObjectStorageConfigured() is false (see
+-- server/lib/objectStorage.js) - same graceful-degradation pattern as
+-- media_assets covers/voiceovers, so an unconfigured S3 never blocks the
+-- underlying user-facing flow (upload, status poll, re-run all still work).
+CREATE TABLE IF NOT EXISTS parser_niche_file_versions (
+    id TEXT PRIMARY KEY,
+    niche_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    s3_key TEXT NOT NULL,
+    original_filename TEXT,
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_parser_niche_file_versions_niche_id ON parser_niche_file_versions(niche_id);
+
 -- One row per Shorts-assembly request handed to video-worker (Phase 2) - the
 -- same "hub DB row tracks a remote worker's job_id" shape as parser_niches
 -- above, just without the persistent-card lifecycle (this is a one-shot job,

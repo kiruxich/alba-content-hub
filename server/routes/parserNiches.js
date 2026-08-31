@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
 import XLSX from 'xlsx';
+import crypto from 'crypto';
 import { db } from '../db.js';
 import { generateParserQueries } from '../lib/generateParserQueries.js';
 import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
 import { isLocalClaudeAgentConfigured, generateNicheDescription } from '../lib/localClaudeAgent.js';
+import { isObjectStorageConfigured, uploadBuffer, publicUrlForKey } from '../lib/objectStorage.js';
 
 const router = Router();
 const WORKER_TOKEN = process.env.PARSER_WORKER_TOKEN || '';
@@ -30,6 +32,83 @@ async function notifyTelegram(text) {
         });
     } catch (e) {
         console.error('parserNiches: failed to notify Telegram:', e.message);
+    }
+}
+
+// Durable archival of niche files into S3-compatible object storage - the
+// only place any of raw/dedup/archive survive a re-run (which nulls the DB
+// columns, see /:id/run below) or the parser-worker cleaning up an old
+// job_id's files. Entirely best-effort: every function here swallows its own
+// errors and is a silent no-op when isObjectStorageConfigured() is false, so
+// archival can never block or break the upload/run/status flows it hooks
+// into - identical in spirit to rehostIfConfigured() in mediaAssets.js.
+async function archiveFileVersion(nicheId, kind, buffer, contentType, originalFilename) {
+    if (!isObjectStorageConfigured()) return;
+    try {
+        const { key } = await uploadBuffer(buffer, { contentType, keyPrefix: `parser-niches/${nicheId}` });
+        await db.execute({
+            sql: `INSERT INTO parser_niche_file_versions (id, niche_id, kind, s3_key, original_filename) VALUES (?, ?, ?, ?, ?)`,
+            args: [crypto.randomUUID(), nicheId, kind, key, originalFilename || null],
+        });
+    } catch (e) {
+        console.error(`parserNiches: failed to archive ${kind} file for niche ${nicheId} to object storage:`, e.message);
+    }
+}
+
+// Worker-produced dedup/archive (and worker-scraped raw) files only exist on
+// parser-worker's disk, keyed by job_id - fetches the bytes once via the
+// same fetchParserFile() the download route uses, then archives them.
+async function archiveWorkerFile(nicheId, jobId, kind, fallbackFilename) {
+    try {
+        const workerRes = await fetchParserFile(jobId, kind);
+        const contentType = workerRes.headers.get('content-type') || 'application/octet-stream';
+        const buf = Buffer.from(await workerRes.arrayBuffer());
+        await archiveFileVersion(nicheId, kind, buf, contentType, fallbackFilename);
+    } catch (e) {
+        console.error(`parserNiches: failed to fetch ${kind} file from worker for archival (niche ${nicheId}):`, e.message);
+    }
+}
+
+// Call this with a niche row *before* any UPDATE that would null or replace
+// raw_file/dedup_file/archive_file/raw_upload_data (a re-run, a fresh
+// upload) - archives whatever's currently on the row so the impending
+// overwrite never permanently loses it. Must be called before row.job_id is
+// itself replaced by a new job, since dedup/archive bytes only exist on the
+// worker under the job_id that produced them. No-op (no worker round-trips
+// either) when object storage isn't configured.
+async function archiveExistingNicheFiles(row) {
+    if (!isObjectStorageConfigured()) return;
+    // Uploaded raw lives locally as base64 - archive directly, no worker round-trip.
+    if (row.raw_upload_data) {
+        await archiveFileVersion(
+            row.id, 'raw',
+            Buffer.from(row.raw_upload_data, 'base64'),
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            row.raw_upload_name || 'raw.xlsx',
+        );
+    }
+    if (row.job_id) {
+        for (const kind of ['raw', 'dedup', 'archive']) {
+            if (kind === 'raw' && row.raw_upload_data) continue; // already handled above
+            if (!row[`${kind}_file`]) continue;
+            await archiveWorkerFile(row.id, row.job_id, kind, row[`${kind}_file`]);
+        }
+    }
+}
+
+// Called from the status-poll route: compares the row as it was *before*
+// this poll against the worker's fresh job.files flags, and archives any
+// kind that just transitioned from unavailable to available - this is what
+// protects a scrape's raw/dedup/archive output from disappearing once
+// job_id changes on the next run or parser-worker cleans up the job dir,
+// since otherwise those bytes are never durably saved anywhere in this app.
+async function archiveNewlyAvailableFiles(row, job) {
+    if (!isObjectStorageConfigured() || !row.job_id || !job?.files) return;
+    for (const kind of ['raw', 'dedup', 'archive']) {
+        if (job.files[kind] && !row[`${kind}_file`]) {
+            const filename = kind === 'archive' ? 'archive.zip' : `${kind}.xlsx`;
+            await archiveWorkerFile(row.id, row.job_id, kind, filename);
+        }
     }
 }
 
@@ -134,6 +213,11 @@ router.post('/:id/run', async (req, res) => {
         const queries = await generateParserQueries(row.category, row.description);
         const job = await createParserJob({ nicheId: row.id, category: row.category, description: row.description, queries });
 
+        // Archive whatever raw/dedup/archive this row currently holds before
+        // the UPDATE below nulls all of it - row.job_id here is still the
+        // *old* job, which is required for fetching worker-produced files.
+        try { await archiveExistingNicheFiles(row); } catch (e) { console.error('parserNiches: archival before run failed:', e.message); }
+
         await db.execute({
             sql: `UPDATE parser_niches SET status = 'queued', queries_json = ?, job_id = ?, log = '', stats_json = NULL,
                   raw_file = NULL, dedup_file = NULL, archive_file = NULL,
@@ -173,6 +257,11 @@ router.get('/:id/status', async (req, res) => {
                 await notifyTelegram(`❌ *Парсер 2ГИС завершился с ошибкой на нише «${row.category}»*\n\n${errorLine}Подробности — в приложении.`);
             }
         }
+
+        // Archive any raw/dedup/archive file that just became available on
+        // this poll, before it's ever at risk of being lost to a re-run or
+        // the worker cleaning up this job_id's directory later.
+        try { await archiveNewlyAvailableFiles(row, job); } catch (e) { console.error('parserNiches: archival on status transition failed:', e.message); }
 
         await db.execute({
             sql: `UPDATE parser_niches SET status = ?, log = ?, stats_json = ?,
@@ -278,6 +367,14 @@ router.post('/:id/upload', (req, res, next) => {
     XLSX.utils.book_append_sheet(cleanWb, XLSX.utils.json_to_sheet(rows), 'Leads');
     const outBuf = XLSX.write(cleanWb, { type: 'buffer', bookType: 'xlsx' });
 
+    // Archive whatever this row currently has (a previous upload, or
+    // worker-produced dedup/archive from an earlier scrape) before the
+    // UPDATE below overwrites/clears it.
+    try { await archiveExistingNicheFiles(row); } catch (e) { console.error('parserNiches: archival before upload failed:', e.message); }
+    // Also archive this brand-new upload itself right away, rather than
+    // relying only on some future overwrite to trigger the archival above.
+    await archiveFileVersion(row.id, 'raw', outBuf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', originalName);
+
     await db.execute({
         sql: `UPDATE parser_niches SET status = 'done', raw_file = 'raw.xlsx', dedup_file = NULL, archive_file = NULL,
               raw_upload_data = ?, raw_upload_name = ?, log = ?, updated_at = strftime('%s','now') WHERE id = ?`,
@@ -312,6 +409,48 @@ router.get('/:id/download/:kind', async (req, res) => {
         res.setHeader('Content-Type', workerRes.headers.get('content-type') || 'application/octet-stream');
         res.setHeader('Content-Disposition', workerRes.headers.get('content-disposition') || 'attachment');
         const buf = Buffer.from(await workerRes.arrayBuffer());
+        res.send(buf);
+    } catch (e) {
+        res.status(502).send('Не удалось скачать файл: ' + e.message);
+    }
+});
+
+// History of durably-archived files for this niche (most recent first) -
+// populates the "История версий" list in the card. Doesn't expose s3_key
+// directly; use the download route below to fetch a version's bytes.
+router.get('/:id/versions', async (req, res) => {
+    const row = (await db.execute({ sql: 'SELECT id FROM parser_niches WHERE id = ?', args: [req.params.id] })).rows[0];
+    if (!row) return res.status(404).json({ error: 'niche not found' });
+    const result = await db.execute({
+        sql: `SELECT id, kind, original_filename, created_at FROM parser_niche_file_versions
+              WHERE niche_id = ? ORDER BY created_at DESC, id DESC`,
+        args: [req.params.id],
+    });
+    res.json(result.rows.map(r => ({
+        id: r.id,
+        kind: r.kind,
+        filename: r.original_filename || '',
+        createdAt: r.created_at,
+    })));
+});
+
+// Streams a specific archived version's bytes straight from object storage -
+// same proxy-download shape as /:id/download/:kind above, just sourced from
+// S3 instead of parser-worker.
+router.get('/:id/versions/:versionId/download', async (req, res) => {
+    const version = (await db.execute({
+        sql: 'SELECT * FROM parser_niche_file_versions WHERE id = ? AND niche_id = ?',
+        args: [req.params.versionId, req.params.id],
+    })).rows[0];
+    if (!version) return res.status(404).send('not found');
+    if (!isObjectStorageConfigured()) return res.status(503).send('Object storage is not configured');
+    try {
+        const s3Res = await fetch(publicUrlForKey(version.s3_key));
+        if (!s3Res.ok) throw new Error(`${s3Res.status} ${s3Res.statusText}`);
+        const filename = (version.original_filename || `${version.kind}.bin`).replace(/"/g, '');
+        res.setHeader('Content-Type', s3Res.headers.get('content-type') || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        const buf = Buffer.from(await s3Res.arrayBuffer());
         res.send(buf);
     } catch (e) {
         res.status(502).send('Не удалось скачать файл: ' + e.message);

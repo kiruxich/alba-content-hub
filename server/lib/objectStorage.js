@@ -101,7 +101,7 @@ function extensionForContentType(contentType) {
     return 'bin';
 }
 
-function publicUrlForKey(key) {
+export function publicUrlForKey(key) {
     if (S3_PUBLIC_URL_BASE) {
         return `${S3_PUBLIC_URL_BASE.replace(/\/+$/, '')}/${key}`;
     }

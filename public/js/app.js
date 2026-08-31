@@ -2275,6 +2275,13 @@ async function generateUrlCheckPdf() {
 // ЗАКАЗЧИКИ (2ГИС-парсер по нишам)
 let parserNiches = [];
 let parserPollTimers = {};
+// Version history is fetched lazily (only once a card's "История версий" is
+// expanded) rather than joined into every /api/parser-niches poll - the grid
+// re-fetches/re-draws every 4s while any niche is active, and most cards
+// never open their history, so eagerly loading it would be wasted work on
+// every single poll tick for the common case.
+let parserNicheVersions = {};     // niche id -> array of version rows, once fetched
+let parserNicheVersionsOpen = {}; // niche id -> bool, whether the section is expanded
 
 async function renderParserNiches() {
     const container = document.getElementById('parser-niches-grid');
@@ -2333,6 +2340,13 @@ function drawParserNiches() {
                 ${n.files.raw ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','raw')">📊 raw.xlsx</div>` : ''}
                 ${n.files.dedup ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','dedup')">✨ dedup.xlsx</div>` : ''}
                 ${n.files.archive ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','archive')">🗄 archive.zip</div>` : ''}
+            </div>
+
+            <div class="parser-niche-versions">
+                <button type="button" class="parser-niche-versions-toggle" onclick="toggleParserNicheVersions('${n.id}')">
+                    📜 История версий ${parserNicheVersionsOpen[n.id] ? '▴' : '▾'}
+                </button>
+                ${parserNicheVersionsOpen[n.id] ? renderParserNicheVersionsList(n.id) : ''}
             </div>
 
             <div class="parser-niche-actions">
@@ -2473,6 +2487,48 @@ async function archiveParserNiche(id) {
 
 function downloadParserFile(id, kind) {
     window.open(`/api/parser-niches/${id}/download/${kind}`, '_blank');
+}
+
+const PARSER_VERSION_KIND_LABELS = { raw: '📊 raw', dedup: '✨ dedup', archive: '🗄 archive' };
+
+function renderParserNicheVersionsList(id) {
+    const versions = parserNicheVersions[id];
+    if (!versions) {
+        return `<div class="parser-niche-versions-list"><div class="parser-niche-versions-empty">Загрузка…</div></div>`;
+    }
+    if (versions.length === 0) {
+        return `<div class="parser-niche-versions-list"><div class="parser-niche-versions-empty">Пока нет сохранённых версий</div></div>`;
+    }
+    return `<div class="parser-niche-versions-list">${versions.map(v => `
+        <div class="parser-niche-version-row" onclick="downloadParserNicheVersion('${id}','${v.id}')">
+            <span class="parser-niche-version-kind">${PARSER_VERSION_KIND_LABELS[v.kind] || escapeHtml(v.kind)}</span>
+            <span class="parser-niche-version-name">${escapeHtml(v.filename || '')}</span>
+            <span class="parser-niche-version-date">${formatAcTimestamp(v.createdAt)}</span>
+        </div>
+    `).join('')}</div>`;
+}
+
+// Toggles a card's "История версий" section - fetches the version list from
+// the server the first time it's opened for a given niche, then caches it
+// client-side (a fresh /api/parser-niches poll never touches this cache, so
+// a newly-archived version won't show until the section is re-opened or the
+// page reloads - acceptable for a history list nobody needs live-updating).
+async function toggleParserNicheVersions(id) {
+    parserNicheVersionsOpen[id] = !parserNicheVersionsOpen[id];
+    if (parserNicheVersionsOpen[id] && !parserNicheVersions[id]) {
+        drawParserNiches(); // show "Загрузка…" immediately
+        try {
+            parserNicheVersions[id] = await api(`/api/parser-niches/${id}/versions`);
+        } catch (e) {
+            parserNicheVersionsOpen[id] = false;
+            showToast('Не удалось загрузить историю версий: ' + e.message);
+        }
+    }
+    drawParserNiches();
+}
+
+function downloadParserNicheVersion(id, versionId) {
+    window.open(`/api/parser-niches/${id}/versions/${versionId}/download`, '_blank');
 }
 
 // "Загрузить Excel" - alternative to running the live 2GIS scraper: upload an
