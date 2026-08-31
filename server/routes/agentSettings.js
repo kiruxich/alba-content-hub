@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { isLocalClaudeAgentConfigured, discoverRssSources } from '../lib/localClaudeAgent.js';
+import { isLocalClaudeAgentConfigured, discoverRssSources, discoverKeywords } from '../lib/localClaudeAgent.js';
 
 const router = Router();
 
@@ -68,10 +68,12 @@ router.put('/', async (req, res) => {
     res.json(serialize(result.rows[0]));
 });
 
-// "Обновить" button next to sources/keywords in Центр агентов - proposes new
-// RSS sources via local-claude-agent (see server/lib/localClaudeAgent.js),
-// validates each candidate for real, and appends only the new valid ones -
-// never touches/removes what's already there.
+// "✨ Предложить новые" button next to RSS sources in Центр агентов - asks
+// local-claude-agent (see server/lib/localClaudeAgent.js) for candidate
+// feeds, validates each one for real (a live fetch for actual RSS/Atom
+// markup), and returns the checked list for the user to review and pick
+// from client-side - nothing is saved here. The user confirms via the
+// existing single-add POST /sources endpoint below, once per selected item.
 router.post('/discover-sources', async (req, res) => {
     if (!isLocalClaudeAgentConfigured()) {
         return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
@@ -94,19 +96,48 @@ router.post('/discover-sources', async (req, res) => {
         return res.status(502).json({ error: e.message });
     }
 
-    const checks = await Promise.all(candidates.map(async (c) => ({
-        ...c,
-        valid: typeof c?.url === 'string' && !existingSources.includes(c.url) && await isValidFeedUrl(c.url),
-    })));
-    const added = checks.filter(c => c.valid).map(c => c.url);
-    const rejected = checks.filter(c => !c.valid).map(c => c.url).filter(Boolean);
+    const checked = await Promise.all(candidates
+        .filter(c => typeof c?.url === 'string' && c.url.trim() && !existingSources.includes(c.url.trim()))
+        .map(async (c) => ({
+            url: c.url.trim(),
+            reason: c.reason || '',
+            valid: await isValidFeedUrl(c.url.trim()),
+        })));
 
-    if (added.length > 0) {
-        const merged = [...existingSources, ...added];
-        await db.execute({ sql: 'UPDATE agent_settings SET sources = ? WHERE id = 1', args: [JSON.stringify(merged)] });
+    res.json({ candidates: checked });
+});
+
+// "✨ Предложить новые" for keywords - same preview-first shape as sources
+// above, minus the live-validity check (there's no way to "validate" a
+// keyword the way there is an RSS URL).
+router.post('/discover-keywords', async (req, res) => {
+    if (!isLocalClaudeAgentConfigured()) {
+        return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
     }
 
-    res.json({ added, rejected, sources: added.length > 0 ? [...existingSources, ...added] : existingSources });
+    const current = (await db.execute('SELECT * FROM agent_settings WHERE id = 1')).rows[0];
+    const existingKeywords = JSON.parse(current.keywords || '[]');
+
+    const nicheRows = (await db.execute('SELECT about FROM project_info')).rows;
+    const niches = nicheRows.map(r => (r.about || '').trim()).filter(Boolean);
+    if (niches.length === 0) {
+        return res.status(400).json({ error: 'Нет описаний продуктов (project_info) — нечего использовать как ниши' });
+    }
+
+    let candidates;
+    try {
+        const result = await discoverKeywords(existingKeywords, niches);
+        candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+    } catch (e) {
+        return res.status(502).json({ error: e.message });
+    }
+
+    const existingLower = new Set(existingKeywords.map(k => String(k).trim().toLowerCase()));
+    const checked = candidates
+        .map(c => ({ keyword: String(c?.keyword || '').trim(), reason: c?.reason || '' }))
+        .filter(c => c.keyword && !existingLower.has(c.keyword.toLowerCase()));
+
+    res.json({ candidates: checked });
 });
 
 // Dedicated "add one" endpoints - deliberately separate from PUT / (which

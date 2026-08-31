@@ -49,6 +49,10 @@ export function discoverRssSources(existingSources, niches) {
     return callTask('rss-discovery', { existingSources, niches });
 }
 
+export function discoverKeywords(existingKeywords, niches) {
+    return callTask('keyword-discovery', { existingKeywords, niches });
+}
+
 export function generateNicheDescription(category) {
     return callTask('niche-description', { category });
 }

@@ -757,25 +757,23 @@
 
                 <div class="controls-row" style="margin-top:8px; align-items:flex-end;">
                     <div class="p-section-title" style="margin:0;">RSS-ИСТОЧНИКИ RESEARCHER (по одному URL на строку) — <span id="as-sources-count">0</span></div>
-                    <button class="edit-btn" id="as-discover-btn" onclick="discoverRssSources()" title="Найти новые источники через local-claude-agent на вашем ПК">✨ Обновить</button>
+                    <button class="edit-btn" id="as-discover-btn" onclick="discoverRssSources()" title="Найти новые источники через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
                 </div>
                 <textarea id="as-sources-input" class="form-textarea" style="min-height:90px;" placeholder="https://example.com/rss" oninput="updateAgentSettingsCounts()"></textarea>
                 <div id="as-discover-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:-8px 0 12px;"></div>
-                <!-- Adds a single source directly server-side (POST /api/agent-settings/sources)
-                     without resaving the whole textarea, so there's no way this can touch/drop
-                     an existing entry - see addAgentSource() in app.js. -->
-                <div style="display:flex; gap:8px; margin:0 0 20px;">
-                    <input type="text" id="as-new-source-input" class="form-input" style="margin:0;" placeholder="https://example.com/rss">
-                    <button class="schedule-btn" style="white-space:nowrap;" onclick="addAgentSource()">+ Добавить</button>
-                </div>
+                <!-- Populated by discoverRssSources() below - a checklist of AI-proposed,
+                     feed-validated candidates the user confirms before anything is added
+                     (POST /api/agent-settings/sources per checked item, one at a time -
+                     never resaves/touches the rest of the list). -->
+                <div id="as-sources-preview" style="display:none; margin:0 0 20px;"></div>
 
-                <div class="p-section-title" style="margin-top:20px;">КЛЮЧЕВЫЕ СЛОВА (через запятую) — <span id="as-keywords-count">0</span></div>
-                <input type="text" id="as-keywords-input" class="form-input" placeholder="AI, SaaS, автоматизация" oninput="updateAgentSettingsCounts()">
-                <!-- Same "add one" pattern as sources above - POST /api/agent-settings/keywords. -->
-                <div style="display:flex; gap:8px; margin:0 0 20px;">
-                    <input type="text" id="as-new-keyword-input" class="form-input" style="margin:0;" placeholder="новое ключевое слово">
-                    <button class="schedule-btn" style="white-space:nowrap;" onclick="addAgentKeyword()">+ Добавить</button>
+                <div class="controls-row" style="margin-top:20px; align-items:flex-end;">
+                    <div class="p-section-title" style="margin:0;">КЛЮЧЕВЫЕ СЛОВА (через запятую) — <span id="as-keywords-count">0</span></div>
+                    <button class="edit-btn" id="as-keywords-discover-btn" onclick="discoverKeywords()" title="Предложить новые ключевые слова через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
                 </div>
+                <input type="text" id="as-keywords-input" class="form-input" placeholder="AI, SaaS, автоматизация" oninput="updateAgentSettingsCounts()">
+                <div id="as-keywords-discover-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:-8px 0 12px;"></div>
+                <div id="as-keywords-preview" style="display:none; margin:0 0 20px;"></div>
 
                 <div class="p-section-title" style="margin-top:20px;">ТОН ГОЛОСА</div>
                 <textarea id="as-tone-input" class="form-textarea" style="min-height:70px;" placeholder="Экспертный, без воды, с конкретными метриками..."></textarea>

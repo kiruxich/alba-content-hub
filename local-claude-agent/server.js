@@ -127,6 +127,35 @@ Respond with a JSON array of objects: [{ "url": "...", "reason": "short reason t
     }
 });
 
+// task: keyword-discovery
+// body: { existingKeywords: string[], niches: string[] }
+// Proposes new RSS-filter keywords - the agent keeps only feed articles that
+// match one of these. Candidates are just proposed here; hub itself decides
+// which ones actually get saved (there's no live-validity check possible for
+// a keyword the way there is for an RSS URL).
+app.post('/run/keyword-discovery', requireToken, async (req, res) => {
+    const existingKeywords = Array.isArray(req.body?.existingKeywords) ? req.body.existingKeywords : [];
+    const niches = Array.isArray(req.body?.niches) ? req.body.niches : [];
+    if (niches.length === 0) return res.status(400).json({ error: 'niches is required (non-empty array)' });
+
+    const prompt = `You are helping curate keyword filters for a content-marketing research agent that scans RSS feeds daily and keeps only articles matching at least one of these keywords. The agent's products/niches: ${niches.join(', ')}.
+
+Already-used keywords (do NOT suggest these again, or close variants of them):
+${existingKeywords.length ? existingKeywords.map(k => `- ${k}`).join('\n') : '(none yet)'}
+
+Suggest 5-10 NEW keywords/short phrases relevant to these niches that would help catch relevant industry news and trend articles - a mix of broad category terms and more specific ones, in Russian or English depending on what's natural for each niche. Each keyword should be 1-3 words, no full sentences.
+
+Respond with a JSON array of objects: [{ "keyword": "...", "reason": "short reason this fits, in Russian" }, ...]`;
+
+    try {
+        const result = await runClaudeForJson(prompt);
+        if (!Array.isArray(result)) throw new Error('expected a JSON array');
+        res.json({ candidates: result });
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
 // task: niche-description
 // body: { category: string }
 // Writes a description for generateParserQueries.js (server/lib) to build

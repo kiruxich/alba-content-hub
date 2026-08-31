@@ -3434,41 +3434,108 @@ function updateAgentSettingsCounts() {
     document.getElementById('as-keywords-count').innerText = keywordsCount || 'пока нет';
 }
 
-// "+ Добавить" next to each field - appends ONE new source/keyword directly
-// via a dedicated server endpoint (POST /api/agent-settings/sources|keywords)
-// that only ever adds, never resaves the whole list - so unlike editing the
-// textarea/input and hitting the page's "Сохранить", there's no way this can
-// accidentally drop an existing entry.
-async function addAgentSource() {
-    const input = document.getElementById('as-new-source-input');
-    const url = input.value.trim();
-    if (!url) return showToast('Укажите URL источника');
-    try {
-        const result = await api('/api/agent-settings/sources', { method: 'POST', body: JSON.stringify({ url }) });
-        agentSettings.sources = result.sources;
-        document.getElementById('as-sources-input').value = result.sources.join('\n');
-        updateAgentSettingsCounts();
-        input.value = '';
-        showToast('Источник добавлен');
-    } catch (e) {
-        showToast('Не удалось добавить: ' + e.message);
+// Preview state for the "✨ Предложить новые" checklists below - which
+// candidates are currently checked, keyed by url/keyword. Rebuilt fresh
+// every time a discover call returns.
+let sourcesPreviewChecked = new Set();
+let keywordsPreviewChecked = new Set();
+
+function renderSourcesPreview(candidates) {
+    const box = document.getElementById('as-sources-preview');
+    if (!candidates.length) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
     }
+    sourcesPreviewChecked = new Set(candidates.filter(c => c.valid).map(c => c.url));
+    box.style.display = 'block';
+    box.innerHTML = `
+        <div class="parser-niche-console" style="max-height:none; color:var(--text-primary);">
+            ${candidates.map(c => `
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:4px 0; ${c.valid ? '' : 'opacity:.5;'}">
+                    <input type="checkbox" style="margin-top:3px;" ${c.valid ? 'checked' : 'disabled'}
+                        onchange="togglePreviewChecked(sourcesPreviewChecked, '${escapeHtml(c.url).replace(/'/g, "\\'")}', this.checked)">
+                    <span>
+                        <div>${escapeHtml(c.url)}${c.valid ? '' : ' — не похоже на рабочий RSS/Atom'}</div>
+                        ${c.reason ? `<div style="color:var(--text-secondary); font-size:11px;">${escapeHtml(c.reason)}</div>` : ''}
+                    </span>
+                </label>`).join('')}
+        </div>
+        <div style="margin-top:8px;">
+            <button class="schedule-btn" onclick="confirmSourcesPreview()">Добавить выбранные</button>
+            <button class="edit-btn" onclick="document.getElementById('as-sources-preview').style.display='none';">Отмена</button>
+        </div>`;
 }
 
-async function addAgentKeyword() {
-    const input = document.getElementById('as-new-keyword-input');
-    const keyword = input.value.trim();
-    if (!keyword) return showToast('Укажите ключевое слово');
-    try {
-        const result = await api('/api/agent-settings/keywords', { method: 'POST', body: JSON.stringify({ keyword }) });
-        agentSettings.keywords = result.keywords;
-        document.getElementById('as-keywords-input').value = result.keywords.join(', ');
-        updateAgentSettingsCounts();
-        input.value = '';
-        showToast('Ключевое слово добавлено');
-    } catch (e) {
-        showToast('Не удалось добавить: ' + e.message);
+function renderKeywordsPreview(candidates) {
+    const box = document.getElementById('as-keywords-preview');
+    if (!candidates.length) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
     }
+    keywordsPreviewChecked = new Set(candidates.map(c => c.keyword));
+    box.style.display = 'block';
+    box.innerHTML = `
+        <div class="parser-niche-console" style="max-height:none; color:var(--text-primary);">
+            ${candidates.map(c => `
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:4px 0;">
+                    <input type="checkbox" style="margin-top:3px;" checked
+                        onchange="togglePreviewChecked(keywordsPreviewChecked, '${escapeHtml(c.keyword).replace(/'/g, "\\'")}', this.checked)">
+                    <span>
+                        <div>${escapeHtml(c.keyword)}</div>
+                        ${c.reason ? `<div style="color:var(--text-secondary); font-size:11px;">${escapeHtml(c.reason)}</div>` : ''}
+                    </span>
+                </label>`).join('')}
+        </div>
+        <div style="margin-top:8px;">
+            <button class="schedule-btn" onclick="confirmKeywordsPreview()">Добавить выбранные</button>
+            <button class="edit-btn" onclick="document.getElementById('as-keywords-preview').style.display='none';">Отмена</button>
+        </div>`;
+}
+
+function togglePreviewChecked(set, value, checked) {
+    if (checked) set.add(value); else set.delete(value);
+}
+
+async function confirmSourcesPreview() {
+    const urls = [...sourcesPreviewChecked];
+    if (!urls.length) return showToast('Ничего не выбрано');
+    let added = 0;
+    for (const url of urls) {
+        try {
+            const result = await api('/api/agent-settings/sources', { method: 'POST', body: JSON.stringify({ url }) });
+            agentSettings.sources = result.sources;
+            added++;
+        } catch (e) {
+            // 409 (already exists) is expected/harmless if the list changed
+            // underneath this preview; anything else is worth a toast.
+            if (!/уже есть/i.test(e.message)) showToast(`${url}: ${e.message}`);
+        }
+    }
+    document.getElementById('as-sources-input').value = (agentSettings.sources || []).join('\n');
+    document.getElementById('as-sources-preview').style.display = 'none';
+    updateAgentSettingsCounts();
+    if (added) showToast(`Добавлено источников: ${added}`);
+}
+
+async function confirmKeywordsPreview() {
+    const keywords = [...keywordsPreviewChecked];
+    if (!keywords.length) return showToast('Ничего не выбрано');
+    let added = 0;
+    for (const keyword of keywords) {
+        try {
+            const result = await api('/api/agent-settings/keywords', { method: 'POST', body: JSON.stringify({ keyword }) });
+            agentSettings.keywords = result.keywords;
+            added++;
+        } catch (e) {
+            if (!/уже есть/i.test(e.message)) showToast(`${keyword}: ${e.message}`);
+        }
+    }
+    document.getElementById('as-keywords-input').value = (agentSettings.keywords || []).join(', ');
+    document.getElementById('as-keywords-preview').style.display = 'none';
+    updateAgentSettingsCounts();
+    if (added) showToast(`Добавлено ключевых слов: ${added}`);
 }
 
 // РУБРИКИ КОНТЕНТА (реиспользуемые структуры постов, живут в этой же вкладке -
@@ -3641,10 +3708,12 @@ async function saveAgentSettingsForm() {
     }
 }
 
-// "✨ Обновить" рядом с RSS-источниками - просит local-claude-agent (на ПК
-// пользователя, см. local-claude-agent/README.md) найти новые фиды под
-// текущие продукты, сервер сам проверяет каждый кандидат живым запросом и
-// добавляет только валидные новые - существующий список не трогается.
+// "✨ Предложить новые" рядом с RSS-источниками - просит local-claude-agent
+// (на ПК пользователя, см. local-claude-agent/README.md) найти новые фиды
+// под текущие продукты, сервер сам проверяет каждый кандидат живым запросом,
+// а добавление происходит только после подтверждения пользователем в
+// чек-листе (renderSourcesPreview/confirmSourcesPreview выше) - ничего не
+// сохраняется автоматически.
 async function discoverRssSources() {
     const btn = document.getElementById('as-discover-btn');
     const statusEl = document.getElementById('as-discover-status');
@@ -3652,15 +3721,14 @@ async function discoverRssSources() {
     btn.textContent = '⏳ Ищу...';
     statusEl.style.display = 'block';
     statusEl.textContent = 'Обращаюсь к local-claude-agent на вашем ПК — это может занять пару минут...';
+    document.getElementById('as-sources-preview').style.display = 'none';
 
     try {
         const result = await api('/api/agent-settings/discover-sources', { method: 'POST' });
-        if (result.added.length > 0) {
-            document.getElementById('as-sources-input').value = result.sources.join('\n');
-            agentSettings.sources = result.sources;
-            updateAgentSettingsCounts();
-            statusEl.textContent = `Добавлено новых источников: ${result.added.length}.`;
-            showToast(`Добавлено ${result.added.length} новых RSS-источников`);
+        const candidates = result.candidates || [];
+        if (candidates.length > 0) {
+            renderSourcesPreview(candidates);
+            statusEl.textContent = `Найдено кандидатов: ${candidates.length}. Проверьте список ниже и подтвердите.`;
         } else {
             statusEl.textContent = 'Новых подходящих источников не нашлось в этот раз.';
         }
@@ -3669,7 +3737,37 @@ async function discoverRssSources() {
         showToast('Не удалось найти источники: ' + e.message);
     } finally {
         btn.disabled = false;
-        btn.textContent = '✨ Обновить';
+        btn.textContent = '✨ Предложить новые';
+    }
+}
+
+// Тот же принцип для ключевых слов - без живой проверки (ключевое слово
+// нельзя "провалидировать" как URL), поэтому все кандидаты приходят
+// отмеченными по умолчанию.
+async function discoverKeywords() {
+    const btn = document.getElementById('as-keywords-discover-btn');
+    const statusEl = document.getElementById('as-keywords-discover-status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Ищу...';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Обращаюсь к local-claude-agent на вашем ПК — это может занять пару минут...';
+    document.getElementById('as-keywords-preview').style.display = 'none';
+
+    try {
+        const result = await api('/api/agent-settings/discover-keywords', { method: 'POST' });
+        const candidates = result.candidates || [];
+        if (candidates.length > 0) {
+            renderKeywordsPreview(candidates);
+            statusEl.textContent = `Найдено кандидатов: ${candidates.length}. Проверьте список ниже и подтвердите.`;
+        } else {
+            statusEl.textContent = 'Новых подходящих ключевых слов не нашлось в этот раз.';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось предложить ключевые слова: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ Предложить новые';
     }
 }
 
