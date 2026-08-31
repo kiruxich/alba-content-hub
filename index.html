@@ -533,8 +533,8 @@
                         <p class="idea-desc-text">Офлайн нейросетевая озвучка (ru_RU-dmitri). Бесплатная альтернатива ElevenLabs — выбирается в форме генерации озвучки.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>video-worker</b><span class="parser-niche-status captcha">○ ждёт публикации порта</span></div>
-                        <p class="idea-desc-text">FFmpeg-сборка Shorts: видео-клип + озвучка + субтитры → готовый вертикальный ролик. Контейнер уже задеплоен и работает, VIDEO_WORKER_URL и ufw-правило (8788) настроены — осталось включить «Ports Exposes: 8788» в Coolify для этого ресурса.</p>
+                        <div class="parser-niche-head"><b>video-worker</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">FFmpeg-сборка Shorts: видео-клип + озвучка + субтитры → готовый вертикальный ролик. Порт 8788 опубликован, VIDEO_WORKER_URL настроен — финальная сборка ролика в кнопке «Сгенерировать» доступна.</p>
                     </div>
                 </div>
 
@@ -577,6 +577,19 @@
                 </div>
 
                 <!-- Layer: agents -->
+                <div class="p-section-title">ЛОКАЛЬНЫЙ АГЕНТ (ВАШ ПК)</div>
+                <p class="idea-desc-text" style="margin-top:-4px;">Не на VPS — два Docker-контейнера на вашем компьютере (docker-compose, restart:unless-stopped), пробрасываются наружу постоянным доменом ngrok.</p>
+                <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>local-claude-agent</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Обёртка над настоящим `claude` CLI (не root, --allowedTools WebSearch, авторизован вашей подпиской через CLAUDE_CODE_OAUTH_TOKEN). Три фиксированные задачи: поиск RSS-источников, описание ниши парсера, сценарий для Reels — не generic-исполнение промптов.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>ngrok-туннель</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Сайдкар-контейнер, постоянный зарезервированный домен (не меняется при перезапуске). hub стучится в него как в обычный HTTPS-эндпоинт через LOCAL_CLAUDE_AGENT_URL.</p>
+                    </div>
+                </div>
+
                 <div class="p-section-title">АГЕНТЫ (АВТОМАТИЗАЦИЯ)</div>
                 <p class="idea-desc-text" style="margin-top:-4px;">Стрелка обратная: агенты сами дёргают REST API hub'а по расписанию (cron / routine), а не hub вызывает их.</p>
                 <div class="parser-niches-grid">
@@ -612,6 +625,14 @@
 
                 <div class="p-section-title" style="margin-top:24px;">КЛЮЧЕВЫЕ РЕШЕНИЯ</div>
                 <div class="parser-niches-grid">
+                    <div class="parser-niche-card">
+                        <b>Почему Telegram-запросы идут через Cloudflare Worker, а не напрямую</b>
+                        <p class="idea-desc-text">api.telegram.org недоступен напрямую с VPS (проверено: стабильный таймаут 10 сек, при этом google.com/github.com открываются мгновенно — точечная блокировка именно этого хоста, не общая проблема сети). Все обращения к Telegram в этом приложении идут через telegramApiBase() (server/lib/telegramApiBase.js), которая читает TELEGRAM_API_BASE_URL — бесплатный Cloudflare Worker (cloudflare-worker-telegram-proxy/) просто перебрасывает запрос на настоящий api.telegram.org со своей инфраструктуры.</p>
+                    </div>
+                    <div class="parser-niche-card">
+                        <b>Почему RSS-поиск и описание ниши работают через ваш ПК, а не через API-ключ на сервере</b>
+                        <p class="idea-desc-text">Разовый запуск `claude` CLI под вашей же подпиской (не отдельный платный Anthropic API-ключ) дешевле и не требует нового биллинга. Из-за этого он физически должен работать там, где есть подписка — на вашем компьютере, а не на VPS — отсюда local-claude-agent + туннель наружу, а не обычный серверный вызов.</p>
+                    </div>
                     <div class="parser-niche-card">
                         <b>Почему parser-worker не в обычном Docker-приложении Coolify</b>
                         <p class="idea-desc-text">2ГИС блокирует headless-браузеры. Xvfb внутри контейнера создаёт виртуальный дисплей, Chromium запускается в обычном (не headless) режиме и выглядит как настоящий браузер — тот же трюк, что у официальных Selenium-образов.</p>
