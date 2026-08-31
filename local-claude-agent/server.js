@@ -186,6 +186,40 @@ Respond with a JSON object: { "description": "term one, term two, term three, ..
     }
 });
 
+// task: script-section
+// body: { heading: string, prompt: string, nicheName: string, nicheSubtitle?: string, toneOfVoice?: string }
+// Writes the text for ONE section of a live cold-call sales script (see
+// "Скрипты" tab / niches table) - each section is generated independently
+// so the user can iterate on one part (e.g. "Боль") without regenerating
+// the whole script, but toneOfVoice (Центр агентов' shared "Тон голоса"
+// field) is always passed in so independently-generated sections still
+// read consistently with each other.
+app.post('/run/script-section', requireToken, async (req, res) => {
+    const heading = (req.body?.heading || '').trim();
+    const prompt = (req.body?.prompt || '').trim();
+    const nicheName = (req.body?.nicheName || '').trim();
+    const nicheSubtitle = (req.body?.nicheSubtitle || '').trim();
+    const toneOfVoice = (req.body?.toneOfVoice || '').trim();
+    if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+    if (!nicheName) return res.status(400).json({ error: 'nicheName is required' });
+
+    const fullPrompt = `You are writing one section ("${heading || 'без названия'}") of a Russian-language live cold-call sales script, for a salesperson calling businesses in the "${nicheName}" niche${nicheSubtitle ? ` (${nicheSubtitle})` : ''}.
+${toneOfVoice ? `\nOverall tone/style to follow for this whole script: ${toneOfVoice}\n` : ''}
+Instruction for this specific section: ${prompt}
+
+Write ONLY the section's script text itself - natural spoken Russian the salesperson would actually say, or a numbered list of prepared questions/talking points if that fits the section better. No markdown formatting, no headers, no meta-commentary about the script.
+
+Respond with a JSON object: { "text": "..." }`;
+
+    try {
+        const result = await runClaudeForJson(fullPrompt);
+        if (typeof result?.text !== 'string' || !result.text.trim()) throw new Error('expected { text }');
+        res.json(result);
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
 // task: reels-script
 // body: { title: string, postText: string }
 // Writes a short vertical-video (Reels/Shorts) scene-by-scene script/voiceover

@@ -2321,12 +2321,21 @@ function renderEditModeHtml(niche) {
                 <input type="text" class="form-input script-section-heading" value="${escapeHtml(s.heading)}" placeholder="Название раздела" onclick="event.stopPropagation()" oninput="setNicheSectionField(${idx}, 'heading', this.value)">
                 <button class="delete-btn" onclick="event.stopPropagation(); removeNicheSection(${idx})">🗑</button>
             </div>
-            ${collapsed ? '' : `<textarea class="form-textarea script-section-text" placeholder="Текст раздела скрипта..." onclick="event.stopPropagation()" oninput="setNicheSectionField(${idx}, 'text', this.value)">${escapeHtml(s.text)}</textarea>`}
+            ${collapsed ? '' : `
+                <textarea class="form-textarea script-section-text" placeholder="Текст раздела скрипта..." onclick="event.stopPropagation()" oninput="setNicheSectionField(${idx}, 'text', this.value)">${escapeHtml(s.text)}</textarea>
+                <div style="display:flex; gap:8px; margin:-6px 0 10px;" onclick="event.stopPropagation()">
+                    <input type="text" class="form-input" id="niche-section-prompt-${s.id}" style="margin:0;" placeholder="Что сгенерировать для этого раздела...">
+                    <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheSectionText(${idx}, '${s.id}')">✨</button>
+                </div>
+                <div id="niche-section-status-${s.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin:-6px 0 10px;"></div>`}
         </div>`;
     });
 
     html += `</div>
         <button class="edit-btn" style="width:100%; margin-top:8px;" onclick="addNicheSection()">+ Добавить раздел</button>
+        <div class="info-box" style="margin-top:16px; font-size:12px; color:var(--text-secondary);">
+            Генерация каждого раздела использует общий «Тон голоса» из настроек Центра агентов плюс промпт, который вы укажете для конкретного раздела — так стиль остаётся единым по всему скрипту, даже если разделы генерируются по отдельности.
+        </div>
         <button class="submit-btn" style="margin-top:16px;" onclick="saveNicheDetail()">Сохранить скрипт</button>
         <button class="delete-btn" style="width:100%; margin-top:8px; justify-content:center;" onclick="deleteNiche('${niche.id}')">🗑 Удалить нишу</button>`;
 
@@ -2348,6 +2357,35 @@ function expandAllNicheSections(expand) {
 function setNicheSectionField(idx, field, value) {
     const niche = niches.find(n => n.id === currentOpenNicheId);
     if (niche && niche.sections[idx]) niche.sections[idx][field] = value;
+}
+
+// Fills a section's text via local-claude-agent from the per-section prompt
+// input next to it - only updates the in-memory niche.sections (same as
+// typing directly into the textarea), still requires the page's own
+// "Сохранить скрипт" to persist, consistent with how every other edit here
+// works.
+async function generateNicheSectionText(idx, sectionId) {
+    const niche = niches.find(n => n.id === currentOpenNicheId);
+    if (!niche || !niche.sections[idx]) return;
+    const promptInput = document.getElementById(`niche-section-prompt-${sectionId}`);
+    const prompt = promptInput ? promptInput.value.trim() : '';
+    if (!prompt) return showToast('Опишите, что сгенерировать для этого раздела');
+
+    const btn = event && event.target;
+    const status = document.getElementById(`niche-section-status-${sectionId}`);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    if (status) status.textContent = 'Генерируем через ИИ на вашем ПК...';
+    try {
+        const result = await api(`/api/niches/${niche.id}/sections/${sectionId}/generate`, { method: 'POST', body: JSON.stringify({ prompt }) });
+        niche.sections[idx].text = result.text;
+        renderNicheDetailContent(currentOpenNicheId);
+        showToast('Текст раздела сгенерирован — не забудьте сохранить скрипт');
+    } catch (e) {
+        if (status) status.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось сгенерировать: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✨'; }
+    }
 }
 
 function addNicheSection() {
