@@ -22,7 +22,10 @@ async function callTask(task, body, { timeoutMs = 3 * 60 * 1000 } = {}) {
     try {
         const res = await fetch(`${AGENT_URL}/run/${task}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Agent-Token': AGENT_TOKEN },
+            // ngrok-skip-browser-warning: without it, ngrok's free-tier tunnels
+            // return an HTML interstitial page instead of proxying through to
+            // the container - harmless no-op header for other tunnel providers.
+            headers: { 'Content-Type': 'application/json', 'X-Agent-Token': AGENT_TOKEN, 'ngrok-skip-browser-warning': 'true' },
             body: JSON.stringify(body),
             signal: controller.signal,
         });
