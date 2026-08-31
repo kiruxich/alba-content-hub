@@ -66,7 +66,10 @@ async function runClaude(prompt) {
 // Asks the model to answer as a single JSON value (no prose wrapper) and
 // parses it - throws with the raw text attached if it didn't comply, so
 // callers can decide whether to retry or surface the raw text to the user.
-async function runClaudeForJson(prompt) {
+// Retries once on a malformed/truncated response (observed in practice -
+// occasional cut-off JSON) before giving up, since a fresh generation
+// attempt is usually well-formed.
+async function runClaudeForJsonOnce(prompt) {
     const text = await runClaude(`${prompt}\n\nRespond with ONLY a single JSON value - no markdown fences, no prose before or after it.`);
     // The model doesn't always honor "no markdown fences" - strip a ```json
     // ... ``` (or bare ``` ... ```) wrapper if present before parsing, rather
@@ -78,6 +81,14 @@ async function runClaudeForJson(prompt) {
         const err = new Error(`claude did not return valid JSON: ${e.message}`);
         err.rawText = text;
         throw err;
+    }
+}
+
+async function runClaudeForJson(prompt) {
+    try {
+        return await runClaudeForJsonOnce(prompt);
+    } catch (e) {
+        return await runClaudeForJsonOnce(prompt);
     }
 }
 
