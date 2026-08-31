@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { telegramApiBase } from './telegramApiBase.js';
 
 // Sends a just-created agent-authored idea to Telegram for human review and
 // records the resulting message_id in telegram_approvals so a reply to that
@@ -41,7 +42,7 @@ export async function sendIdeaForApproval(idea) {
     ].join('\n');
 
     try {
-        const tgRes = await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+        const tgRes = await fetch(`${telegramApiBase()}/bot${settings.token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: settings.chat_id, text, parse_mode: 'Markdown' }),

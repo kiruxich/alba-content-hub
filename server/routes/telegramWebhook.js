@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { telegramApiBase } from '../lib/telegramApiBase.js';
 
 const router = Router();
 
@@ -84,7 +85,7 @@ async function handleUpdate(update, settings) {
     }
 
     if (settings.token && settings.chat_id) {
-        await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+        await fetch(`${telegramApiBase()}/bot${settings.token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

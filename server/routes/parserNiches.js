@@ -6,6 +6,7 @@ import { db } from '../db.js';
 import { generateParserQueries } from '../lib/generateParserQueries.js';
 import { createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile } from '../lib/parserWorkerClient.js';
 import { isLocalClaudeAgentConfigured, generateNicheDescription } from '../lib/localClaudeAgent.js';
+import { telegramApiBase } from '../lib/telegramApiBase.js';
 import { isObjectStorageConfigured, uploadBuffer, publicUrlForKey } from '../lib/objectStorage.js';
 
 const router = Router();
@@ -25,7 +26,7 @@ async function notifyTelegram(text) {
     const settings = settingsRes.rows[0];
     if (!settings?.token || !settings?.chat_id) return;
     try {
-        await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+        await fetch(`${telegramApiBase()}/bot${settings.token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: settings.chat_id, text, parse_mode: 'Markdown' }),

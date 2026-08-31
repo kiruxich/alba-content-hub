@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { resolveLangError, pickLangFields } from '../lib/resolveIdeaLang.js';
+import { telegramApiBase } from '../lib/telegramApiBase.js';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.post('/post', async (req, res) => {
     const messageText = `*${title}*\n\n${desc || ''}\n\n👉 _${cta || ''}_\n\n#${idea.funnel || 'TOFU'} #AlbaCreation`;
 
     try {
-        const tgRes = await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+        const tgRes = await fetch(`${telegramApiBase()}/bot${settings.token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: channel.chat_id, text: messageText, parse_mode: 'Markdown' }),

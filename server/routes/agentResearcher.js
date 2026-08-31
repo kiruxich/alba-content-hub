@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Parser from 'rss-parser';
 import { db } from '../db.js';
+import { telegramApiBase } from '../lib/telegramApiBase.js';
 import { embed, cosineSimilarity } from '../lib/embeddings.js';
 import { PRODUCTS } from '../lib/products.js';
 import { checkBudgetCap } from '../lib/checkBudgetCap.js';
@@ -138,7 +139,7 @@ async function notifyTelegram(brief) {
     const text = `🔎 *Сводка Researcher за ${brief.date}*\n\n${lines.join('\n\n') || 'Актуальных тем не найдено сегодня.'}`;
 
     try {
-        await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+        await fetch(`${telegramApiBase()}/bot${settings.token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: settings.chat_id, text, parse_mode: 'Markdown' }),
