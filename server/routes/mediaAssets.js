@@ -39,12 +39,12 @@ async function rehostIfConfigured(kieUrl, keyPrefix) {
     }
 }
 
-async function insertGeneratedAsset({ url, type, productId, modelUsed, creditsConsumed }) {
+async function insertGeneratedAsset({ url, type, productId, modelUsed, creditsConsumed, folder }) {
     const id = String(Date.now());
     await db.execute({
-        sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source)
-              VALUES (?, ?, ?, ?, NULL, '[]', 'ai_generated')`,
-        args: [id, url, type, productId || null],
+        sql: `INSERT INTO media_assets (id, url, type, product_id, rubric_id, tags, source, folder)
+              VALUES (?, ?, ?, ?, NULL, '[]', 'ai_generated', ?)`,
+        args: [id, url, type, productId || null, folder || null],
     });
     // Cost is only logged once generation has already succeeded (the asset
     // row above is inserted first) - a failed/timed-out generation never
@@ -69,13 +69,20 @@ function serialize(row) {
         source: row.source || 'manual',
         usedCount: row.used_count || 0,
         createdAt: row.created_at,
+        folder: row.folder || null,
+        hidden: Boolean(row.hidden),
     };
 }
 
-// GET /api/media-assets?product_id=insights&type=image
+// GET /api/media-assets?product_id=insights&type=image&folder=...&includeHidden=1
+// Hidden by default excludes voiceovers generated post-approval (see
+// generate-voiceover below) - those exist only to back an idea's
+// voiceoverAssetId, not to be browsed/reused, so they'd just be noise here.
 router.get('/', async (req, res) => {
     const productId = (req.query.product_id || '').trim();
     const type = (req.query.type || '').trim();
+    const folder = req.query.folder !== undefined ? String(req.query.folder).trim() : undefined;
+    const includeHidden = req.query.includeHidden === '1';
 
     const clauses = [];
     const args = [];
@@ -86,6 +93,17 @@ router.get('/', async (req, res) => {
     if (type) {
         clauses.push('type = ?');
         args.push(type);
+    }
+    if (folder !== undefined) {
+        if (folder === '') {
+            clauses.push('(folder IS NULL OR folder = \'\')');
+        } else {
+            clauses.push('folder = ?');
+            args.push(folder);
+        }
+    }
+    if (!includeHidden) {
+        clauses.push('(hidden IS NULL OR hidden = 0)');
     }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await db.execute({
@@ -178,6 +196,7 @@ router.post('/generate-cover', async (req, res) => {
             productId: b.productId,
             modelUsed: 'flux-2/pro-text-to-image',
             creditsConsumed,
+            folder: b.folder,
         });
         res.status(201).json(serialize(row));
     } catch (e) {
@@ -206,6 +225,7 @@ router.post('/generate-video', async (req, res) => {
             productId: b.productId,
             modelUsed: 'kling-2.6/text-to-video',
             creditsConsumed,
+            folder: b.folder,
         });
         res.status(201).json(serialize(row));
     } catch (e) {
@@ -274,13 +294,14 @@ router.post('/generate-voiceover', async (req, res) => {
     }
     const id = String(Date.now());
     await db.execute({
-        sql: `INSERT INTO media_assets (id, url, type, transcript, product_id, rubric_id, tags, source)
-              VALUES (?, ?, 'audio', ?, ?, ?, ?, 'ai-generated')`,
+        sql: `INSERT INTO media_assets (id, url, type, transcript, product_id, rubric_id, tags, source, hidden)
+              VALUES (?, ?, 'audio', ?, ?, ?, ?, 'ai-generated', ?)`,
         args: [
             id, url, text,
             b.productId || null,
             b.rubricId || null,
             JSON.stringify(b.tags || []),
+            b.hidden ? 1 : 0,
         ],
     });
 

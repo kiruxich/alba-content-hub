@@ -503,6 +503,17 @@ await ensureColumn('niches', 'cold_call_pitch', "TEXT DEFAULT ''");
 // could only show `url`, which for an unconfigured-S3 fallback is itself a
 // giant data:audio/...;base64,... string, not something meant to be read).
 await ensureColumn('media_assets', 'transcript', 'TEXT');
+// Groups cover/video variants generated while drafting a post in "Создание
+// контента" by the draft's topic, so rejected variants aren't lost in one
+// flat list - see server/routes/mediaAssets.js's generate-cover/generate-video.
+// NULL for anything generated elsewhere (Медиатека's own generate buttons,
+// uploads) - those stay outside any folder, same as before this existed.
+await ensureColumn('media_assets', 'folder', 'TEXT');
+// Voiceovers generated after a post is approved (see ideas.js's
+// generate-voiceover-for-idea) are real media_assets rows - the idea's
+// voiceoverAssetId still needs somewhere to point - but shouldn't clutter
+// the general Медиатека grid; this flags them to be filtered out by default.
+await ensureColumn('media_assets', 'hidden', 'INTEGER DEFAULT 0');
 
 // project_info: moves what used to be hardcoded frontend productsData fields
 // (target audience, value proposition) into the DB and adds new fields the

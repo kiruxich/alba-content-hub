@@ -321,13 +321,12 @@ async function renderBankView() {
 
             <div class="action-btn-row">
                 <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
-                <button class="tg-btn" style="background:var(--accent-purple);" onclick="toggleAutogenPanel('${idea.id}')">✨ Медиа (обложка/озвучка/видео)</button>
+                ${(idea.status === 'ready' || idea.status === 'done') ? `<button class="tg-btn" style="background:var(--accent-purple);" ${idea.generatingVoiceover ? 'disabled' : ''} onclick="generateIdeaVoiceover('${idea.id}')">${idea.generatingVoiceover ? '⏳ Озвучиваем...' : (idea.voiceoverAssetId ? '🎙 Переозвучить' : '🎙 Сгенерировать озвучку')}</button>` : ''}
                 <button class="tg-btn" style="background:var(--accent-blue);" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
                 <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
             </div>
             <div id="idea-gen-status-${idea.id}" class="generation-status" style="display:none;"></div>
-            <div id="autogen-panel-${idea.id}" style="display:none; margin-top:10px;"></div>
         </div>`;
     });
 
@@ -484,10 +483,12 @@ async function promoteContentDraftFormat(id) {
         ? { title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
             titleEn: enBlock.title, descEn: enBlock.desc, ctaEn: enBlock.cta,
             format: formatDef.ideaFormat, status: 'ready', source: 'manual',
-            targetGroups: draft.productId ? [draft.productId] : [] }
+            targetGroups: draft.productId ? [draft.productId] : [],
+            coverAssetId: draft.selectedCoverAssetId || null }
         : { title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
             format: formatDef.ideaFormat, status: 'ready', source: 'manual',
-            targetGroups: draft.productId ? [draft.productId] : [] };
+            targetGroups: draft.productId ? [draft.productId] : [],
+            coverAssetId: draft.selectedCoverAssetId || null };
 
     try {
         const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify(body) });
@@ -540,12 +541,61 @@ function renderContentDraftCard(draft) {
                 <textarea class="form-textarea" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'desc', this.value)">${escapeHtml(block.desc)}</textarea>
                 <input type="text" class="form-input" placeholder="CTA" value="${escapeHtml(block.cta)}" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'cta', this.value)">
             ` : ''}
-            <div class="action-btn-row">
+
+            <div class="p-section-title" style="margin-top:16px;">ОБЛОЖКА</div>
+            ${(draft.coverCandidates && draft.coverCandidates.length) ? `
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                    ${draft.coverCandidates.map(c => `
+                        <img src="${escapeHtml(c.url)}" onclick="selectDraftCover('${draft.id}', '${c.id}')"
+                            style="width:64px; height:64px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid ${draft.selectedCoverAssetId === c.id ? 'var(--accent-blue)' : 'transparent'};">
+                    `).join('')}
+                </div>
+            ` : `<div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">Вариантов пока нет.</div>`}
+            <button class="edit-btn" ${draft.generatingCover ? 'disabled' : ''} onclick="generateDraftCover('${draft.id}')">${draft.generatingCover ? '⏳ Генерируем...' : '🎨 Сгенерировать вариант обложки'}</button>
+
+            <div class="action-btn-row" style="margin-top:12px;">
                 ${!hasEn ? `<button class="edit-btn" ${isTranslating ? 'disabled' : ''} onclick="translateContentDraft('${draft.id}')">${isTranslating ? '⏳ Переводим...' : '🇬🇧 Перевести на английский'}</button>` : ''}
                 <button class="tg-btn" style="background:var(--accent-blue);" onclick="promoteContentDraftFormat('${draft.id}')">➕ Добавить в хранилище (${lang === 'en' ? 'RU+EN' : 'RU'})</button>
             </div>
         `}
     </div>`;
+}
+
+// Генерирует ещё один вариант обложки для черновика (kie.ai через
+// server/routes/mediaAssets.js's generate-cover) - каждый вызов добавляет
+// новый вариант в draft.coverCandidates, а не заменяет предыдущий, чтобы
+// можно было выбрать любой из уже сгенерированных. Все варианты (включая
+// невыбранные) складываются в Медиатеку в одну папку по теме черновика -
+// см. folder в generate-cover - для переиспользования потом, ничего не
+// пропадает.
+async function generateDraftCover(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft) return;
+    const block = draft.ru?.[draft.activeFormat];
+    const prompt = `Обложка для поста${draft.productId ? ' о продукте ' + (productsData.find(p => p.id === draft.productId)?.title || '') : ''}: ${block?.title || draft.topic}. ${(block?.desc || '').slice(0, 200)}`;
+
+    draft.generatingCover = true;
+    renderContentCreationView();
+    try {
+        const asset = await api('/api/media-assets/generate-cover', {
+            method: 'POST',
+            body: JSON.stringify({ prompt, productId: draft.productId || null, folder: draft.topic || null }),
+        });
+        draft.coverCandidates = draft.coverCandidates || [];
+        draft.coverCandidates.push(asset);
+        draft.selectedCoverAssetId = asset.id;
+        showToast('Вариант обложки сгенерирован');
+    } catch (e) {
+        showToast('Не удалось сгенерировать обложку: ' + e.message);
+    }
+    draft.generatingCover = false;
+    renderContentCreationView();
+}
+
+function selectDraftCover(id, assetId) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft) draft.selectedCoverAssetId = assetId;
+    renderContentCreationView();
 }
 
 // Всё в статусе 'idea' - и то, что написал агент Generator (source='agent'),
@@ -1059,177 +1109,33 @@ function copyTelegramFormatted(ideaId) {
     showToast('Скопировано с разметкой!');
 }
 
-// АВТО-ГЕНЕРАЦИЯ МЕДИА ДЛЯ ИДЕИ ("✨ Сгенерировать" на карточке в Банке идей)
-//
-// Renders inline right under the idea card (in #autogen-panel-<ideaId>, part
-// of the card markup - see renderIdeasBank) rather than a modal, so you keep
-// the card's context in view. toggleAutogenPanel() opens/closes it and shows
-// the voiceover-provider picker first (ElevenLabs looking "configured" via a
-// present API key doesn't mean it actually works - e.g. an unpaid plan 403s
-// at call time - so defaulting silently to it and failing was the old,
-// confusing behavior). confirmAutoGenerate() then calls
-// POST /api/ideas/:id/auto-generate (server/routes/ideas.js), which runs
-// cover-image + voiceover generation (and, for 'Reels / Shorts' ideas, a
-// shot-list+voiceover script via local-claude-agent, then video + assembly)
-// server-side and returns per-step results. Assembly is job-based
-// (video-worker), so once that job is kicked off this polls
-// GET /api/video-assembly/:jobId the same way parser niches poll their own
-// job status (see startParserPolling above) until it reaches done/error.
-//
-// The "terminal" log is simulated client-side staged progress, not truly
-// live server output - the actual generation happens in one blocking
-// request server-side, there's no streaming/SSE wired up for it. Framed as
-// such (see the log lines below) rather than pretending otherwise.
-function toggleAutogenPanel(ideaId) {
-    const panel = document.getElementById(`autogen-panel-${ideaId}`);
-    if (!panel) return;
-    if (panel.style.display === 'none' || !panel.style.display) {
-        panel.style.display = '';
-        panel.innerHTML = `
-            <div class="info-box" style="padding:14px 16px;">
-                <label class="form-label" style="margin-top:0; font-size:11px;">Озвучка:</label>
-                <select id="autogen-provider-${ideaId}" class="form-select" style="margin-bottom:10px;">
-                    <option value="piper">Piper (бесплатно, self-hosted)</option>
-                    <option value="elevenlabs">ElevenLabs (платно, выше качество)</option>
-                </select>
-                <button class="submit-btn" style="margin-top:0;" onclick="confirmAutoGenerate('${ideaId}')">✨ Сгенерировать</button>
-            </div>`;
-    } else {
-        panel.style.display = 'none';
-        panel.innerHTML = '';
-    }
-}
-
-function logToAutogen(ideaId, text) {
-    const log = document.getElementById(`autogen-log-${ideaId}`);
-    if (!log) return;
-    const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
-    log.innerHTML += `[${time}] ${escapeHtml(text)}\n`;
-    log.scrollTop = log.scrollHeight;
-}
-
-async function confirmAutoGenerate(ideaId) {
-    const provider = document.getElementById(`autogen-provider-${ideaId}`).value;
-    const panel = document.getElementById(`autogen-panel-${ideaId}`);
-    panel.innerHTML = `
-        <div id="autogen-log-${ideaId}" class="parser-niche-console" style="min-height:70px; margin-bottom:8px;"></div>
-        <div id="autogen-result-${ideaId}"></div>`;
-
-    await autoGenerateIdeaMedia(ideaId, provider);
-}
-
-async function autoGenerateIdeaMedia(ideaId, voiceoverProvider) {
+// "🎙 Сгенерировать озвучку" на карточке Хранилища - доступна только после
+// утверждения (status ready/done), т.е. когда текст уже зафиксирован и
+// озвучивать нечего менять. В отличие от обложки (генерируется заранее в
+// Создании контента, с вариантами на выбор) озвучка - разовая, читает
+// финальный idea.desc, и не показывается в общей Медиатеке (hidden: true) -
+// только напрямую привязывается через idea.voiceoverAssetId.
+async function generateIdeaVoiceover(ideaId) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
+    if (!idea.desc || !idea.desc.trim()) return showToast('У идеи нет текста для озвучки');
 
-    const statusElId = `idea-gen-status-${ideaId}`;
-    const isReels = idea.format === 'Reels / Shorts';
-    logToAutogen(ideaId, isReels
-        ? 'Запускаем: обложка (kie.ai Flux), сценарий Reels, озвучка…'
-        : 'Запускаем: обложка (kie.ai Flux), озвучка…');
-    logToAutogen(ideaId, `Провайдер озвучки: ${voiceoverProvider === 'piper' ? 'Piper' : 'ElevenLabs'} (симулированный прогресс — реальный лог сервера сюда не транслируется)`);
-    const finishTicker = startGenerationTicker(statusElId, [
-        { afterSeconds: 15, text: 'kie.ai и провайдер озвучки всё ещё работают…' },
-        { afterSeconds: 90, text: isReels ? 'Обложка и озвучка почти готовы, дальше — видео…' : 'Почти готово…' },
-        { afterSeconds: 240, text: 'Видео (kie.ai Kling) может генерироваться до 7 минут…' },
-    ]);
-
+    idea.generatingVoiceover = true;
+    renderBankView();
     try {
-        const result = await api(`/api/ideas/${ideaId}/auto-generate`, { method: 'POST', body: JSON.stringify({ voiceoverProvider }) });
-        if (result.idea) {
-            ideasBank = ideasBank.map(i => i.id === ideaId ? result.idea : i);
-        }
-
-        if (result.cover?.asset) logToAutogen(ideaId, '✅ Обложка готова');
-        if (result.cover?.error) logToAutogen(ideaId, '❌ Обложка: ' + result.cover.error);
-        if (result.reelsScript) logToAutogen(ideaId, '✅ Сценарий Reels сгенерирован');
-        if (result.voiceover?.asset) {
-            logToAutogen(ideaId, `✅ Озвучка готова${result.voiceover.usedFallback ? ` (запрошенный провайдер не сработал, использован ${result.voiceover.provider === 'piper' ? 'Piper' : 'ElevenLabs'})` : ''}`);
-        }
-        if (result.voiceover?.error) logToAutogen(ideaId, '❌ Озвучка: ' + result.voiceover.error);
-        if (result.video?.asset) logToAutogen(ideaId, '✅ Видео-клип готов');
-        if (result.video?.error) logToAutogen(ideaId, '❌ Видео: ' + result.video.error);
-
-        if (result.assembly && result.assembly.jobId) {
-            logToAutogen(ideaId, 'Обложка и озвучка готовы — собираем ролик через video-worker…');
-            finishTicker(true, 'Собираем ролик…');
-            startIdeaAssemblyPolling(ideaId, result.assembly.jobId, result, statusElId);
-        } else {
-            if (result.assembly?.error) logToAutogen(ideaId, '❌ Сборка: ' + result.assembly.error);
-            const hasAnyError = result.cover?.error || result.voiceover?.error || result.video?.error || result.assembly?.error;
-            finishTicker(!hasAnyError, hasAnyError ? 'Готово частично' : 'Готово');
-            renderAutogenResult(ideaId, result);
-        }
-        renderMediaAssets();
+        const asset = await api('/api/media-assets/generate-voiceover', {
+            method: 'POST',
+            body: JSON.stringify({ text: idea.desc, provider: 'piper', productId: idea.targetGroups?.[0] || null, hidden: true }),
+        });
+        const updated = await api(`/api/ideas/${ideaId}`, { method: 'PUT', body: JSON.stringify({ voiceoverAssetId: asset.id }) });
+        ideasBank = ideasBank.map(i => i.id === ideaId ? updated : i);
+        showToast('Озвучка готова');
     } catch (e) {
-        logToAutogen(ideaId, '❌ Ошибка запроса: ' + e.message);
-        finishTicker(false, 'Ошибка: ' + e.message);
-        showToast('Не удалось сгенерировать медиа: ' + e.message);
+        showToast('Не удалось сгенерировать озвучку: ' + e.message);
     }
-}
-
-function startIdeaAssemblyPolling(ideaId, jobId, resultSoFar, statusElId) {
-    const timer = setInterval(async () => {
-        try {
-            const job = await api(`/api/video-assembly/${jobId}`);
-            if (job.status === 'done') {
-                clearInterval(timer);
-                logToAutogen(ideaId, '✅ Ролик собран');
-                showToast('Ролик для идеи готов!');
-                renderAutogenResult(ideaId, { ...resultSoFar, assembly: { ...resultSoFar.assembly, status: 'done' } });
-                renderMediaAssets();
-            } else if (job.status === 'error') {
-                clearInterval(timer);
-                logToAutogen(ideaId, '❌ Ошибка сборки: ' + (job.error || 'неизвестная ошибка'));
-                renderAutogenResult(ideaId, resultSoFar);
-            }
-            // queued/running - keep polling
-        } catch (e) {
-            clearInterval(timer);
-            logToAutogen(ideaId, '❌ Ошибка опроса статуса сборки: ' + e.message);
-            renderAutogenResult(ideaId, resultSoFar);
-        }
-    }, 4000);
-}
-
-// Final view after generation - the Reels shot list/voiceover script if one
-// was generated, and the media itself inline (image/audio/video), so
-// there's one place to see everything that came out of a generation run
-// instead of hunting through Медиатека. The post text itself is already
-// visible right above on the card, so it's not repeated here.
-function renderAutogenResult(ideaId, result) {
-    const box = document.getElementById(`autogen-result-${ideaId}`);
-    if (!box) return;
-
-    let html = '';
-
-    if (result.reelsScript) {
-        html += `<div class="p-section-title" style="margin-top:16px;">СЦЕНАРИЙ REELS</div>
-            <div class="info-box">
-                <div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; margin-bottom:6px;">Раскадровка</div>
-                <ul style="margin:0 0 12px; padding-left:18px;">${(result.reelsScript.shotList || []).map(s => `<li style="margin-bottom:4px;">${escapeHtml(s)}</li>`).join('')}</ul>
-                <div style="font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; margin-bottom:6px;">Текст озвучки</div>
-                <p style="margin:0; white-space:pre-wrap;">${escapeHtml(result.reelsScript.voiceoverText || '')}</p>
-            </div>`;
-    }
-
-    if (result.cover?.asset) {
-        html += `<div class="p-section-title" style="margin-top:16px;">ОБЛОЖКА</div><img src="${result.cover.asset.url}" style="width:100%; border-radius:12px; display:block;">`;
-    }
-    if (result.voiceover?.asset) {
-        html += `<div class="p-section-title" style="margin-top:16px;">ОЗВУЧКА</div><audio controls style="width:100%;" src="${result.voiceover.asset.url}"></audio>`;
-    }
-    if (result.video?.asset) {
-        html += `<div class="p-section-title" style="margin-top:16px;">ВИДЕО-КЛИП</div><video controls style="width:100%; border-radius:12px;" src="${result.video.asset.url}"></video>`;
-    }
-    if (result.assembly?.status === 'done') {
-        html += `<div class="p-section-title" style="margin-top:16px;">ГОТОВЫЙ РОЛИК</div><p style="color:var(--text-secondary); font-size:13px;">Собран и сохранён в Медиатеке.</p>`;
-    } else if (result.assembly?.jobId) {
-        html += `<div class="p-section-title" style="margin-top:16px;">ГОТОВЫЙ РОЛИК</div><p style="color:var(--text-secondary); font-size:13px;">Ещё собирается — смотрите лог выше.</p>`;
-    }
-
-    box.innerHTML = html;
-    box.style.display = '';
+    const stillIdea = ideasBank.find(i => i.id === ideaId);
+    if (stillIdea) stillIdea.generatingVoiceover = false;
+    renderBankView();
 }
 
 function checkFunnelBalance() {
@@ -3804,6 +3710,13 @@ async function removeParserNiche(id) {
 let mediaAssets = [];
 let mediaAssetFilterType = '';
 let mediaAssetFilterProduct = '';
+// null = showing the folder list; a string (folder name, or '' for "Без
+// темы") = showing that folder's assets. Folders group cover/video variants
+// generated while drafting in "Создание контента" by the draft's topic -
+// see generateDraftCover() - so rejected variants stay findable instead of
+// disappearing into one flat list.
+let mediaAssetOpenFolder = null;
+const MEDIA_NO_FOLDER_KEY = '__no_folder__';
 
 function mediaAssetProductLabel(productId) {
     const p = productsData.find(p => p.id === productId);
@@ -3923,23 +3836,27 @@ function toggleMediaTranscript(id, btn) {
     if (btn) btn.textContent = expanded ? 'Свернуть' : 'Показать больше';
 }
 
+// Referenced by bare name (no quotes) from the inline onerror="..." handlers
+// below, instead of being inlined as a quoted string literal there - HTML
+// entities in an attribute value get decoded before the JS engine ever sees
+// them, so escaping the placeholder's own quotes as &#39; still collided
+// with the enclosing this.outerHTML='...' wrapper once decoded. A bare
+// global reference has no quotes to collide with at all.
+const MEDIA_ASSET_PLACEHOLDER_HTML = '<div class="media-asset-placeholder">⚠️ Не удалось загрузить превью</div>';
+
 function mediaAssetPreviewHtml(asset) {
-    // Built with single-quoted HTML attrs and HTML-entity-escaped single quotes so it can be
-    // safely embedded inside the (double-quoted) onerror="..." attribute below without the
-    // placeholder's own quotes prematurely closing that attribute.
-    const placeholder = `<div class='media-asset-placeholder'>&#9888;&#65039; Не удалось загрузить превью</div>`;
     if (asset.type === 'video') {
         return `<video class="media-asset-preview" src="${escapeHtml(asset.url)}" muted preload="metadata"
-                    onerror="this.outerHTML='${placeholder}'"></video>`;
+                    onerror="this.outerHTML=MEDIA_ASSET_PLACEHOLDER_HTML"></video>`;
     }
     if (asset.type === 'audio') {
         return `<div class="media-asset-preview" style="display:flex; align-items:center; justify-content:center; background:var(--bg-grouped);">
                     <audio controls preload="metadata" style="width:calc(100% - 24px);" src="${escapeHtml(asset.url)}"
-                        onerror="this.parentElement.outerHTML='${placeholder}'"></audio>
+                        onerror="this.parentElement.outerHTML=MEDIA_ASSET_PLACEHOLDER_HTML"></audio>
                 </div>`;
     }
     return `<img class="media-asset-preview" src="${escapeHtml(asset.url)}" loading="lazy" alt=""
-                onerror="this.outerHTML='${placeholder}'">`;
+                onerror="this.outerHTML=MEDIA_ASSET_PLACEHOLDER_HTML">`;
 }
 
 function drawMediaAssetsGrid() {
@@ -3951,7 +3868,36 @@ function drawMediaAssetsGrid() {
         return;
     }
 
-    grid.innerHTML = mediaAssets.map(asset => `
+    if (mediaAssetOpenFolder === null) {
+        const groups = {};
+        mediaAssets.forEach(a => {
+            const key = a.folder || MEDIA_NO_FOLDER_KEY;
+            (groups[key] = groups[key] || []).push(a);
+        });
+        const folderKeys = Object.keys(groups).sort((a, b) => a === MEDIA_NO_FOLDER_KEY ? 1 : b === MEDIA_NO_FOLDER_KEY ? -1 : a.localeCompare(b));
+        grid.innerHTML = folderKeys.map(key => {
+            const items = groups[key];
+            const label = key === MEDIA_NO_FOLDER_KEY ? 'Без темы' : key;
+            return `
+            <div class="product-card" onclick="openMediaFolder('${escapeHtml(key).replace(/'/g, "\\'")}')">
+                ${mediaAssetPreviewHtml(items[0])}
+                <div class="card-header" style="margin-top:10px;">
+                    <div class="card-title" style="font-size:15px;">${escapeHtml(label)}</div>
+                    <span class="card-badge" style="background:rgba(255,255,255,0.08); color:var(--text-secondary);">${items.length}</span>
+                </div>
+            </div>`;
+        }).join('');
+        return;
+    }
+
+    const folderAssets = mediaAssets.filter(a => (a.folder || MEDIA_NO_FOLDER_KEY) === mediaAssetOpenFolder);
+    const folderLabel = mediaAssetOpenFolder === MEDIA_NO_FOLDER_KEY ? 'Без темы' : mediaAssetOpenFolder;
+    grid.innerHTML = `
+        <div style="grid-column:1/-1; display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+            <button class="edit-btn" onclick="openMediaFolder(null)">← Все папки</button>
+            <b>${escapeHtml(folderLabel)}</b>
+        </div>` +
+        folderAssets.map(asset => `
         <div class="media-asset-card">
             ${mediaAssetPreviewHtml(asset)}
             <div class="media-asset-body">
@@ -3970,6 +3916,11 @@ function drawMediaAssetsGrid() {
             </div>
         </div>
     `).join('');
+}
+
+function openMediaFolder(key) {
+    mediaAssetOpenFolder = key;
+    drawMediaAssetsGrid();
 }
 
 function openMediaLightbox(assetId) {
