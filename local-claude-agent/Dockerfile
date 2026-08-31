@@ -12,11 +12,15 @@ RUN npm install --omit=dev
 
 COPY server.js .
 
-# Auth state from `claude setup-token` lives under $HOME/.claude - mount a
-# named volume at this path (see README.md) so it survives container
-# restarts/rebuilds instead of needing to re-auth every time.
+# `claude --dangerously-skip-permissions` (needed since there's no TTY here
+# to approve tool use interactively) refuses to run as root/sudo - has to be
+# a real non-root user. Auth state from `claude setup-token` lives under
+# $HOME/.claude - mount a named volume at this path (see README.md) so it
+# survives container restarts/rebuilds instead of needing to re-auth every time.
 ENV HOME=/home/agent
-RUN mkdir -p /home/agent && chmod 777 /home/agent
+RUN usermod -d /home/agent node \
+    && mkdir -p /home/agent && chown -R node:node /home/agent /app
+USER node
 
 EXPOSE 8790
 CMD ["node", "server.js"]

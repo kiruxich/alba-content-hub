@@ -39,10 +39,30 @@ to see it again) - you'll paste it into hub's env vars later.
 docker exec -it local-claude-agent claude setup-token
 ```
 
-Follow the prompts (opens a browser login). The resulting long-lived token is
-written into the `claude-agent-auth` volume, so it survives container
-restarts and even a `docker build` re-run - you only do this once, unless you
-explicitly remove the volume.
+This needs a real terminal (TTY) - it won't produce output piped/backgrounded.
+Follow the prompts (opens a browser login, or prints a URL to open manually -
+if pasting the URL doesn't work because your terminal wrapped it across lines,
+press `c` in the prompt to copy the unwrapped URL to your clipboard instead of
+selecting the text by hand). It prints a long-lived (1-year) token starting
+`sk-ant-oat01-...` at the end - **copy it, you won't see it again**.
+
+Set it as an env var on the container so it doesn't need to be re-entered on
+every rebuild/recreate (`claude setup-token`'s own on-disk config only
+persists via the mounted volume, but re-passing the token directly is
+simpler and survives even a `docker volume rm`):
+
+```bash
+docker rm -f local-claude-agent
+docker run -d --name local-claude-agent \
+  -p 8790:8790 \
+  -e AGENT_TOKEN=<your AGENT_TOKEN from step 2> \
+  -e CLAUDE_CODE_OAUTH_TOKEN=<the sk-ant-oat01-... token> \
+  -v claude-agent-auth:/home/agent \
+  local-claude-agent
+```
+
+To get a fresh token later (e.g. it expires after a year, or you revoke it),
+just repeat this whole step - you don't need to touch the image or volume.
 
 Verify it worked:
 
