@@ -130,6 +130,99 @@ async function fetchCandidates(sources) {
     return candidates;
 }
 
+// VK community walls (vk_trend_sources - see server/db.js) - a real public
+// API, so unlike Telegram/Instagram this can run automatically here
+// alongside RSS instead of needing a manual per-click scan. Reuses the same
+// token already used for publishing (vk_settings.access_token) - reading a
+// public wall works with any valid VK token, doesn't need admin rights over
+// the target community. Silently returns [] if VK isn't configured or has
+// no trend sources - this must never block the rest of a Researcher run.
+async function fetchVkCandidates() {
+    const settingsRow = (await db.execute('SELECT access_token FROM vk_settings WHERE id = 1')).rows[0];
+    const accessToken = settingsRow?.access_token;
+    if (!accessToken) return [];
+
+    const sources = (await db.execute('SELECT group_id FROM vk_trend_sources')).rows;
+    if (sources.length === 0) return [];
+
+    const candidates = [];
+    for (const { group_id: groupId } of sources) {
+        try {
+            const url = new URL('https://api.vk.com/method/wall.get');
+            url.searchParams.set('v', '5.199');
+            url.searchParams.set('count', '15');
+            url.searchParams.set('access_token', accessToken);
+            // A pure-digit value is a numeric community id (owner_id = -id);
+            // anything else is treated as the community's short name/domain.
+            if (/^\d+$/.test(groupId)) url.searchParams.set('owner_id', String(-Math.abs(Number(groupId))));
+            else url.searchParams.set('domain', groupId);
+
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.error_msg || `VK error ${data.error.error_code}`);
+
+            for (const item of (data.response?.items || [])) {
+                const cleaned = truncate(stripHtml(item.text || ''));
+                if (!cleaned) continue;
+                candidates.push({
+                    title: cleaned.slice(0, 80),
+                    link: `https://vk.com/wall${item.owner_id}_${item.id}`,
+                    text: cleaned,
+                    pubDate: item.date ? new Date(item.date * 1000).toISOString() : null,
+                });
+            }
+        } catch (e) {
+            console.error(`Researcher: failed to fetch VK source ${groupId}:`, e.message);
+        }
+    }
+    return candidates;
+}
+
+// YouTube channel uploads (youtube_trend_sources) - a real public API (Data
+// API v3 search.list), read-only YOUTUBE_API_KEY (agent_settings), NOT the
+// OAuth credentials used for publishing (those are per-account and scoped
+// to uploading, not reading arbitrary channels). Same silent-skip-if-
+// unconfigured contract as fetchVkCandidates above.
+async function fetchYoutubeCandidates() {
+    const settingsRow = (await db.execute('SELECT youtube_api_key FROM agent_settings WHERE id = 1')).rows[0];
+    const apiKey = settingsRow?.youtube_api_key;
+    if (!apiKey) return [];
+
+    const sources = (await db.execute('SELECT channel_id FROM youtube_trend_sources')).rows;
+    if (sources.length === 0) return [];
+
+    const candidates = [];
+    for (const { channel_id: channelId } of sources) {
+        try {
+            const url = new URL('https://www.googleapis.com/youtube/v3/search');
+            url.searchParams.set('key', apiKey);
+            url.searchParams.set('channelId', channelId);
+            url.searchParams.set('part', 'snippet');
+            url.searchParams.set('order', 'date');
+            url.searchParams.set('type', 'video');
+            url.searchParams.set('maxResults', '10');
+
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message || `YouTube API error ${data.error.code}`);
+
+            for (const item of (data.items || [])) {
+                const cleaned = truncate(stripHtml(item.snippet?.description || item.snippet?.title || ''));
+                if (!cleaned) continue;
+                candidates.push({
+                    title: item.snippet?.title || '',
+                    link: `https://www.youtube.com/watch?v=${item.id?.videoId}`,
+                    text: cleaned,
+                    pubDate: item.snippet?.publishedAt || null,
+                });
+            }
+        } catch (e) {
+            console.error(`Researcher: failed to fetch YouTube source ${channelId}:`, e.message);
+        }
+    }
+    return candidates;
+}
+
 async function logRun(runDate, status, log, trendsFound, costUsd, briefJson) {
     await db.execute({
         sql: `INSERT INTO agent_runs (run_date, agent_name, status, log, cost_usd, trends_found, brief_json) VALUES (?, 'researcher', ?, ?, ?, ?, ?)`,
@@ -184,18 +277,16 @@ async function runResearcher(req, res) {
         const settingsResult = await db.execute('SELECT sources FROM agent_settings WHERE id = 1');
         const sources = JSON.parse(settingsResult.rows[0]?.sources || '[]');
 
-        if (sources.length === 0) {
-            await logRun(runDate, 'skipped', 'No RSS sources configured in agent_settings.', 0, 0);
-            return res.json({ status: 'skipped', reason: 'no_sources' });
-        }
-
-        const [candidates, productVectors] = await Promise.all([
+        const [rssCandidates, vkCandidates, youtubeCandidates, productVectors] = await Promise.all([
             fetchCandidates(sources),
+            fetchVkCandidates(),
+            fetchYoutubeCandidates(),
             getProductVectors(),
         ]);
+        const candidates = [...rssCandidates, ...vkCandidates, ...youtubeCandidates];
 
         if (candidates.length === 0) {
-            await logRun(runDate, 'skipped', 'Sources returned no usable items.', 0, 0);
+            await logRun(runDate, 'skipped', 'No sources configured, or all configured sources (RSS/VK/YouTube) returned no usable items.', 0, 0);
             return res.json({ status: 'skipped', reason: 'no_candidates' });
         }
 
@@ -239,7 +330,7 @@ async function runResearcher(req, res) {
         // Local embeddings only, no LLM call in this step - genuinely free.
         await logRun(
             runDate, 'success',
-            `Scanned ${candidates.length} candidates from ${sources.length} source(s) in ${durationSec}s, picked ${top.length}.`,
+            `Scanned ${candidates.length} candidates (${rssCandidates.length} RSS, ${vkCandidates.length} VK, ${youtubeCandidates.length} YouTube) in ${durationSec}s, picked ${top.length}.`,
             top.length, 0, brief
         );
         await notifyTelegram(brief);

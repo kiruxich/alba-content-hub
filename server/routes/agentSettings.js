@@ -31,6 +31,7 @@ function serialize(row) {
         weeklySchedule: JSON.parse(row.weekly_schedule || '[]'),
         postFormula: row.post_formula || '',
         generatorPrompt: row.generator_prompt || '',
+        youtubeApiKey: row.youtube_api_key || '',
     };
 }
 
@@ -56,13 +57,14 @@ router.put('/', async (req, res) => {
     const weekly_schedule = b.weeklySchedule !== undefined ? JSON.stringify(b.weeklySchedule) : current.weekly_schedule;
     const post_formula = b.postFormula !== undefined ? b.postFormula : current.post_formula;
     const generator_prompt = b.generatorPrompt !== undefined ? b.generatorPrompt : current.generator_prompt;
+    const youtube_api_key = b.youtubeApiKey !== undefined ? b.youtubeApiKey : current.youtube_api_key;
 
     await db.execute({
         sql: `UPDATE agent_settings SET sources = ?, keywords = ?, tone_of_voice = ?, budget_daily_cap_usd = ?,
               video_generation_enabled = ?, platform_auto_publish = ?, product_of_week_override = ?,
-              weekly_schedule = ?, post_formula = ?, generator_prompt = ? WHERE id = 1`,
+              weekly_schedule = ?, post_formula = ?, generator_prompt = ?, youtube_api_key = ? WHERE id = 1`,
         args: [sources, keywords, tone_of_voice, budget_daily_cap_usd, video_generation_enabled,
-            platform_auto_publish, product_of_week_override, weekly_schedule, post_formula, generator_prompt],
+            platform_auto_publish, product_of_week_override, weekly_schedule, post_formula, generator_prompt, youtube_api_key],
     });
     const result = await db.execute('SELECT * FROM agent_settings WHERE id = 1');
     res.json(serialize(result.rows[0]));

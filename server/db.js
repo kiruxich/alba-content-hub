@@ -188,16 +188,23 @@ CREATE TABLE IF NOT EXISTS vk_settings (
 );
 INSERT OR IGNORE INTO vk_settings (id, access_token, group_id) VALUES (1, '', '');
 
--- One VK token can post to several communities (unlike Instagram/YouTube/
--- Threads, which each need a wholly separate account for RU vs EN) - this
--- mirrors telegram_channels exactly: a picked list of publish targets under
--- one token, not a second account. The 'lang' column is optional (NULL =
--- works for either) and only used to pre-select a sensible default in the
--- publish modal - the picker is still manual, same as Telegram's channel select.
+-- One hub setup can post to several VK communities (unlike Instagram/
+-- YouTube/Threads, which each need a wholly separate ACCOUNT for RU vs EN) -
+-- conceptually mirrors telegram_channels (a picked list of publish targets,
+-- not a second account), but VK's own API means each community's access
+-- token can only post to that community's own wall - unlike a Telegram bot
+-- token, one VK token can't act on behalf of several different communities
+-- at once. So the token lives PER ROW here, not once in vk_settings
+-- (vk_settings.access_token is kept only as an optional fallback for a user
+-- token with groups+wall scope across communities it admins - rare, most
+-- users will fill access_token on every row). The 'lang' column is optional
+-- (NULL = works for either) and only used to pre-select a sensible default
+-- in the publish modal - the picker is still manual, same as Telegram's.
 CREATE TABLE IF NOT EXISTS vk_groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     label TEXT NOT NULL,
     group_id TEXT NOT NULL,
+    access_token TEXT DEFAULT '',
     lang TEXT,
     created_at INTEGER DEFAULT (strftime('%s','now'))
 );
@@ -569,6 +576,7 @@ await ensureColumn('scheduled_events', 'publish_at', 'INTEGER');
 await ensureColumn('scheduled_events', 'channel_id', 'INTEGER');
 await ensureColumn('scheduled_events', 'board_id', 'TEXT');
 await ensureColumn('scheduled_events', 'vk_group_id', 'INTEGER');
+await ensureColumn('vk_groups', 'access_token', "TEXT DEFAULT ''");
 await ensureColumn('scheduled_events', 'lang', "TEXT DEFAULT 'ru'");
 await ensureColumn('scheduled_events', 'publish_status', "TEXT DEFAULT 'pending'");
 await ensureColumn('scheduled_events', 'publish_error', 'TEXT');
@@ -583,6 +591,12 @@ await ensureColumn('agent_settings', 'post_formula', "TEXT DEFAULT ''");
 // brief into a drafted post - surfaced in the "Настройки агентов" tab so it
 // can be tuned without touching code.
 await ensureColumn('agent_settings', 'generator_prompt', "TEXT DEFAULT ''");
+// Read-only YouTube Data API v3 key (NOT the OAuth client used for
+// publishing - see server/lib/socialPublishers/youtube.js) - search.list on
+// a channel's uploads is public data and only needs a simple API key, no
+// per-account consent flow. Used by Researcher to scan youtube_trend_sources
+// alongside RSS/VK, see server/routes/agentResearcher.js.
+await ensureColumn('agent_settings', 'youtube_api_key', "TEXT DEFAULT ''");
 // Latest structured Researcher brief (see agent-researcher/run) - kept
 // alongside agent_runs' free-text log so Generator (and the UI) can read the
 // exact trends/products it picked without re-scanning RSS sources.

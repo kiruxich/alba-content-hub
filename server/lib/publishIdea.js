@@ -91,12 +91,20 @@ async function publishSocial(platform, { ideaId, boardId, groupId, lang }) {
     // as Telegram's channelId, picked explicitly in the publish modal.
     let result;
     if (platform === 'vk') {
-        const settings = (await db.execute('SELECT access_token FROM vk_settings WHERE id = 1')).rows[0];
-        if (!settings.access_token) throw httpError(400, 'VK не настроен');
         if (!groupId) throw httpError(400, 'Не выбрано сообщество для публикации. Добавьте хотя бы одно в настройках VK.');
-        const groupRow = (await db.execute({ sql: 'SELECT group_id FROM vk_groups WHERE id = ?', args: [groupId] })).rows[0];
+        const groupRow = (await db.execute({ sql: 'SELECT group_id, access_token FROM vk_groups WHERE id = ?', args: [groupId] })).rows[0];
         if (!groupRow) throw httpError(400, 'Выбранное сообщество не найдено - возможно, оно было удалено. Выберите другое.');
-        result = await publishToVk(idea, { accessToken: settings.access_token, groupId: groupRow.group_id }, coverAsset?.url || null, effectiveLang);
+        // Each VK community's own token can only post to its own wall (unlike
+        // a Telegram bot token) - see server/db.js's vk_groups comment. Falls
+        // back to vk_settings.access_token only for the rare case of a user
+        // token with groups+wall scope shared across communities.
+        let accessToken = groupRow.access_token;
+        if (!accessToken) {
+            const settings = (await db.execute('SELECT access_token FROM vk_settings WHERE id = 1')).rows[0];
+            accessToken = settings.access_token;
+        }
+        if (!accessToken) throw httpError(400, 'У этого сообщества нет токена, и общий токен VK тоже не настроен');
+        result = await publishToVk(idea, { accessToken, groupId: groupRow.group_id }, coverAsset?.url || null, effectiveLang);
     } else if (platform === 'instagram') {
         const settings = (await db.execute({ sql: 'SELECT access_token, business_account_id FROM instagram_settings WHERE lang = ?', args: [effectiveLang] })).rows[0];
         if (!settings.access_token || !settings.business_account_id) throw httpError(400, `Instagram (${effectiveLang.toUpperCase()}) не настроен`);

@@ -1756,7 +1756,7 @@ function renderVkGroupsList() {
         <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:0.5px solid var(--separator);">
             <div>
                 <div style="font-weight:600; font-size:13px;">${escapeHtml(g.label)} ${g.lang ? `<span style="font-weight:400; color:var(--text-secondary); font-size:11px;">${langLabel[g.lang] || ''}</span>` : ''}</div>
-                <div style="font-size:12px; color:var(--text-secondary);">${escapeHtml(g.groupId)}</div>
+                <div style="font-size:12px; color:var(--text-secondary);">ID ${escapeHtml(g.groupId)} · токен ${g.hasToken ? escapeHtml(g.tokenPreview) : '<span style="color:var(--accent-red);">не задан</span>'}</div>
             </div>
             <button class="delete-btn" onclick="deleteVkGroup(${g.id})">🗑</button>
         </div>`).join('');
@@ -1764,19 +1764,19 @@ function renderVkGroupsList() {
 
 async function addVkGroup() {
     const labelInput = document.getElementById('vk-new-group-label');
-    const groupIdInput = document.getElementById('vk-new-group-id');
+    const tokenInput = document.getElementById('vk-new-group-token');
     const langInput = document.getElementById('vk-new-group-lang');
     const label = labelInput.value.trim();
-    const groupId = groupIdInput.value.trim();
+    const accessToken = tokenInput.value.trim();
     const lang = langInput.value || undefined;
-    if (!label || !groupId) {
-        showToast('Укажите название и ID сообщества');
+    if (!accessToken) {
+        showToast('Укажите токен доступа сообщества');
         return;
     }
     try {
-        await api('/api/settings/vk-groups', { method: 'POST', body: JSON.stringify({ label, groupId, lang }) });
+        await api('/api/settings/vk-groups', { method: 'POST', body: JSON.stringify({ label, accessToken, lang }) });
         labelInput.value = '';
-        groupIdInput.value = '';
+        tokenInput.value = '';
         langInput.value = '';
         await loadVkGroups();
         showToast('Сообщество добавлено');
@@ -4474,9 +4474,100 @@ async function renderAgentSettingsForm() {
     document.getElementById('as-tone-input').value = agentSettings.toneOfVoice || '';
     document.getElementById('as-formula-input').value = agentSettings.postFormula || '';
     document.getElementById('as-generator-prompt-input').value = agentSettings.generatorPrompt || '';
+    document.getElementById('as-youtube-api-key-input').value = agentSettings.youtubeApiKey || '';
     updateAgentSettingsCounts();
     await loadContentRubrics();
     await loadTelegramWatchChannels();
+    await loadVkTrendSources();
+    await loadYoutubeTrendSources();
+}
+
+// VK/YOUTUBE TREND SOURCES - real public APIs, so Researcher scans these
+// automatically alongside RSS (unlike Telegram/Instagram watch lists above,
+// which need a manual click). Own storage/UI, mirrors telegram_watch_channels.
+let vkTrendSources = [];
+let youtubeTrendSources = [];
+
+async function loadVkTrendSources() {
+    try { vkTrendSources = await api('/api/settings/vk-trend-sources'); } catch (e) { vkTrendSources = []; }
+    renderVkTrendSourcesList();
+}
+
+function renderVkTrendSourcesList() {
+    const box = document.getElementById('vkts-list');
+    if (!box) return;
+    box.innerHTML = vkTrendSources.length === 0
+        ? `<p style="color:var(--text-secondary); font-size:12px; margin:0;">Пока не добавлено ни одного сообщества.</p>`
+        : vkTrendSources.map(s => `
+            <span class="group-chip" style="display:inline-flex; align-items:center; gap:6px; margin:2px 4px 2px 0;">
+                ${escapeHtml(s.label || s.groupId)}
+                <a href="#" onclick="deleteVkTrendSource(${s.id}); return false;" style="color:var(--accent-red);">✕</a>
+            </span>`).join('');
+}
+
+async function addVkTrendSource() {
+    const input = document.getElementById('vkts-add-input');
+    const groupId = input.value.trim();
+    if (!groupId) return showToast('Укажите ID или короткое имя сообщества');
+    try {
+        const created = await api('/api/settings/vk-trend-sources', { method: 'POST', body: JSON.stringify({ groupId }) });
+        vkTrendSources.push(created);
+        renderVkTrendSourcesList();
+        input.value = '';
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function deleteVkTrendSource(id) {
+    try {
+        await api(`/api/settings/vk-trend-sources/${id}`, { method: 'DELETE' });
+        vkTrendSources = vkTrendSources.filter(s => s.id !== id);
+        renderVkTrendSourcesList();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+async function loadYoutubeTrendSources() {
+    try { youtubeTrendSources = await api('/api/settings/youtube-trend-sources'); } catch (e) { youtubeTrendSources = []; }
+    renderYoutubeTrendSourcesList();
+}
+
+function renderYoutubeTrendSourcesList() {
+    const box = document.getElementById('ytts-list');
+    if (!box) return;
+    box.innerHTML = youtubeTrendSources.length === 0
+        ? `<p style="color:var(--text-secondary); font-size:12px; margin:0;">Пока не добавлено ни одного канала.</p>`
+        : youtubeTrendSources.map(s => `
+            <span class="group-chip" style="display:inline-flex; align-items:center; gap:6px; margin:2px 4px 2px 0;">
+                ${escapeHtml(s.label || s.channelId)}
+                <a href="#" onclick="deleteYoutubeTrendSource(${s.id}); return false;" style="color:var(--accent-red);">✕</a>
+            </span>`).join('');
+}
+
+async function addYoutubeTrendSource() {
+    const input = document.getElementById('ytts-add-input');
+    const channelId = input.value.trim();
+    if (!channelId) return showToast('Укажите ID канала');
+    try {
+        const created = await api('/api/settings/youtube-trend-sources', { method: 'POST', body: JSON.stringify({ channelId }) });
+        youtubeTrendSources.push(created);
+        renderYoutubeTrendSourcesList();
+        input.value = '';
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function deleteYoutubeTrendSource(id) {
+    try {
+        await api(`/api/settings/youtube-trend-sources/${id}`, { method: 'DELETE' });
+        youtubeTrendSources = youtubeTrendSources.filter(s => s.id !== id);
+        renderYoutubeTrendSourcesList();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
 }
 
 // Live counters next to the RSS-sources/keywords section titles - just
@@ -4850,11 +4941,12 @@ async function saveAgentSettingsForm() {
     const toneOfVoice = document.getElementById('as-tone-input').value;
     const postFormula = document.getElementById('as-formula-input').value;
     const generatorPrompt = document.getElementById('as-generator-prompt-input').value;
+    const youtubeApiKey = document.getElementById('as-youtube-api-key-input').value;
 
     try {
         agentSettings = await api('/api/agent-settings', {
             method: 'PUT',
-            body: JSON.stringify({ sources, keywords, toneOfVoice, postFormula, generatorPrompt }),
+            body: JSON.stringify({ sources, keywords, toneOfVoice, postFormula, generatorPrompt, youtubeApiKey }),
         });
         showToast('Настройки агентов сохранены!');
     } catch (e) {

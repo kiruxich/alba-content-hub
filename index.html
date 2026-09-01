@@ -825,6 +825,31 @@
                      never resaves/touches the rest of the list). -->
                 <div id="as-sources-preview" style="display:none; margin:0 0 20px;"></div>
 
+                <!-- VK/YouTube trend sources - real public APIs, so Researcher scans these
+                     automatically alongside RSS above (server/routes/agentResearcher.js).
+                     Own fields/storage (vk_trend_sources/youtube_trend_sources), not mixed
+                     into the RSS textarea. -->
+                <div class="controls-row" style="margin-top:20px; align-items:flex-end;">
+                    <div class="p-section-title" style="margin:0;">VK-СООБЩЕСТВА ДЛЯ RESEARCHER'А</div>
+                </div>
+                <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Стены этих сообществ Researcher сканирует автоматически, как RSS — использует токен из настроек публикации VK.</p>
+                <div class="controls-row">
+                    <input type="text" id="vkts-add-input" class="form-input" placeholder="короткое имя или ID сообщества" style="max-width:260px;">
+                    <button class="schedule-btn" onclick="addVkTrendSource()">+ Добавить</button>
+                </div>
+                <div id="vkts-list" style="margin:10px 0 20px;"></div>
+
+                <div class="controls-row" style="align-items:flex-end;">
+                    <div class="p-section-title" style="margin:0;">YOUTUBE-КАНАЛЫ ДЛЯ RESEARCHER'А</div>
+                </div>
+                <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Требует отдельный API-ключ (не тот, что для публикации) — YouTube Data API v3 ключ из Google Cloud Console.</p>
+                <input type="text" id="as-youtube-api-key-input" class="form-input" placeholder="YouTube Data API v3 key" style="margin-bottom:10px;">
+                <div class="controls-row">
+                    <input type="text" id="ytts-add-input" class="form-input" placeholder="ID канала (UC...)" style="max-width:260px;">
+                    <button class="schedule-btn" onclick="addYoutubeTrendSource()">+ Добавить</button>
+                </div>
+                <div id="ytts-list" style="margin:10px 0 20px;"></div>
+
                 <div class="controls-row" style="margin-top:20px; align-items:flex-end;">
                     <div class="p-section-title" style="margin:0;">КЛЮЧЕВЫЕ СЛОВА (через запятую) — <span id="as-keywords-count">0</span></div>
                     <button class="edit-btn" id="as-keywords-discover-btn" onclick="discoverKeywords()" title="Предложить новые ключевые слова через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
@@ -1190,19 +1215,13 @@
 
                 <!-- VK TAB -->
                 <div id="ps-tab-vk" class="ps-tab-content" style="display:none;">
-                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Токен с правом wall — один токен может публиковать в несколько сообществ, где у него есть права (как в Telegram — один бот, много каналов).</p>
-                    <label class="form-label">Access Token:</label>
-                    <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
-
-                    <button class="submit-btn" onclick="saveVkSettings()">Сохранить токен</button>
-
-                    <div class="info-box" style="margin-top:20px;">
+                    <div class="info-box">
                         <strong>Сообщества для публикации</strong>
-                        <p style="color:var(--text-secondary); font-size:12px; margin:6px 0 12px;">Этот токен публикует в эти сообщества — выбор конкретного сообщества (и, опционально, язык-подсказка для авто-выбора по умолчанию) появится при публикации идеи.</p>
+                        <p style="color:var(--text-secondary); font-size:12px; margin:6px 0 12px;">В отличие от Telegram-бота, токен доступа VK привязан к своему сообществу — у каждого сообщества свой токен (Управление сообществом → Работа с API → Ключи доступа), не общий. Вставьте токен — сообщество определится по нему автоматически, название можно не указывать.</p>
                         <div id="vk-groups-list"></div>
                         <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-start;">
-                            <input type="text" id="vk-new-group-label" class="form-input" style="margin:0;" placeholder="Название (например, Основное сообщество)">
-                            <input type="text" id="vk-new-group-id" class="form-input" style="margin:0;" placeholder="ID сообщества (без минуса)">
+                            <input type="text" id="vk-new-group-label" class="form-input" style="margin:0;" placeholder="Название (необязательно)">
+                            <input type="text" id="vk-new-group-token" class="form-input" style="margin:0;" placeholder="Токен доступа сообщества (vk1.a....)">
                             <select id="vk-new-group-lang" class="form-select" style="margin:0; max-width:110px;">
                                 <option value="">— любой —</option>
                                 <option value="ru">🇷🇺 RU</option>
@@ -1211,6 +1230,15 @@
                             <button class="schedule-btn" style="white-space:nowrap;" onclick="addVkGroup()">+ Добавить</button>
                         </div>
                     </div>
+
+                    <details style="margin-top:16px;">
+                        <summary style="cursor:pointer; color:var(--text-secondary); font-size:12px;">Общий токен (редкий случай — пользовательский токен с правами groups+wall на несколько сообществ сразу)</summary>
+                        <div style="margin-top:10px;">
+                            <label class="form-label">Access Token:</label>
+                            <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
+                            <button class="submit-btn" onclick="saveVkSettings()">Сохранить общий токен</button>
+                        </div>
+                    </details>
                 </div>
 
                 <!-- INSTAGRAM TAB -->

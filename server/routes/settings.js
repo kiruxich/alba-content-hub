@@ -116,26 +116,104 @@ router.put('/vk', async (req, res) => {
 // VK publish-target communities (see vk_groups in server/db.js) - same
 // shape as /telegram-channels above: one token (saved via PUT /vk), many
 // communities it's allowed to post to, picked in the publish modal.
+// Token is write-only (never round-trips back in full - only hasToken/
+// tokenPreview, same pattern as the platform settings below) since each
+// row's token is a real credential, not a public id like group_id.
 router.get('/vk-groups', async (req, res) => {
-    const result = await db.execute('SELECT id, label, group_id, lang, created_at FROM vk_groups ORDER BY created_at ASC');
-    res.json(result.rows.map(row => ({ id: row.id, label: row.label, groupId: row.group_id, lang: row.lang || null, createdAt: row.created_at })));
+    const result = await db.execute('SELECT id, label, group_id, access_token, lang, created_at FROM vk_groups ORDER BY created_at ASC');
+    res.json(result.rows.map(row => ({
+        id: row.id, label: row.label, groupId: row.group_id, lang: row.lang || null, createdAt: row.created_at,
+        hasToken: Boolean(row.access_token),
+        tokenPreview: row.access_token ? `••••${row.access_token.slice(-4)}` : '',
+    })));
 });
 
+// VK community access tokens are scoped to the community they were created
+// from (unlike a Telegram bot token) - groups.getById with a community
+// token, called with NO group_id param, resolves to that one community
+// automatically, so the user only ever pastes the token, never has to hunt
+// down a numeric id themselves.
 router.post('/vk-groups', async (req, res) => {
-    const { label, groupId, lang } = req.body || {};
-    if (!label || !String(label).trim()) return res.status(400).json({ error: 'Укажите название сообщества' });
-    if (!groupId || !String(groupId).trim()) return res.status(400).json({ error: 'Укажите ID сообщества' });
+    const { accessToken, label, lang } = req.body || {};
+    const token = String(accessToken || '').trim();
+    if (!token) return res.status(400).json({ error: 'Укажите токен доступа сообщества' });
+
+    let resolved;
+    try {
+        const url = new URL('https://api.vk.com/method/groups.getById');
+        url.searchParams.set('v', '5.199');
+        url.searchParams.set('access_token', token);
+        const data = await (await fetch(url)).json();
+        if (data.error) throw new Error(data.error.error_msg || `VK error ${data.error.error_code}`);
+        resolved = (data.response?.groups || data.response)?.[0];
+        if (!resolved) throw new Error('VK не вернул информацию о сообществе для этого токена');
+    } catch (e) {
+        return res.status(400).json({ error: `Не удалось проверить токен: ${e.message}` });
+    }
+
     const resolvedLang = lang === 'ru' || lang === 'en' ? lang : null;
+    const finalLabel = (label && String(label).trim()) || resolved.name || `VK ${resolved.id}`;
     const result = await db.execute({
-        sql: 'INSERT INTO vk_groups (label, group_id, lang) VALUES (?, ?, ?)',
-        args: [String(label).trim(), String(groupId).trim(), resolvedLang],
+        sql: 'INSERT INTO vk_groups (label, group_id, access_token, lang) VALUES (?, ?, ?, ?)',
+        args: [finalLabel, String(resolved.id), token, resolvedLang],
     });
     const id = Number(result.lastInsertRowid);
-    res.status(201).json({ id, label: String(label).trim(), groupId: String(groupId).trim(), lang: resolvedLang });
+    res.status(201).json({
+        id, label: finalLabel, groupId: String(resolved.id), lang: resolvedLang,
+        hasToken: true, tokenPreview: `••••${token.slice(-4)}`,
+    });
 });
 
 router.delete('/vk-groups/:id', async (req, res) => {
     await db.execute({ sql: 'DELETE FROM vk_groups WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+});
+
+// VK/YouTube trend sources (see vk_trend_sources/youtube_trend_sources in
+// server/db.js) - what Researcher scans for trend candidates alongside RSS
+// (server/routes/agentResearcher.js), NOT publish targets. Kept as their own
+// tables/endpoints (mirroring vk-groups/telegram-channels above) rather than
+// mixed into agent_settings.sources, since Центр агентов shows them in their
+// own fields, not the shared RSS textarea.
+router.get('/vk-trend-sources', async (req, res) => {
+    const result = await db.execute('SELECT id, group_id, label, created_at FROM vk_trend_sources ORDER BY created_at ASC');
+    res.json(result.rows.map(row => ({ id: row.id, groupId: row.group_id, label: row.label || '', createdAt: row.created_at })));
+});
+
+router.post('/vk-trend-sources', async (req, res) => {
+    const groupId = String(req.body?.groupId || '').trim();
+    const label = String(req.body?.label || '').trim();
+    if (!groupId) return res.status(400).json({ error: 'Укажите ID или короткое имя сообщества' });
+    const result = await db.execute({
+        sql: 'INSERT INTO vk_trend_sources (group_id, label) VALUES (?, ?)',
+        args: [groupId, label],
+    });
+    res.status(201).json({ id: Number(result.lastInsertRowid), groupId, label, createdAt: Math.floor(Date.now() / 1000) });
+});
+
+router.delete('/vk-trend-sources/:id', async (req, res) => {
+    await db.execute({ sql: 'DELETE FROM vk_trend_sources WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+});
+
+router.get('/youtube-trend-sources', async (req, res) => {
+    const result = await db.execute('SELECT id, channel_id, label, created_at FROM youtube_trend_sources ORDER BY created_at ASC');
+    res.json(result.rows.map(row => ({ id: row.id, channelId: row.channel_id, label: row.label || '', createdAt: row.created_at })));
+});
+
+router.post('/youtube-trend-sources', async (req, res) => {
+    const channelId = String(req.body?.channelId || '').trim();
+    const label = String(req.body?.label || '').trim();
+    if (!channelId) return res.status(400).json({ error: 'Укажите ID канала' });
+    const result = await db.execute({
+        sql: 'INSERT INTO youtube_trend_sources (channel_id, label) VALUES (?, ?)',
+        args: [channelId, label],
+    });
+    res.status(201).json({ id: Number(result.lastInsertRowid), channelId, label, createdAt: Math.floor(Date.now() / 1000) });
+});
+
+router.delete('/youtube-trend-sources/:id', async (req, res) => {
+    await db.execute({ sql: 'DELETE FROM youtube_trend_sources WHERE id = ?', args: [req.params.id] });
     res.json({ ok: true });
 });
 
