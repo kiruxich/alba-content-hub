@@ -31,6 +31,7 @@ export async function runDueCalendarPublishes() {
                 ideaId: row.idea_id,
                 channelId: row.channel_id,
                 boardId: row.board_id,
+                groupId: row.vk_group_id,
                 lang: row.lang || 'ru',
             });
             await db.execute({

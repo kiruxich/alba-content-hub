@@ -9,7 +9,9 @@
 // something the server runs on its own.
 //
 // Usage (from the project root, against the real deployed DB):
-//   node --env-file-if-exists=.env scripts/register-youtube-oauth.mjs <client_id> <client_secret>
+//   node --env-file-if-exists=.env scripts/register-youtube-oauth.mjs <client_id> <client_secret> [--lang ru|en]
+// Run it twice (once per --lang) if you're setting up the RU and EN accounts
+// - see server/db.js's migrateSettingsTableToLangKey for why there are two.
 //
 // Prerequisites (you create these yourself in Google Cloud Console - this
 // script only consumes them, it does not create a Cloud project):
@@ -38,9 +40,9 @@
 //   5. Optionally fetches the channel's title via YouTube Data API's
 //      channels.list?mine=true for a nicer confirmation message.
 //   6. Saves client_id, client_secret, refresh_token, channel_title into
-//      youtube_settings (id = 1), via the same UPDATE shape
-//      server/routes/settings.js uses - this script talks to the DB
-//      directly, not through the HTTP API.
+//      youtube_settings (lang = 'ru' or 'en', per --lang), via the same
+//      UPDATE shape server/routes/settings.js uses - this script talks to
+//      the DB directly, not through the HTTP API.
 //
 // On the OAuth flow itself (verified against Google's current docs as of
 // this writing - see the script's PR/commit description for sources):
@@ -82,7 +84,9 @@ const SCOPES = [
 function usageAndExit(message) {
     if (message) console.error(`Ошибка: ${message}\n`);
     console.error('Использование:');
-    console.error('  node scripts/register-youtube-oauth.mjs <client_id> <client_secret>');
+    console.error('  node scripts/register-youtube-oauth.mjs <client_id> <client_secret> [--lang ru|en]');
+    console.error('  --lang выбирает, в какой из двух аккаунтов (RU/EN) сохранить токен - по умолчанию ru.');
+    console.error('  Запустите дважды (с --lang ru и с --lang en), если нужны оба аккаунта.');
     console.error('');
     console.error('client_id и client_secret берутся из своего проекта в Google Cloud Console:');
     console.error('  1. https://console.cloud.google.com/ - создать/выбрать проект');
@@ -108,7 +112,13 @@ function base64url(buffer) {
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
-const positional = args.filter(a => a !== '--dry-run');
+// --lang ru|en selects which of the two RU/EN account rows this run writes
+// into (see server/db.js's migrateSettingsTableToLangKey) - run this script
+// twice, once per account, to set up both. Defaults to 'ru' for the common
+// single-account case.
+const langArgIdx = args.indexOf('--lang');
+const lang = langArgIdx !== -1 && args[langArgIdx + 1] === 'en' ? 'en' : 'ru';
+const positional = args.filter((a, i) => a !== '--dry-run' && a !== '--lang' && i !== langArgIdx + 1);
 const [clientId, clientSecret] = positional;
 
 if (!clientId || !clientId.trim()) usageAndExit('нужен client_id первым аргументом');
@@ -271,16 +281,16 @@ try {
     console.log('Не удалось запросить название канала (не критично, продолжаю):', e.message);
 }
 
-// --- save into youtube_settings (id = 1) -------------------------
+// --- save into youtube_settings (lang = 'ru' or 'en') -------------------------
 
 await db.execute({
-    sql: 'UPDATE youtube_settings SET client_id = ?, client_secret = ?, refresh_token = ?, channel_title = ? WHERE id = 1',
-    args: [clientId.trim(), clientSecret.trim(), tokenData.refresh_token.trim(), channelTitle],
+    sql: 'UPDATE youtube_settings SET client_id = ?, client_secret = ?, refresh_token = ?, channel_title = ? WHERE lang = ?',
+    args: [clientId.trim(), clientSecret.trim(), tokenData.refresh_token.trim(), channelTitle, lang],
 });
 
-console.log('\nГотово. Сохранено в youtube_settings:');
+console.log(`\nГотово. Сохранено в youtube_settings (аккаунт: ${lang.toUpperCase()}):`);
 console.log(`  client_id:     ${mask(clientId)}`);
 console.log(`  client_secret: ${mask(clientSecret)}`);
 console.log(`  refresh_token: ${mask(tokenData.refresh_token)}`);
 console.log(`  channel_title: ${channelTitle || '(не определён)'}`);
-console.log('\nYouTube-публикация теперь настроена - server/lib/socialPublishers/youtube.js сможет получать access token по этому refresh_token при каждой публикации.');
+console.log(`\nYouTube-публикация (${lang.toUpperCase()}) теперь настроена - server/lib/socialPublishers/youtube.js сможет получать access token по этому refresh_token при каждой публикации ${lang === 'ru' ? 'русскоязычных' : 'англоязычных'} постов. Для второго языка запустите этот скрипт ещё раз с --lang ${lang === 'ru' ? 'en' : 'ru'}.`);

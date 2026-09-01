@@ -37,15 +37,20 @@ router.put('/', async (req, res) => {
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 // Month index (0-11) -> which quarter block's period it likely falls in.
-// Periods are free-text ("Январь — Март"), not real dates, so this is a
-// best-effort match on the standard Jan-Mar/Apr-Jun/Jul-Sep/Oct-Dec split -
-// if a quarter's period text has been edited to something else, this still
-// falls back sanely (just won't find a match for that one).
+// Periods are free-text, not real dates, so this is a best-effort regex
+// match - if a period's text has been edited to something else, this simply
+// won't find a match for that one (buildContentPlanContext handles that
+// gracefully - currentQuarter just stays null). Matches the 7-period
+// breakdown (roughly bimonthly, one per product) used since the roadmap
+// was expanded to cover all 7 products - see the Контент-план page.
 const QUARTER_MONTH_RANGES = [
-    { months: [0, 1, 2], match: /янв|февр|март/i },
-    { months: [3, 4, 5], match: /апрел|май|июн/i },
-    { months: [6, 7, 8], match: /июл|август|сентябр/i },
-    { months: [9, 10, 11], match: /октябр|ноябр|декабр/i },
+    { months: [0, 1], match: /январ|февр/i },
+    { months: [2, 3], match: /март|апрел/i },
+    { months: [4, 5], match: /май|июн/i },
+    { months: [6, 7], match: /июл|август/i },
+    { months: [8], match: /сентябр/i },
+    { months: [9], match: /октябр/i },
+    { months: [10, 11], match: /ноябр|декабр/i },
 ];
 
 // Shared by GET /context below and server/routes/contentDrafts.js's
@@ -77,6 +82,25 @@ export async function buildContentPlanContext() {
     if (distribution?.text) lines.push(`Модель дистрибуции: ${distribution.text}`);
     if (currentQuarter) lines.push(`Текущий фокус квартала (${currentQuarter.period}) — ${currentQuarter.title}: ${currentQuarter.text}`);
     if (todayFocus?.focus) lines.push(`Фокус сегодняшнего дня (${todayFocus.label}): ${todayFocus.focus}`);
+
+    // Weekly "Маркетолог" routine's conclusions (server/routes/marketing.js)
+    // - this is the actual bridge that makes its analysis reach
+    // Researcher/Generator, since both already fetch this same endpoint.
+    // Best-effort: no successful run yet is normal (agent hasn't fired),
+    // not an error worth surfacing to a caller of this context builder.
+    try {
+        const marketingResult = await db.execute(
+            "SELECT run_date, brief_json FROM agent_runs WHERE agent_name = 'marketing' AND status = 'success' AND brief_json IS NOT NULL ORDER BY id DESC LIMIT 1"
+        );
+        const marketingRow = marketingResult.rows[0];
+        if (marketingRow) {
+            const parsed = JSON.parse(marketingRow.brief_json);
+            const topRec = (parsed.recommendations || [])[0];
+            let line = `Выводы агента «Маркетолог» (от ${marketingRow.run_date}): ${parsed.summary}`;
+            if (topRec?.text) line += ` Главная рекомендация: ${topRec.text}`;
+            lines.push(line);
+        }
+    } catch { /* agent_runs read failed - skip this line, not fatal */ }
 
     return lines.join('\n\n');
 }

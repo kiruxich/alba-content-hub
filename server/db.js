@@ -60,6 +60,60 @@ async function ensureColumn(table, column, definition) {
     }
 }
 
+// One-time table rebuild for the RU/EN dual-account settings tables
+// (vk_settings, instagram_settings, youtube_settings, threads_settings -
+// Telegram and Pinterest are deliberately excluded, see the callers below).
+// These tables were originally a single-row singleton (id INTEGER PRIMARY
+// KEY CHECK (id = 1)) - that CHECK constraint makes it impossible to just
+// ALTER TABLE + INSERT a second row for the 'en' account, so this rebuilds
+// the table onto a `lang` primary key instead, carrying the existing row
+// over as 'ru' (real production tokens must survive this) and adding an
+// empty 'en' row. Idempotent - skips entirely once `lang` already exists,
+// safe to call on every boot like ensureColumn above.
+async function migrateSettingsTableToLangKey(table, columns) {
+    const info = await db.execute(`PRAGMA table_info(${table})`);
+    if (info.rows.some(r => r.name === 'lang')) return; // already migrated
+    const colNames = columns.map(c => c.split(' ')[0]);
+    // Seed the id=1 row here (not in the raw CREATE TABLE block) so this
+    // still works as a no-op INSERT OR IGNORE on a fresh table, without
+    // ever running against the post-migration `lang`-keyed shape (which has
+    // no `id` column and would error on every later boot otherwise).
+    await db.execute(`INSERT OR IGNORE INTO ${table} (id, ${colNames.join(', ')}) VALUES (1, ${colNames.map(() => `''`).join(', ')})`);
+    const tmpTable = `${table}_lang_migration`;
+    await db.execute(`DROP TABLE IF EXISTS ${tmpTable}`);
+    await db.execute(`CREATE TABLE ${tmpTable} (lang TEXT PRIMARY KEY CHECK (lang IN ('ru','en')), ${columns.join(', ')})`);
+    await db.execute(
+        `INSERT OR IGNORE INTO ${tmpTable} (lang, ${colNames.join(', ')}) SELECT 'ru', ${colNames.join(', ')} FROM ${table} WHERE id = 1`
+    );
+    await db.execute(`INSERT OR IGNORE INTO ${tmpTable} (lang) VALUES ('en')`);
+    await db.execute(`DROP TABLE ${table}`);
+    await db.execute(`ALTER TABLE ${tmpTable} RENAME TO ${table}`);
+}
+
+// One-time reversal of the above: vk_settings briefly went through the
+// lang-key migration during initial development of the RU/EN account
+// feature, then the design changed to a single token + vk_groups list (see
+// the comment on the vk_settings CREATE TABLE below) before that code ever
+// shipped - but on any environment where the lang-keyed table was already
+// created (this dev DB, and possibly production), the CREATE TABLE IF NOT
+// EXISTS below is a no-op and boot fails. This rebuilds vk_settings back
+// onto its original `id INTEGER PRIMARY KEY CHECK (id = 1)` shape, carrying
+// the 'ru' row's token/group_id over (the only row that could ever have
+// held a real value). Idempotent - skips once `id` already exists.
+async function migrateVkSettingsBackToIdKey() {
+    const info = await db.execute(`PRAGMA table_info(vk_settings)`);
+    if (info.rows.length === 0 || info.rows.some(r => r.name === 'id')) return; // not created yet, or already correct shape
+    await db.execute(`DROP TABLE IF EXISTS vk_settings_id_migration`);
+    await db.execute(`CREATE TABLE vk_settings_id_migration (id INTEGER PRIMARY KEY CHECK (id = 1), access_token TEXT DEFAULT '', group_id TEXT DEFAULT '')`);
+    await db.execute(
+        `INSERT OR IGNORE INTO vk_settings_id_migration (id, access_token, group_id) SELECT 1, access_token, group_id FROM vk_settings WHERE lang = 'ru'`
+    );
+    await db.execute(`INSERT OR IGNORE INTO vk_settings_id_migration (id, access_token, group_id) VALUES (1, '', '')`);
+    await db.execute(`DROP TABLE vk_settings`);
+    await db.execute(`ALTER TABLE vk_settings_id_migration RENAME TO vk_settings`);
+}
+await migrateVkSettingsBackToIdKey();
+
 await db.executeMultiple(`
 CREATE TABLE IF NOT EXISTS ideas (
     id TEXT PRIMARY KEY,
@@ -134,6 +188,20 @@ CREATE TABLE IF NOT EXISTS vk_settings (
 );
 INSERT OR IGNORE INTO vk_settings (id, access_token, group_id) VALUES (1, '', '');
 
+-- One VK token can post to several communities (unlike Instagram/YouTube/
+-- Threads, which each need a wholly separate account for RU vs EN) - this
+-- mirrors telegram_channels exactly: a picked list of publish targets under
+-- one token, not a second account. The 'lang' column is optional (NULL =
+-- works for either) and only used to pre-select a sensible default in the
+-- publish modal - the picker is still manual, same as Telegram's channel select.
+CREATE TABLE IF NOT EXISTS vk_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,
+    group_id TEXT NOT NULL,
+    lang TEXT,
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
 -- Instagram: a long-lived Page access token (Meta Graph API) plus the
 -- connected Instagram Business/Creator account id it publishes to. See
 -- server/lib/socialPublishers/instagram.js.
@@ -142,7 +210,6 @@ CREATE TABLE IF NOT EXISTS instagram_settings (
     access_token TEXT DEFAULT '',
     business_account_id TEXT DEFAULT ''
 );
-INSERT OR IGNORE INTO instagram_settings (id, access_token, business_account_id) VALUES (1, '', '');
 
 -- YouTube: OAuth2 client credentials + a long-lived refresh token (obtained
 -- once via a consent flow, not a simple pasted token - see
@@ -154,7 +221,6 @@ CREATE TABLE IF NOT EXISTS youtube_settings (
     refresh_token TEXT DEFAULT '',
     channel_title TEXT DEFAULT ''
 );
-INSERT OR IGNORE INTO youtube_settings (id, client_id, client_secret, refresh_token, channel_title) VALUES (1, '', '', '', '');
 
 -- Threads: a Threads user access token (threads_basic + threads_content_publish
 -- scopes, from a Meta app with the "Threads use case" - a separate app type
@@ -165,7 +231,6 @@ CREATE TABLE IF NOT EXISTS threads_settings (
     access_token TEXT DEFAULT '',
     user_id TEXT DEFAULT ''
 );
-INSERT OR IGNORE INTO threads_settings (id, access_token, user_id) VALUES (1, '', '');
 
 -- Pinterest: a user access token (pins:read, pins:write, boards:read,
 -- boards:write scopes) plus an optional default board id - unlike the other
@@ -390,6 +455,17 @@ CREATE TABLE IF NOT EXISTS video_assembly_jobs (
 );
 `);
 
+// RU/EN dual-account migration for Instagram/YouTube/Threads - see
+// migrateSettingsTableToLangKey's comment above. Telegram (already has its
+// own multi-channel setup) and Pinterest (single account, no RU/EN split
+// requested) are deliberately not migrated. VK is ALSO not migrated this
+// way - one VK token can post to several communities, so it gets its own
+// vk_groups list (mirroring telegram_channels) instead of a second account -
+// see the CREATE TABLE below and server/routes/settings.js's /vk-groups.
+await migrateSettingsTableToLangKey('instagram_settings', [`access_token TEXT DEFAULT ''`, `business_account_id TEXT DEFAULT ''`]);
+await migrateSettingsTableToLangKey('youtube_settings', [`client_id TEXT DEFAULT ''`, `client_secret TEXT DEFAULT ''`, `refresh_token TEXT DEFAULT ''`, `channel_title TEXT DEFAULT ''`]);
+await migrateSettingsTableToLangKey('threads_settings', [`access_token TEXT DEFAULT ''`, `user_id TEXT DEFAULT ''`]);
+
 // Additive columns on existing tables - safe to run on every startup.
 // ideas: distinguish agent-authored drafts from manual ones, and keep the
 // raw agent draft alongside the human-edited text (needed later so the
@@ -448,6 +524,7 @@ await ensureColumn('scheduled_events', 'utm_code', 'TEXT');
 await ensureColumn('scheduled_events', 'publish_at', 'INTEGER');
 await ensureColumn('scheduled_events', 'channel_id', 'INTEGER');
 await ensureColumn('scheduled_events', 'board_id', 'TEXT');
+await ensureColumn('scheduled_events', 'vk_group_id', 'INTEGER');
 await ensureColumn('scheduled_events', 'lang', "TEXT DEFAULT 'ru'");
 await ensureColumn('scheduled_events', 'publish_status', "TEXT DEFAULT 'pending'");
 await ensureColumn('scheduled_events', 'publish_error', 'TEXT');

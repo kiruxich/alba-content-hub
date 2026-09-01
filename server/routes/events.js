@@ -29,6 +29,7 @@ function serialize(row) {
         publishAt: row.publish_at || null,
         channelId: row.channel_id || null,
         boardId: row.board_id || null,
+        groupId: row.vk_group_id || null,
         lang: row.lang || 'ru',
         publishStatus: row.publish_status || 'pending',
         publishError: row.publish_error || null,
@@ -51,13 +52,13 @@ router.post('/', async (req, res) => {
     const utmCode = `${b.ideaId ? `idea${b.ideaId}` : `pub${id}`}_${platform}`;
     await db.execute({
         sql: `
-            INSERT INTO scheduled_events (id, idea_id, title, date_str, raw_date, color, format, cta, desc, platform, external_post_id, utm_code, publish_at, channel_id, board_id, lang, publish_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO scheduled_events (id, idea_id, title, date_str, raw_date, color, format, cta, desc, platform, external_post_id, utm_code, publish_at, channel_id, board_id, vk_group_id, lang, publish_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         args: [id, b.ideaId ?? null, b.title, b.dateStr || '', b.rawDate,
             b.color || '#0a84ff', b.format || 'TG Пост', b.cta || '', b.desc || '',
             platform, b.externalPostId || null, utmCode,
-            b.publishAt || null, b.channelId || null, b.boardId || null, b.lang || 'ru',
+            b.publishAt || null, b.channelId || null, b.boardId || null, b.groupId || null, b.lang || 'ru',
             b.publishAt ? 'pending' : null],
     });
     const result = await db.execute({ sql: 'SELECT * FROM scheduled_events WHERE id = ?', args: [id] });

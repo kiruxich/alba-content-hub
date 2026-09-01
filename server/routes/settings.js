@@ -69,38 +69,79 @@ router.delete('/telegram-channels/:id', async (req, res) => {
     res.json({ ok: true });
 });
 
-// VK, Instagram, and YouTube settings follow the exact same write-mostly
-// pattern as Telegram above: secrets never round-trip back to the browser in
-// full, only a masked preview + whether they're configured. See
-// server/lib/socialPublishers/*.js for what each is used for.
+// VK, Instagram, YouTube, and Threads settings follow the exact same
+// write-mostly pattern as Telegram above: secrets never round-trip back to
+// the browser in full, only a masked preview + whether they're configured.
+// See server/lib/socialPublishers/*.js for what each is used for.
+//
+// RU/EN dual accounts: unlike Telegram (its own multi-channel setup), VK
+// (its own multi-group setup, see /vk-groups below) and Pinterest (single
+// account), Instagram/YouTube/Threads hold TWO separate credential rows -
+// one per language (see server/db.js's migrateSettingsTableToLangKey).
+// Every GET/PUT for those three takes `?lang=ru|en` (GET, default 'ru') /
+// body `lang` (PUT, default 'ru') so existing callers that don't pass it
+// yet keep working against the RU account unchanged.
+// server/lib/publishIdea.js picks the account automatically from the post's
+// own language at publish time - there's no separate account picker in the
+// publish flow itself for these three.
+function resolveLang(value) {
+    return value === 'en' ? 'en' : 'ru';
+}
 
+// VK: one token, many communities it can post to (mirrors Telegram, not the
+// RU/EN split above) - group_id here is legacy/unused now that /vk-groups
+// exists, kept only so an old row's data isn't silently dropped.
 router.get('/vk', async (req, res) => {
-    const result = await db.execute('SELECT access_token, group_id FROM vk_settings WHERE id = 1');
+    const result = await db.execute('SELECT access_token FROM vk_settings WHERE id = 1');
     const row = result.rows[0];
     const hasToken = Boolean(row.access_token);
     res.json({
-        groupId: row.group_id || '',
         hasToken,
         tokenPreview: hasToken ? `••••${row.access_token.slice(-4)}` : '',
     });
 });
 
 router.put('/vk', async (req, res) => {
-    const { accessToken, groupId } = req.body || {};
-    const currentRes = await db.execute('SELECT access_token, group_id FROM vk_settings WHERE id = 1');
+    const { accessToken } = req.body || {};
+    const currentRes = await db.execute('SELECT access_token FROM vk_settings WHERE id = 1');
     const current = currentRes.rows[0];
     const nextToken = accessToken !== undefined && accessToken !== '' ? accessToken.trim() : current.access_token;
-    const nextGroupId = groupId !== undefined ? groupId.trim() : current.group_id;
-    await db.execute({ sql: 'UPDATE vk_settings SET access_token = ?, group_id = ? WHERE id = 1', args: [nextToken, nextGroupId] });
+    await db.execute({ sql: 'UPDATE vk_settings SET access_token = ? WHERE id = 1', args: [nextToken] });
     res.json({
-        groupId: nextGroupId,
         hasToken: Boolean(nextToken),
         tokenPreview: nextToken ? `••••${nextToken.slice(-4)}` : '',
     });
 });
 
+// VK publish-target communities (see vk_groups in server/db.js) - same
+// shape as /telegram-channels above: one token (saved via PUT /vk), many
+// communities it's allowed to post to, picked in the publish modal.
+router.get('/vk-groups', async (req, res) => {
+    const result = await db.execute('SELECT id, label, group_id, lang, created_at FROM vk_groups ORDER BY created_at ASC');
+    res.json(result.rows.map(row => ({ id: row.id, label: row.label, groupId: row.group_id, lang: row.lang || null, createdAt: row.created_at })));
+});
+
+router.post('/vk-groups', async (req, res) => {
+    const { label, groupId, lang } = req.body || {};
+    if (!label || !String(label).trim()) return res.status(400).json({ error: 'Укажите название сообщества' });
+    if (!groupId || !String(groupId).trim()) return res.status(400).json({ error: 'Укажите ID сообщества' });
+    const resolvedLang = lang === 'ru' || lang === 'en' ? lang : null;
+    const result = await db.execute({
+        sql: 'INSERT INTO vk_groups (label, group_id, lang) VALUES (?, ?, ?)',
+        args: [String(label).trim(), String(groupId).trim(), resolvedLang],
+    });
+    const id = Number(result.lastInsertRowid);
+    res.status(201).json({ id, label: String(label).trim(), groupId: String(groupId).trim(), lang: resolvedLang });
+});
+
+router.delete('/vk-groups/:id', async (req, res) => {
+    await db.execute({ sql: 'DELETE FROM vk_groups WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+});
+
 router.get('/instagram', async (req, res) => {
-    const result = await db.execute('SELECT access_token, business_account_id FROM instagram_settings WHERE id = 1');
+    const lang = resolveLang(req.query.lang);
+    const result = await db.execute({ sql: 'SELECT access_token, business_account_id FROM instagram_settings WHERE lang = ?', args: [lang] });
     const row = result.rows[0];
     const hasToken = Boolean(row.access_token);
     res.json({
@@ -111,12 +152,13 @@ router.get('/instagram', async (req, res) => {
 });
 
 router.put('/instagram', async (req, res) => {
-    const { accessToken, businessAccountId } = req.body || {};
-    const currentRes = await db.execute('SELECT access_token, business_account_id FROM instagram_settings WHERE id = 1');
+    const { accessToken, businessAccountId, lang: rawLang } = req.body || {};
+    const lang = resolveLang(rawLang);
+    const currentRes = await db.execute({ sql: 'SELECT access_token, business_account_id FROM instagram_settings WHERE lang = ?', args: [lang] });
     const current = currentRes.rows[0];
     const nextToken = accessToken !== undefined && accessToken !== '' ? accessToken.trim() : current.access_token;
     const nextAccountId = businessAccountId !== undefined ? businessAccountId.trim() : current.business_account_id;
-    await db.execute({ sql: 'UPDATE instagram_settings SET access_token = ?, business_account_id = ? WHERE id = 1', args: [nextToken, nextAccountId] });
+    await db.execute({ sql: 'UPDATE instagram_settings SET access_token = ?, business_account_id = ? WHERE lang = ?', args: [nextToken, nextAccountId, lang] });
     res.json({
         businessAccountId: nextAccountId,
         hasToken: Boolean(nextToken),
@@ -130,7 +172,8 @@ router.put('/instagram', async (req, res) => {
 // publish to work; the route reports each independently so the UI can point
 // out exactly what's missing.
 router.get('/youtube', async (req, res) => {
-    const result = await db.execute('SELECT client_id, client_secret, refresh_token, channel_title FROM youtube_settings WHERE id = 1');
+    const lang = resolveLang(req.query.lang);
+    const result = await db.execute({ sql: 'SELECT client_id, client_secret, refresh_token, channel_title FROM youtube_settings WHERE lang = ?', args: [lang] });
     const row = result.rows[0];
     res.json({
         clientId: row.client_id || '',
@@ -142,16 +185,17 @@ router.get('/youtube', async (req, res) => {
 });
 
 router.put('/youtube', async (req, res) => {
-    const { clientId, clientSecret, refreshToken, channelTitle } = req.body || {};
-    const currentRes = await db.execute('SELECT client_id, client_secret, refresh_token, channel_title FROM youtube_settings WHERE id = 1');
+    const { clientId, clientSecret, refreshToken, channelTitle, lang: rawLang } = req.body || {};
+    const lang = resolveLang(rawLang);
+    const currentRes = await db.execute({ sql: 'SELECT client_id, client_secret, refresh_token, channel_title FROM youtube_settings WHERE lang = ?', args: [lang] });
     const current = currentRes.rows[0];
     const nextClientId = clientId !== undefined ? clientId.trim() : current.client_id;
     const nextClientSecret = clientSecret !== undefined && clientSecret !== '' ? clientSecret.trim() : current.client_secret;
     const nextRefreshToken = refreshToken !== undefined && refreshToken !== '' ? refreshToken.trim() : current.refresh_token;
     const nextChannelTitle = channelTitle !== undefined ? channelTitle.trim() : current.channel_title;
     await db.execute({
-        sql: 'UPDATE youtube_settings SET client_id = ?, client_secret = ?, refresh_token = ?, channel_title = ? WHERE id = 1',
-        args: [nextClientId, nextClientSecret, nextRefreshToken, nextChannelTitle],
+        sql: 'UPDATE youtube_settings SET client_id = ?, client_secret = ?, refresh_token = ?, channel_title = ? WHERE lang = ?',
+        args: [nextClientId, nextClientSecret, nextRefreshToken, nextChannelTitle, lang],
     });
     res.json({
         clientId: nextClientId,
@@ -166,7 +210,8 @@ router.put('/youtube', async (req, res) => {
 // access token never round-trips back to the browser in full, only a masked
 // preview + whether it's configured. See server/lib/socialPublishers/threads.js.
 router.get('/threads', async (req, res) => {
-    const result = await db.execute('SELECT access_token, user_id FROM threads_settings WHERE id = 1');
+    const lang = resolveLang(req.query.lang);
+    const result = await db.execute({ sql: 'SELECT access_token, user_id FROM threads_settings WHERE lang = ?', args: [lang] });
     const row = result.rows[0];
     const hasToken = Boolean(row.access_token);
     res.json({
@@ -177,12 +222,13 @@ router.get('/threads', async (req, res) => {
 });
 
 router.put('/threads', async (req, res) => {
-    const { accessToken, userId } = req.body || {};
-    const currentRes = await db.execute('SELECT access_token, user_id FROM threads_settings WHERE id = 1');
+    const { accessToken, userId, lang: rawLang } = req.body || {};
+    const lang = resolveLang(rawLang);
+    const currentRes = await db.execute({ sql: 'SELECT access_token, user_id FROM threads_settings WHERE lang = ?', args: [lang] });
     const current = currentRes.rows[0];
     const nextToken = accessToken !== undefined && accessToken !== '' ? accessToken.trim() : current.access_token;
     const nextUserId = userId !== undefined ? userId.trim() : current.user_id;
-    await db.execute({ sql: 'UPDATE threads_settings SET access_token = ?, user_id = ? WHERE id = 1', args: [nextToken, nextUserId] });
+    await db.execute({ sql: 'UPDATE threads_settings SET access_token = ?, user_id = ? WHERE lang = ?', args: [nextToken, nextUserId, lang] });
     res.json({
         userId: nextUserId,
         hasToken: Boolean(nextToken),

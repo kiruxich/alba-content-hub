@@ -1084,6 +1084,10 @@
                     <label class="form-label">Доска Pinterest:</label>
                     <select id="schedule-board-select" class="form-select" onchange="onScheduleBoardChange()"></select>
                 </div>
+                <div id="schedule-vk-group-row" style="display:none;">
+                    <label class="form-label">Сообщество VK:</label>
+                    <select id="schedule-vk-group-select" class="form-select" onchange="onScheduleVkGroupChange()"></select>
+                </div>
 
                 <label class="form-label" style="margin-top:8px;">Язык:</label>
                 <div style="display:flex; gap:8px; margin-bottom:12px;">
@@ -1161,19 +1165,36 @@
 
                 <!-- VK TAB -->
                 <div id="ps-tab-vk" class="ps-tab-content" style="display:none;">
-                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Токен сообщества (community access token) с правом wall — создаётся в настройках сообщества VK или через Standalone-приложение.</p>
-                    <label class="form-label">Access Token сообщества:</label>
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Токен с правом wall — один токен может публиковать в несколько сообществ, где у него есть права (как в Telegram — один бот, много каналов).</p>
+                    <label class="form-label">Access Token:</label>
                     <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
 
-                    <label class="form-label">ID сообщества (group_id, без минуса):</label>
-                    <input type="text" id="vk-group-input" class="form-input" placeholder="123456789">
+                    <button class="submit-btn" onclick="saveVkSettings()">Сохранить токен</button>
 
-                    <button class="submit-btn" onclick="saveVkSettings()">Сохранить настройки</button>
+                    <div class="info-box" style="margin-top:20px;">
+                        <strong>Сообщества для публикации</strong>
+                        <p style="color:var(--text-secondary); font-size:12px; margin:6px 0 12px;">Этот токен публикует в эти сообщества — выбор конкретного сообщества (и, опционально, язык-подсказка для авто-выбора по умолчанию) появится при публикации идеи.</p>
+                        <div id="vk-groups-list"></div>
+                        <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-start;">
+                            <input type="text" id="vk-new-group-label" class="form-input" style="margin:0;" placeholder="Название (например, Основное сообщество)">
+                            <input type="text" id="vk-new-group-id" class="form-input" style="margin:0;" placeholder="ID сообщества (без минуса)">
+                            <select id="vk-new-group-lang" class="form-select" style="margin:0; max-width:110px;">
+                                <option value="">— любой —</option>
+                                <option value="ru">🇷🇺 RU</option>
+                                <option value="en">🇬🇧 EN</option>
+                            </select>
+                            <button class="schedule-btn" style="white-space:nowrap;" onclick="addVkGroup()">+ Добавить</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- INSTAGRAM TAB -->
                 <div id="ps-tab-ig" class="ps-tab-content" style="display:none;">
-                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Page access token из приложения Meta Graph API, привязанного к странице Facebook с подключённым Instagram Business/Creator аккаунтом.</p>
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Page access token из приложения Meta Graph API, привязанного к странице Facebook с подключённым Instagram Business/Creator аккаунтом. Два отдельных аккаунта — RU и EN, выбирается автоматически по языку публикуемого поста.</p>
+                    <div style="display:flex; gap:8px; margin-bottom:16px;">
+                        <button id="ig-lang-ru-btn" class="edit-btn" onclick="setPublishSettingsLang('ig','ru')">🇷🇺 RU-аккаунт</button>
+                        <button id="ig-lang-en-btn" class="edit-btn" onclick="setPublishSettingsLang('ig','en')">🇬🇧 EN-аккаунт</button>
+                    </div>
                     <label class="form-label">Page Access Token:</label>
                     <input type="text" id="ig-token-input" class="form-input" placeholder="EAAxxxxxxxx...">
 
@@ -1185,7 +1206,11 @@
 
                 <!-- YOUTUBE TAB -->
                 <div id="ps-tab-yt" class="ps-tab-content" style="display:none;">
-                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">OAuth2-приложение из Google Cloud Console + refresh token, полученный один раз через экран согласия (не просто токен, как в Telegram/VK).</p>
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">OAuth2-приложение из Google Cloud Console + refresh token, полученный один раз через экран согласия (не просто токен, как в Telegram/VK). Два отдельных канала/аккаунта — RU и EN, выбирается автоматически по языку публикуемого поста (см. scripts/register-youtube-oauth.mjs --lang).</p>
+                    <div style="display:flex; gap:8px; margin-bottom:16px;">
+                        <button id="yt-lang-ru-btn" class="edit-btn" onclick="setPublishSettingsLang('yt','ru')">🇷🇺 RU-канал</button>
+                        <button id="yt-lang-en-btn" class="edit-btn" onclick="setPublishSettingsLang('yt','en')">🇬🇧 EN-канал</button>
+                    </div>
                     <label class="form-label">OAuth Client ID:</label>
                     <input type="text" id="yt-client-id-input" class="form-input" placeholder="xxxxx.apps.googleusercontent.com">
 
@@ -1203,7 +1228,11 @@
 
                 <!-- THREADS TAB -->
                 <div id="ps-tab-th" class="ps-tab-content" style="display:none;">
-                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Threads user access token из приложения Meta с use case "Threads" (не Facebook Graph API) — нужны разрешения threads_basic и threads_content_publish, аккаунт должен пройти App Review.</p>
+                    <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Threads user access token из приложения Meta с use case "Threads" (не Facebook Graph API) — нужны разрешения threads_basic и threads_content_publish, аккаунт должен пройти App Review. Два отдельных аккаунта — RU и EN, выбирается автоматически по языку публикуемого поста.</p>
+                    <div style="display:flex; gap:8px; margin-bottom:16px;">
+                        <button id="th-lang-ru-btn" class="edit-btn" onclick="setPublishSettingsLang('th','ru')">🇷🇺 RU-аккаунт</button>
+                        <button id="th-lang-en-btn" class="edit-btn" onclick="setPublishSettingsLang('th','en')">🇬🇧 EN-аккаунт</button>
+                    </div>
                     <label class="form-label">Threads Access Token:</label>
                     <input type="text" id="th-token-input" class="form-input" placeholder="THQVJ...xxxxxxxx...">
 
@@ -1260,6 +1289,11 @@
                 <div id="publish-board-row" style="display:none;">
                     <label class="form-label">Доска Pinterest:</label>
                     <select id="publish-board-select" class="form-select" onchange="onPublishBoardChange()"></select>
+                </div>
+
+                <div id="publish-vk-group-row" style="display:none;">
+                    <label class="form-label">Сообщество VK:</label>
+                    <select id="publish-vk-group-select" class="form-select" onchange="onPublishVkGroupChange()"></select>
                 </div>
 
                 <div id="publish-not-configured-box" class="info-box" style="display:none; margin-bottom:16px; border-color: rgba(255,69,58,0.35);"></div>

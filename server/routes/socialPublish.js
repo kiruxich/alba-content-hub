@@ -8,9 +8,9 @@ const router = Router();
 // scheduler so both entry points behave identically.
 function makePublishRoute(platform) {
     return async (req, res) => {
-        const { ideaId, boardId, lang } = req.body || {};
+        const { ideaId, boardId, groupId, lang } = req.body || {};
         try {
-            const result = await publishIdea(platform, { ideaId, boardId, lang });
+            const result = await publishIdea(platform, { ideaId, boardId, groupId, lang });
             res.json(result);
         } catch (e) {
             res.status(e.status || 500).json({ error: e.message });

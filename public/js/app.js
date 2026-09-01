@@ -21,9 +21,14 @@ let igMeta = { businessAccountId: '', hasToken: false, tokenPreview: '' };
 let ytMeta = { clientId: '', channelTitle: '', hasClientSecret: false, hasRefreshToken: false, configured: false };
 let thMeta = { userId: '', hasToken: false, tokenPreview: '' };
 let pinMeta = { defaultBoardId: '', hasToken: false, tokenPreview: '' };
+// Which account (RU/EN) each platform's settings tab is currently showing -
+// VK/Instagram/YouTube/Threads hold two separate credential rows (see
+// server/db.js's migrateSettingsTableToLangKey); Telegram and Pinterest
+// don't have this split, so they're not in this map.
+let publishSettingsLang = { ig: 'ru', yt: 'ru', th: 'ru' };
 let telegramChannels = []; // [{ id, label, chatId }] - see server/routes/settings.js /telegram-channels
 let pinterestBoards = []; // [{ id, name }] - see server/routes/settings.js /pinterest/boards
-let publishModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
+let publishModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null, boardId: null, groupId: null };
 let planSettings = { daily: 1, weekly: 7 };
 let currentSelectedIdea = null;
 let currentOpenProductId = null;
@@ -1551,19 +1556,24 @@ function processImportJSON(event) {
 // in full, only a masked preview + whether they're configured; see server/routes/settings.js
 // for the write-mostly PUT pattern each save*Settings function below hits.
 async function openPublishSettingsModal() {
+    publishSettingsLang = { ig: 'ru', yt: 'ru', th: 'ru' };
     try {
         const [telegram, vk, instagram, youtube, threads, pinterest] = await Promise.all([
             api('/api/settings/telegram'),
             api('/api/settings/vk'),
-            api('/api/settings/instagram'),
-            api('/api/settings/youtube'),
-            api('/api/settings/threads'),
+            api('/api/settings/instagram?lang=ru'),
+            api('/api/settings/youtube?lang=ru'),
+            api('/api/settings/threads?lang=ru'),
             api('/api/settings/pinterest'),
         ]);
         tgMeta = telegram; vkMeta = vk; igMeta = instagram; ytMeta = youtube; thMeta = threads; pinMeta = pinterest;
     } catch (e) {
         showToast('Не удалось получить настройки публикаций: ' + e.message);
     }
+
+    fillVkForm(); fillIgForm(); fillYtForm(); fillThForm();
+    ['ig', 'yt', 'th'].forEach(updatePlatformLangToggle);
+    await loadVkGroups();
 
     const tokenInput = document.getElementById('tg-token-input');
     const chatInput = document.getElementById('tg-chat-input');
@@ -1574,51 +1584,6 @@ async function openPublishSettingsModal() {
             : '123456789:ABCdefGHI...';
     }
     if (chatInput) chatInput.value = tgMeta.chatId || '';
-
-    const vkTokenInput = document.getElementById('vk-token-input');
-    const vkGroupInput = document.getElementById('vk-group-input');
-    if (vkTokenInput) {
-        vkTokenInput.value = '';
-        vkTokenInput.placeholder = vkMeta.hasToken
-            ? `Сохранён токен ${vkMeta.tokenPreview} — введите новый, чтобы заменить`
-            : 'vk1.a.xxxxxxxx...';
-    }
-    if (vkGroupInput) vkGroupInput.value = vkMeta.groupId || '';
-
-    const igTokenInput = document.getElementById('ig-token-input');
-    const igAccountInput = document.getElementById('ig-account-input');
-    if (igTokenInput) {
-        igTokenInput.value = '';
-        igTokenInput.placeholder = igMeta.hasToken
-            ? `Сохранён токен ${igMeta.tokenPreview} — введите новый, чтобы заменить`
-            : 'EAAxxxxxxxx...';
-    }
-    if (igAccountInput) igAccountInput.value = igMeta.businessAccountId || '';
-
-    const ytClientIdInput = document.getElementById('yt-client-id-input');
-    const ytClientSecretInput = document.getElementById('yt-client-secret-input');
-    const ytRefreshTokenInput = document.getElementById('yt-refresh-token-input');
-    const ytChannelTitleInput = document.getElementById('yt-channel-title-input');
-    if (ytClientIdInput) ytClientIdInput.value = ytMeta.clientId || '';
-    if (ytClientSecretInput) {
-        ytClientSecretInput.value = '';
-        ytClientSecretInput.placeholder = ytMeta.hasClientSecret ? 'Сохранён — введите новый, чтобы заменить' : 'GOCSPX-xxxxxxxx...';
-    }
-    if (ytRefreshTokenInput) {
-        ytRefreshTokenInput.value = '';
-        ytRefreshTokenInput.placeholder = ytMeta.hasRefreshToken ? 'Сохранён — введите новый, чтобы заменить' : '1//0gxxxxxxxx...';
-    }
-    if (ytChannelTitleInput) ytChannelTitleInput.value = ytMeta.channelTitle || '';
-
-    const thTokenInput = document.getElementById('th-token-input');
-    const thUserInput = document.getElementById('th-user-input');
-    if (thTokenInput) {
-        thTokenInput.value = '';
-        thTokenInput.placeholder = thMeta.hasToken
-            ? `Сохранён токен ${thMeta.tokenPreview} — введите новый, чтобы заменить`
-            : 'THQVJ...xxxxxxxx...';
-    }
-    if (thUserInput) thUserInput.value = thMeta.userId || '';
 
     const pinTokenInput = document.getElementById('pin-token-input');
     if (pinTokenInput) {
@@ -1765,16 +1730,173 @@ async function deleteTelegramChannel(id) {
     }
 }
 
+// VK publish-target communities - mirrors the Telegram channels functions
+// above exactly (one token, many communities - see vk_groups in server/db.js).
+let vkGroups = [];
+
+async function loadVkGroups() {
+    try {
+        vkGroups = await api('/api/settings/vk-groups');
+    } catch (e) {
+        vkGroups = [];
+        showToast('Не удалось получить список сообществ VK: ' + e.message);
+    }
+    renderVkGroupsList();
+}
+
+function renderVkGroupsList() {
+    const container = document.getElementById('vk-groups-list');
+    if (!container) return;
+    if (vkGroups.length === 0) {
+        container.innerHTML = `<p style="color:var(--text-secondary); font-size:13px; margin:0;">Сообществ пока нет — добавьте первое ниже.</p>`;
+        return;
+    }
+    const langLabel = { ru: '🇷🇺 RU', en: '🇬🇧 EN' };
+    container.innerHTML = vkGroups.map(g => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:0.5px solid var(--separator);">
+            <div>
+                <div style="font-weight:600; font-size:13px;">${escapeHtml(g.label)} ${g.lang ? `<span style="font-weight:400; color:var(--text-secondary); font-size:11px;">${langLabel[g.lang] || ''}</span>` : ''}</div>
+                <div style="font-size:12px; color:var(--text-secondary);">${escapeHtml(g.groupId)}</div>
+            </div>
+            <button class="delete-btn" onclick="deleteVkGroup(${g.id})">🗑</button>
+        </div>`).join('');
+}
+
+async function addVkGroup() {
+    const labelInput = document.getElementById('vk-new-group-label');
+    const groupIdInput = document.getElementById('vk-new-group-id');
+    const langInput = document.getElementById('vk-new-group-lang');
+    const label = labelInput.value.trim();
+    const groupId = groupIdInput.value.trim();
+    const lang = langInput.value || undefined;
+    if (!label || !groupId) {
+        showToast('Укажите название и ID сообщества');
+        return;
+    }
+    try {
+        await api('/api/settings/vk-groups', { method: 'POST', body: JSON.stringify({ label, groupId, lang }) });
+        labelInput.value = '';
+        groupIdInput.value = '';
+        langInput.value = '';
+        await loadVkGroups();
+        showToast('Сообщество добавлено');
+    } catch (e) {
+        showToast('Не удалось добавить сообщество: ' + e.message);
+    }
+}
+
+// Prefers a group explicitly tagged for this language, falls back to any
+// group (lang-untagged or not), so the publish modal always starts with
+// *something* selected if at least one group exists.
+function pickDefaultVkGroupId(lang) {
+    const tagged = vkGroups.find(g => g.lang === lang);
+    if (tagged) return tagged.id;
+    return vkGroups[0] ? vkGroups[0].id : null;
+}
+
+async function deleteVkGroup(id) {
+    try {
+        await api(`/api/settings/vk-groups/${id}`, { method: 'DELETE' });
+        await loadVkGroups();
+        showToast('Сообщество удалено');
+    } catch (e) {
+        showToast('Не удалось удалить сообщество: ' + e.message);
+    }
+}
+
+function fillVkForm() {
+    const vkTokenInput = document.getElementById('vk-token-input');
+    if (vkTokenInput) {
+        vkTokenInput.value = '';
+        vkTokenInput.placeholder = vkMeta.hasToken
+            ? `Сохранён токен ${vkMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'vk1.a.xxxxxxxx...';
+    }
+}
+
+function fillIgForm() {
+    const igTokenInput = document.getElementById('ig-token-input');
+    const igAccountInput = document.getElementById('ig-account-input');
+    if (igTokenInput) {
+        igTokenInput.value = '';
+        igTokenInput.placeholder = igMeta.hasToken
+            ? `Сохранён токен ${igMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'EAAxxxxxxxx...';
+    }
+    if (igAccountInput) igAccountInput.value = igMeta.businessAccountId || '';
+}
+
+function fillYtForm() {
+    const ytClientIdInput = document.getElementById('yt-client-id-input');
+    const ytClientSecretInput = document.getElementById('yt-client-secret-input');
+    const ytRefreshTokenInput = document.getElementById('yt-refresh-token-input');
+    const ytChannelTitleInput = document.getElementById('yt-channel-title-input');
+    if (ytClientIdInput) ytClientIdInput.value = ytMeta.clientId || '';
+    if (ytClientSecretInput) {
+        ytClientSecretInput.value = '';
+        ytClientSecretInput.placeholder = ytMeta.hasClientSecret ? 'Сохранён — введите новый, чтобы заменить' : 'GOCSPX-xxxxxxxx...';
+    }
+    if (ytRefreshTokenInput) {
+        ytRefreshTokenInput.value = '';
+        ytRefreshTokenInput.placeholder = ytMeta.hasRefreshToken ? 'Сохранён — введите новый, чтобы заменить' : '1//0gxxxxxxxx...';
+    }
+    if (ytChannelTitleInput) ytChannelTitleInput.value = ytMeta.channelTitle || '';
+}
+
+function fillThForm() {
+    const thTokenInput = document.getElementById('th-token-input');
+    const thUserInput = document.getElementById('th-user-input');
+    if (thTokenInput) {
+        thTokenInput.value = '';
+        thTokenInput.placeholder = thMeta.hasToken
+            ? `Сохранён токен ${thMeta.tokenPreview} — введите новый, чтобы заменить`
+            : 'THQVJ...xxxxxxxx...';
+    }
+    if (thUserInput) thUserInput.value = thMeta.userId || '';
+}
+
+// Reflects publishSettingsLang[platform] on that tab's RU/EN toggle buttons
+// (id pattern `${platform}-lang-ru-btn`/`${platform}-lang-en-btn`).
+function updatePlatformLangToggle(platform) {
+    const lang = publishSettingsLang[platform];
+    const ruBtn = document.getElementById(`${platform}-lang-ru-btn`);
+    const enBtn = document.getElementById(`${platform}-lang-en-btn`);
+    if (ruBtn) ruBtn.style.background = lang === 'ru' ? 'var(--accent-blue)' : '';
+    if (ruBtn) ruBtn.style.color = lang === 'ru' ? '#fff' : '';
+    if (enBtn) enBtn.style.background = lang === 'en' ? 'var(--accent-blue)' : '';
+    if (enBtn) enBtn.style.color = lang === 'en' ? '#fff' : '';
+}
+
+const PLATFORM_FILL_FN = { ig: fillIgForm, yt: fillYtForm, th: fillThForm };
+const PLATFORM_API_PATH = { ig: 'instagram', yt: 'youtube', th: 'threads' };
+
+// Switches the VK/Instagram/YouTube/Threads settings tab between its RU and
+// EN account (two separate credential rows - see server/db.js's
+// migrateSettingsTableToLangKey) - re-fetches just that platform's settings
+// for the newly selected language and re-fills the form.
+async function setPublishSettingsLang(platform, lang) {
+    publishSettingsLang[platform] = lang;
+    updatePlatformLangToggle(platform);
+    try {
+        const meta = await api(`/api/settings/${PLATFORM_API_PATH[platform]}?lang=${lang}`);
+        if (platform === 'ig') igMeta = meta;
+        else if (platform === 'yt') ytMeta = meta;
+        else if (platform === 'th') thMeta = meta;
+        PLATFORM_FILL_FN[platform]();
+    } catch (e) {
+        showToast('Не удалось загрузить настройки: ' + e.message);
+    }
+}
+
 // VK (community wall.post)
 async function saveVkSettings() {
     const accessToken = document.getElementById('vk-token-input').value.trim();
-    const groupId = document.getElementById('vk-group-input').value.trim();
     try {
-        vkMeta = await api('/api/settings/vk', { method: 'PUT', body: JSON.stringify({ accessToken, groupId }) });
-        showToast('Настройки VK сохранены');
+        vkMeta = await api('/api/settings/vk', { method: 'PUT', body: JSON.stringify({ accessToken }) });
+        showToast('Токен VK сохранён');
         renderBankView();
     } catch (e) {
-        showToast('Не удалось сохранить настройки VK: ' + e.message);
+        showToast('Не удалось сохранить токен VK: ' + e.message);
     }
 }
 
@@ -1782,9 +1904,10 @@ async function saveVkSettings() {
 async function saveIgSettings() {
     const accessToken = document.getElementById('ig-token-input').value.trim();
     const businessAccountId = document.getElementById('ig-account-input').value.trim();
+    const lang = publishSettingsLang.ig;
     try {
-        igMeta = await api('/api/settings/instagram', { method: 'PUT', body: JSON.stringify({ accessToken, businessAccountId }) });
-        showToast('Настройки Instagram сохранены');
+        igMeta = await api('/api/settings/instagram', { method: 'PUT', body: JSON.stringify({ accessToken, businessAccountId, lang }) });
+        showToast(`Настройки Instagram (${lang.toUpperCase()}) сохранены`);
         renderBankView();
     } catch (e) {
         showToast('Не удалось сохранить настройки Instagram: ' + e.message);
@@ -1797,9 +1920,10 @@ async function saveYtSettings() {
     const clientSecret = document.getElementById('yt-client-secret-input').value.trim();
     const refreshToken = document.getElementById('yt-refresh-token-input').value.trim();
     const channelTitle = document.getElementById('yt-channel-title-input').value.trim();
+    const lang = publishSettingsLang.yt;
     try {
-        ytMeta = await api('/api/settings/youtube', { method: 'PUT', body: JSON.stringify({ clientId, clientSecret, refreshToken, channelTitle }) });
-        showToast('Настройки YouTube сохранены');
+        ytMeta = await api('/api/settings/youtube', { method: 'PUT', body: JSON.stringify({ clientId, clientSecret, refreshToken, channelTitle, lang }) });
+        showToast(`Настройки YouTube (${lang.toUpperCase()}) сохранены`);
         renderBankView();
     } catch (e) {
         showToast('Не удалось сохранить настройки YouTube: ' + e.message);
@@ -1810,9 +1934,10 @@ async function saveYtSettings() {
 async function saveThSettings() {
     const accessToken = document.getElementById('th-token-input').value.trim();
     const userId = document.getElementById('th-user-input').value.trim();
+    const lang = publishSettingsLang.th;
     try {
-        thMeta = await api('/api/settings/threads', { method: 'PUT', body: JSON.stringify({ accessToken, userId }) });
-        showToast('Настройки Threads сохранены');
+        thMeta = await api('/api/settings/threads', { method: 'PUT', body: JSON.stringify({ accessToken, userId, lang }) });
+        showToast(`Настройки Threads (${lang.toUpperCase()}) сохранены`);
         renderBankView();
     } catch (e) {
         showToast('Не удалось сохранить настройки Threads: ' + e.message);
@@ -1867,16 +1992,18 @@ async function loadPublishMeta() {
     }
     await loadTelegramChannels();
     await loadPinterestBoards();
+    await loadVkGroups();
 }
 
 async function openPublishModal(ideaId) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
 
-    publishModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
+    publishModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null, groupId: null };
     await loadPublishMeta();
     if (telegramChannels.length > 0) publishModalState.channelId = telegramChannels[0].id;
     publishModalState.boardId = pinMeta.defaultBoardId || (pinterestBoards[0] && pinterestBoards[0].id) || null;
+    publishModalState.groupId = pickDefaultVkGroupId('ru');
 
     document.getElementById('publish-idea-title').innerText = idea.title;
     openOverlay('publish-overlay');
@@ -1888,6 +2015,9 @@ function setPublishPlatform(platformId) {
     if (platformId === 'telegram' && !publishModalState.channelId && telegramChannels.length > 0) {
         publishModalState.channelId = telegramChannels[0].id;
     }
+    if (platformId === 'vk' && !publishModalState.groupId) {
+        publishModalState.groupId = pickDefaultVkGroupId(publishModalState.lang);
+    }
     renderPublishModal();
 }
 
@@ -1895,6 +2025,9 @@ function setPublishLang(lang) {
     const idea = getPublishModalIdea();
     if (lang === 'en' && (!idea || !idea.titleEn)) return; // greyed out - defense in depth against a stray click
     publishModalState.lang = lang;
+    // Re-suggest a VK group matching the new language - still just a
+    // default, the group select below lets the user override it.
+    if (publishModalState.platform === 'vk') publishModalState.groupId = pickDefaultVkGroupId(lang);
     renderPublishModal();
 }
 
@@ -1906,6 +2039,11 @@ function onPublishChannelChange() {
 function onPublishBoardChange() {
     const select = document.getElementById('publish-board-select');
     publishModalState.boardId = select.value || null;
+}
+
+function onPublishVkGroupChange() {
+    const select = document.getElementById('publish-vk-group-select');
+    publishModalState.groupId = select.value ? Number(select.value) : null;
 }
 
 function renderPublishModal() {
@@ -1946,12 +2084,25 @@ function renderPublishModal() {
         boardRow.style.display = 'none';
     }
 
+    const vkGroupRow = document.getElementById('publish-vk-group-row');
+    const vkGroupSelect = document.getElementById('publish-vk-group-select');
+    if (publishModalState.platform === 'vk') {
+        vkGroupRow.style.display = '';
+        vkGroupSelect.innerHTML = vkGroups.length === 0
+            ? `<option value="">— нет сообществ —</option>`
+            : vkGroups.map(g => `<option value="${g.id}" ${g.id === publishModalState.groupId ? 'selected' : ''}>${escapeHtml(g.label)}</option>`).join('');
+    } else {
+        vkGroupRow.style.display = 'none';
+    }
+
     const warnBox = document.getElementById('publish-not-configured-box');
     let warnMsg = '';
     if (!configured) {
         warnMsg = currentPlatform.notConfiguredMsg;
     } else if (publishModalState.platform === 'telegram' && telegramChannels.length === 0) {
         warnMsg = 'Нет добавленных каналов для публикации. Добавьте хотя бы один канал в настройках публикаций.';
+    } else if (publishModalState.platform === 'vk' && vkGroups.length === 0) {
+        warnMsg = 'Нет добавленных сообществ для публикации. Добавьте хотя бы одно в настройках публикаций.';
     } else if (publishModalState.platform === 'pinterest' && pinterestBoards.length === 0) {
         warnMsg = 'Нет ни одной доски в Pinterest. Создайте доску в настройках публикаций.';
     } else if (publishModalState.platform === 'pinterest' && !idea.coverAssetId) {
@@ -1987,6 +2138,7 @@ function renderPublishModal() {
 
     const canPublish = configured
         && (publishModalState.platform !== 'telegram' || publishModalState.channelId)
+        && (publishModalState.platform !== 'vk' || publishModalState.groupId)
         && (publishModalState.platform !== 'pinterest' || (publishModalState.boardId && idea.coverAssetId));
     document.getElementById('publish-confirm-btn').disabled = !canPublish;
 }
@@ -1994,12 +2146,15 @@ function renderPublishModal() {
 async function confirmPublish() {
     const idea = getPublishModalIdea();
     if (!idea) return;
-    const { platform, lang, channelId, boardId, ideaId } = publishModalState;
+    const { platform, lang, channelId, boardId, groupId, ideaId } = publishModalState;
 
     try {
         if (platform === 'telegram') {
             if (!channelId) { showToast('Выберите канал для публикации'); return; }
             await api('/api/telegram/post', { method: 'POST', body: JSON.stringify({ ideaId, channelId, lang }) });
+        } else if (platform === 'vk') {
+            if (!groupId) { showToast('Выберите сообщество для публикации'); return; }
+            await api('/api/publish/vk', { method: 'POST', body: JSON.stringify({ ideaId, groupId, lang }) });
         } else if (platform === 'pinterest') {
             if (!boardId) { showToast('Выберите доску для публикации'); return; }
             await api('/api/publish/pinterest', { method: 'POST', body: JSON.stringify({ ideaId, boardId, lang }) });
@@ -2276,7 +2431,7 @@ function renderProductDetailContent(productId) {
 }
 
 // ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ И ПИКЕР ИДЕЙ
-let scheduleModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
+let scheduleModalState = { ideaId: null, platform: 'telegram', lang: 'ru', channelId: null, boardId: null, groupId: null };
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // matches Date.getDay(), see agentSettings.weeklySchedule's day field
 
 async function openScheduleForIdea(ideaId) {
@@ -2287,7 +2442,7 @@ async function openScheduleForIdea(ideaId) {
     const pTitle = targetProduct ? targetProduct.title : "Alba Creation";
 
     currentSelectedIdea = idea;
-    scheduleModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null };
+    scheduleModalState = { ideaId, platform: 'telegram', lang: 'ru', channelId: null, boardId: null, groupId: null };
 
     const sTitle = document.getElementById('schedule-title');
     const sCat = document.getElementById('schedule-category');
@@ -2300,6 +2455,7 @@ async function openScheduleForIdea(ideaId) {
     await loadPublishMeta();
     if (telegramChannels.length > 0) scheduleModalState.channelId = telegramChannels[0].id;
     scheduleModalState.boardId = pinMeta.defaultBoardId || (pinterestBoards[0] && pinterestBoards[0].id) || null;
+    scheduleModalState.groupId = pickDefaultVkGroupId('ru');
 
     openOverlay('schedule-overlay');
     renderScheduleModal();
@@ -2322,12 +2478,17 @@ function setSchedulePlatform(platformId) {
     if (platformId === 'telegram' && !scheduleModalState.channelId && telegramChannels.length > 0) {
         scheduleModalState.channelId = telegramChannels[0].id;
     }
+    if (platformId === 'vk' && !scheduleModalState.groupId) {
+        scheduleModalState.groupId = pickDefaultVkGroupId(scheduleModalState.lang);
+    }
     renderScheduleModal();
 }
 
 function setScheduleLang(lang) {
     if (lang === 'en' && (!currentSelectedIdea || !currentSelectedIdea.titleEn)) return;
     scheduleModalState.lang = lang;
+    // Re-suggest a VK group matching the new language - same as the publish modal.
+    if (scheduleModalState.platform === 'vk') scheduleModalState.groupId = pickDefaultVkGroupId(lang);
     renderScheduleModal();
 }
 
@@ -2339,6 +2500,11 @@ function onScheduleChannelChange() {
 function onScheduleBoardChange() {
     const select = document.getElementById('schedule-board-select');
     scheduleModalState.boardId = select.value || null;
+}
+
+function onScheduleVkGroupChange() {
+    const select = document.getElementById('schedule-vk-group-select');
+    scheduleModalState.groupId = select.value ? Number(select.value) : null;
 }
 
 function renderScheduleModal() {
@@ -2378,12 +2544,25 @@ function renderScheduleModal() {
         boardRow.style.display = 'none';
     }
 
+    const vkGroupRow = document.getElementById('schedule-vk-group-row');
+    const vkGroupSelect = document.getElementById('schedule-vk-group-select');
+    if (scheduleModalState.platform === 'vk') {
+        vkGroupRow.style.display = '';
+        vkGroupSelect.innerHTML = vkGroups.length === 0
+            ? `<option value="">— нет сообществ —</option>`
+            : vkGroups.map(g => `<option value="${g.id}" ${g.id === scheduleModalState.groupId ? 'selected' : ''}>${escapeHtml(g.label)}</option>`).join('');
+    } else {
+        vkGroupRow.style.display = 'none';
+    }
+
     const warnBox = document.getElementById('schedule-not-configured-box');
     let warnMsg = '';
     if (!configured) {
         warnMsg = currentPlatform.notConfiguredMsg;
     } else if (scheduleModalState.platform === 'telegram' && telegramChannels.length === 0) {
         warnMsg = 'Нет добавленных каналов для публикации. Добавьте хотя бы один канал в настройках публикаций.';
+    } else if (scheduleModalState.platform === 'vk' && vkGroups.length === 0) {
+        warnMsg = 'Нет добавленных сообществ для публикации. Добавьте хотя бы одно в настройках публикаций.';
     } else if (scheduleModalState.platform === 'pinterest' && pinterestBoards.length === 0) {
         warnMsg = 'Нет ни одной доски в Pinterest. Создайте доску в настройках публикаций.';
     }
@@ -2403,6 +2582,7 @@ function renderScheduleModal() {
 
     const canConfirm = configured
         && (scheduleModalState.platform !== 'telegram' || scheduleModalState.channelId)
+        && (scheduleModalState.platform !== 'vk' || scheduleModalState.groupId)
         && (scheduleModalState.platform !== 'pinterest' || scheduleModalState.boardId);
     document.getElementById('schedule-confirm-btn').disabled = !canConfirm;
 }
@@ -2435,6 +2615,7 @@ async function confirmSchedule() {
             platform: scheduleModalState.platform,
             channelId: scheduleModalState.channelId,
             boardId: scheduleModalState.boardId,
+            groupId: scheduleModalState.groupId,
             lang: scheduleModalState.lang,
             publishAt,
         }) });

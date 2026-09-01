@@ -73,7 +73,7 @@ async function publishTelegram({ ideaId, channelId, lang }) {
     return { ok: true };
 }
 
-async function publishSocial(platform, { ideaId, boardId, lang }) {
+async function publishSocial(platform, { ideaId, boardId, groupId, lang }) {
     const idea = await loadIdea(ideaId);
     if (!idea) throw httpError(404, 'idea not found');
 
@@ -82,22 +82,32 @@ async function publishSocial(platform, { ideaId, boardId, lang }) {
     if (langError) throw httpError(400, langError);
 
     const coverAsset = await loadCoverAsset(idea);
+    // Instagram/YouTube/Threads each hold two credential rows keyed by
+    // `lang` (see server/db.js's migrateSettingsTableToLangKey) - the
+    // account is picked automatically from the post's own language, same
+    // effectiveLang already resolved above for the post text itself. No
+    // separate account selector for those three anywhere in the publish flow.
+    // VK is different: one token, many communities (vk_groups) - same shape
+    // as Telegram's channelId, picked explicitly in the publish modal.
     let result;
     if (platform === 'vk') {
-        const settings = (await db.execute('SELECT access_token, group_id FROM vk_settings WHERE id = 1')).rows[0];
-        if (!settings.access_token || !settings.group_id) throw httpError(400, 'VK не настроен');
-        result = await publishToVk(idea, { accessToken: settings.access_token, groupId: settings.group_id }, coverAsset?.url || null, effectiveLang);
+        const settings = (await db.execute('SELECT access_token FROM vk_settings WHERE id = 1')).rows[0];
+        if (!settings.access_token) throw httpError(400, 'VK не настроен');
+        if (!groupId) throw httpError(400, 'Не выбрано сообщество для публикации. Добавьте хотя бы одно в настройках VK.');
+        const groupRow = (await db.execute({ sql: 'SELECT group_id FROM vk_groups WHERE id = ?', args: [groupId] })).rows[0];
+        if (!groupRow) throw httpError(400, 'Выбранное сообщество не найдено - возможно, оно было удалено. Выберите другое.');
+        result = await publishToVk(idea, { accessToken: settings.access_token, groupId: groupRow.group_id }, coverAsset?.url || null, effectiveLang);
     } else if (platform === 'instagram') {
-        const settings = (await db.execute('SELECT access_token, business_account_id FROM instagram_settings WHERE id = 1')).rows[0];
-        if (!settings.access_token || !settings.business_account_id) throw httpError(400, 'Instagram не настроен');
+        const settings = (await db.execute({ sql: 'SELECT access_token, business_account_id FROM instagram_settings WHERE lang = ?', args: [effectiveLang] })).rows[0];
+        if (!settings.access_token || !settings.business_account_id) throw httpError(400, `Instagram (${effectiveLang.toUpperCase()}) не настроен`);
         result = await publishToInstagram(idea, { accessToken: settings.access_token, businessAccountId: settings.business_account_id }, coverAsset, effectiveLang);
     } else if (platform === 'youtube') {
-        const settings = (await db.execute('SELECT client_id, client_secret, refresh_token FROM youtube_settings WHERE id = 1')).rows[0];
-        if (!settings.client_id || !settings.client_secret || !settings.refresh_token) throw httpError(400, 'YouTube не настроен');
+        const settings = (await db.execute({ sql: 'SELECT client_id, client_secret, refresh_token FROM youtube_settings WHERE lang = ?', args: [effectiveLang] })).rows[0];
+        if (!settings.client_id || !settings.client_secret || !settings.refresh_token) throw httpError(400, `YouTube (${effectiveLang.toUpperCase()}) не настроен`);
         result = await publishToYoutube(idea, { clientId: settings.client_id, clientSecret: settings.client_secret, refreshToken: settings.refresh_token }, coverAsset, effectiveLang);
     } else if (platform === 'threads') {
-        const settings = (await db.execute('SELECT access_token, user_id FROM threads_settings WHERE id = 1')).rows[0];
-        if (!settings.access_token || !settings.user_id) throw httpError(400, 'Threads не настроен');
+        const settings = (await db.execute({ sql: 'SELECT access_token, user_id FROM threads_settings WHERE lang = ?', args: [effectiveLang] })).rows[0];
+        if (!settings.access_token || !settings.user_id) throw httpError(400, `Threads (${effectiveLang.toUpperCase()}) не настроен`);
         result = await publishToThreads(idea, { accessToken: settings.access_token, userId: settings.user_id }, coverAsset, effectiveLang);
     } else if (platform === 'pinterest') {
         const settings = (await db.execute('SELECT access_token, default_board_id FROM pinterest_settings WHERE id = 1')).rows[0];
@@ -112,8 +122,8 @@ async function publishSocial(platform, { ideaId, boardId, lang }) {
     return { ok: true, externalPostId: result.externalPostId };
 }
 
-export async function publishIdea(platform, { ideaId, channelId, boardId, lang }) {
+export async function publishIdea(platform, { ideaId, channelId, boardId, groupId, lang }) {
     if (!ideaId) throw httpError(400, 'ideaId is required');
     if (platform === 'telegram') return publishTelegram({ ideaId, channelId, lang });
-    return publishSocial(platform, { ideaId, boardId, lang });
+    return publishSocial(platform, { ideaId, boardId, groupId, lang });
 }
