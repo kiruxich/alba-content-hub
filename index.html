@@ -628,25 +628,26 @@
                 <div class="parser-niches-grid">
                     <div class="parser-niche-card">
                         <div class="parser-niche-head"><b>VK</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">wall.post, community-токен. Ждёт токена в настройках.</p>
+                        <p class="idea-desc-text">wall.post, один community-токен на всё (как у Telegram — не два аккаунта). Публикует в любое из добавленных сообществ (vk_groups) — сообщество выбирается в модалке публикации/планирования, с подсказкой по умолчанию исходя из языка поста. Ждёт токена в настройках.</p>
                     </div>
                     <div class="parser-niche-card">
                         <div class="parser-niche-head"><b>Instagram</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">Graph API, нужен Business-аккаунт. Ждёт токена в настройках.</p>
+                        <p class="idea-desc-text">Graph API, нужен Business-аккаунт. Два отдельных аккаунта — RU и EN, аккаунт выбирается автоматически по языку публикуемого поста, без ручного пикера. Оба ждут токена в настройках (переключатель RU/EN в форме).</p>
                     </div>
                     <div class="parser-niche-card">
                         <div class="parser-niche-head"><b>YouTube</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">Data API v3, resumable upload. Ждёт OAuth — есть скрипт register-youtube-oauth.mjs.</p>
+                        <p class="idea-desc-text">Data API v3, resumable upload. Два отдельных OAuth-аккаунта — RU и EN, выбор автоматический по языку поста. register-youtube-oauth.mjs теперь принимает --lang ru|en, нужно прогнать дважды по одному на каждый аккаунт.</p>
                     </div>
                     <div class="parser-niche-card">
                         <div class="parser-niche-head"><b>Threads</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">Отдельный API Meta (graph.threads.net), не тот же что у Instagram. Ждёт App Review от Meta.</p>
+                        <p class="idea-desc-text">Отдельный API Meta (graph.threads.net), не тот же что у Instagram. Два отдельных аккаунта — RU и EN, выбор автоматический по языку поста. Ждёт App Review от Meta для обоих.</p>
                     </div>
                     <div class="parser-niche-card">
                         <div class="parser-niche-head"><b>Pinterest</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">API v5, каждый пин обязательно на доску (board_id) — доска выбирается при публикации или задаётся по умолчанию в настройках. Требует обложку, текст-онли пины не поддерживаются.</p>
+                        <p class="idea-desc-text">API v5, каждый пин обязательно на доску (board_id) — доска выбирается при публикации или задаётся по умолчанию в настройках. Требует обложку, текст-онли пины не поддерживаются. Один аккаунт на оба языка (как VK) — у Pinterest нет RU/EN-разделения.</p>
                     </div>
                 </div>
+                <p class="idea-desc-text" style="margin-top:8px; opacity:0.8;">Telegram намеренно не тронут — там уже работает своя схема из нескольких каналов под одним ботом (см. ниже «Хранилище постов»).</p>
 
                 <!-- Layer: agents -->
                 <div class="p-section-title">ЛОКАЛЬНЫЙ АГЕНТ (ВАШ ПК)</div>
@@ -678,8 +679,12 @@
                         <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый понедельник в 8:20 (Amsterdam летом — UTC-время фиксировано, зимой сдвинется на час). Читает /insights/brief за 7 дней, ищет закономерности по форматам/рубрикам, пишет выводы в agent_runs.</p>
                     </div>
                     <div class="parser-niche-card">
+                        <div class="parser-niche-head"><b>Маркетолог (Marketing)</b><span class="parser-niche-status done">● работает</span></div>
+                        <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый понедельник в 8:37 (сразу после Insights). Читает /api/marketing/brief (трата по агентам, cost-per-post, cost-per-lead) плюс последние выводы Insights и текущий квартал контент-плана, пишет вывод по эффективности расходов в agent_runs. Эти выводы попадают в /api/content-plan/context — тот же контекст, что читают Researcher и Generator, так что вся система реагирует на них, а не только страница Аналитики.</p>
+                    </div>
+                    <div class="parser-niche-card">
                         <div class="parser-niche-head"><b>Metrics Sync</b><span class="parser-niche-status done">● работает</span></div>
-                        <p class="idea-desc-text">System cron на VPS, каждые 6 часов. Подтягивает просмотры/лайки с VK/Instagram/YouTube обратно в scheduled_events по опубликованным постам.</p>
+                        <p class="idea-desc-text">System cron на VPS, каждые 6 часов. Подтягивает просмотры/лайки/сохранения с VK/Instagram/YouTube/Pinterest обратно в scheduled_events по опубликованным постам. Telegram — исключение: Bot API физически не отдаёт число просмотров, это ограничение платформы, не баг.</p>
                     </div>
                 </div>
 
