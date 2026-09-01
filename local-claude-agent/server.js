@@ -16,6 +16,8 @@ import express from 'express';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import crypto from 'node:crypto';
+import { TelegramClient } from 'telegram';
+import { StringSession } from 'telegram/sessions/index.js';
 
 const execFileAsync = promisify(execFile);
 const app = express();
@@ -28,6 +30,33 @@ const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000; // web search + writing can take a coup
 // sentences, turn a post into a script) - Haiku handles them fine and costs
 // far less of the account's usage than Sonnet/Opus would for the same work.
 const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+
+// Telegram-watch (see README.md "Telegram source watching") - a real user
+// (MTProto) session, not the publish bot, so it can read arbitrary public
+// channels' posts the way a normal Telegram app would. Logged in once via
+// `node telegram-login.js` (see that file) - TELEGRAM_SESSION below is the
+// resulting long-lived credential. Connected lazily on first use and kept
+// connected (not reconnected per-request) to avoid hammering Telegram's
+// login flow and tripping flood limits.
+const TELEGRAM_API_ID = Number(process.env.TELEGRAM_API_ID || '');
+const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || '';
+const TELEGRAM_SESSION = process.env.TELEGRAM_SESSION || '';
+let telegramClientPromise = null;
+
+function isTelegramWatchConfigured() {
+    return Boolean(TELEGRAM_API_ID && TELEGRAM_API_HASH && TELEGRAM_SESSION);
+}
+
+async function getTelegramClient() {
+    if (!isTelegramWatchConfigured()) {
+        throw new Error('TELEGRAM_API_ID/TELEGRAM_API_HASH/TELEGRAM_SESSION not configured - run `node telegram-login.js` once, see README.md');
+    }
+    if (!telegramClientPromise) {
+        const client = new TelegramClient(new StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH, { connectionRetries: 5 });
+        telegramClientPromise = client.connect().then(() => client);
+    }
+    return telegramClientPromise;
+}
 
 function timingSafeEqual(a, b) {
     const bufA = Buffer.from(String(a));
@@ -102,6 +131,70 @@ async function runClaudeForJson(prompt, options = {}) {
 }
 
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+// task: telegram-add-channel
+// body: { username: string }
+// Resolves a channel/public-chat username to confirm it's real and reachable
+// (with this account's session) before hub saves it to its watch list -
+// same "validate before save" principle as the RSS-discovery flow's own
+// live feed check.
+app.post('/run/telegram-add-channel', requireToken, async (req, res) => {
+    const username = (req.body?.username || '').trim().replace(/^@/, '');
+    if (!username) return res.status(400).json({ error: 'username is required' });
+
+    try {
+        const client = await getTelegramClient();
+        const entity = await client.getEntity(username);
+        res.json({
+            username,
+            title: entity?.title || entity?.firstName || username,
+            membersCount: entity?.participantsCount ?? null,
+        });
+    } catch (e) {
+        res.status(502).json({ error: `не удалось найти канал @${username}: ${e.message}` });
+    }
+});
+
+// task: telegram-scan-channels
+// body: { usernames: string[], limit?: number }
+// Fetches the most recent posts (limit, default 10) from each channel - live
+// each call, nothing is cached/stored on this side. Text-only content
+// (media is skipped, not downloaded) since this is for browsing/inspiration,
+// not republishing.
+app.post('/run/telegram-scan-channels', requireToken, async (req, res) => {
+    const usernames = Array.isArray(req.body?.usernames) ? req.body.usernames.map(u => String(u).trim().replace(/^@/, '')).filter(Boolean) : [];
+    const limit = Math.min(Number(req.body?.limit) || 10, 25);
+    if (usernames.length === 0) return res.status(400).json({ error: 'usernames is required (non-empty array)' });
+
+    let client;
+    try {
+        client = await getTelegramClient();
+    } catch (e) {
+        return res.status(502).json({ error: e.message });
+    }
+
+    const results = [];
+    for (const username of usernames) {
+        try {
+            const entity = await client.getEntity(username);
+            const messages = await client.getMessages(entity, { limit });
+            const posts = messages
+                .filter(m => m.message && m.message.trim())
+                .map(m => ({
+                    id: m.id,
+                    text: m.message,
+                    date: m.date ? new Date(m.date * 1000).toISOString() : null,
+                    views: m.views ?? null,
+                    forwards: m.forwards ?? null,
+                    link: `https://t.me/${username}/${m.id}`,
+                }));
+            results.push({ username, title: entity?.title || username, posts, error: null });
+        } catch (e) {
+            results.push({ username, title: username, posts: [], error: e.message });
+        }
+    }
+    res.json({ channels: results });
+});
 
 // task: rss-discovery
 // body: { existingSources: string[], niches: string[] }

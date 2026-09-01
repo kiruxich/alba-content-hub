@@ -12,6 +12,12 @@ services:
     environment:
       - AGENT_TOKEN=${AGENT_TOKEN}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+      # Telegram-watch (optional - only needed for the "источники" scanning
+      # feature, see README.md "Telegram source watching"). Leave unset and
+      # those endpoints just error until you run telegram-login.js once.
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_SESSION=${TELEGRAM_SESSION}
     volumes:
       - claude-agent-auth:/home/agent
     # No host port mapping needed - only the ngrok service (on the same

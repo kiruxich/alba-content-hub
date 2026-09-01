@@ -89,6 +89,54 @@ the "Обновить"/"Сгенерировать" buttons that use this will j
 "не настроен" error until both are set, and again whenever your PC/Docker
 happens to be off (a normal network-error toast, not a crash).
 
+## 5. Telegram source watching (optional)
+
+A separate feature in Центр агентов - a manually-curated list of Telegram
+channels you can browse for inspiration, scanned live on demand (never on a
+schedule - this always requires your Mac to actually be running when you
+click "Обновить", unlike RSS/VK/YouTube which run automatically on the VPS).
+Reading arbitrary public channels' posts needs a real Telegram user
+(MTProto) session - a bot token can't do this - so this is a one-time
+interactive login as your own Telegram account, done once on this container.
+
+**a) Get API credentials** (free, one-time) - go to
+[my.telegram.org](https://my.telegram.org) → log in with your phone number →
+"API development tools" → fill in any app name/short name → copy the
+`api_id` and `api_hash` shown.
+
+**b) Add them to `.env`:**
+
+```
+TELEGRAM_API_ID=<api_id from my.telegram.org>
+TELEGRAM_API_HASH=<api_hash from my.telegram.org>
+```
+
+**c) Log in interactively** (needs a real terminal - phone number, the login
+code Telegram sends you, and your 2FA password if you have one enabled):
+
+```bash
+docker compose run --rm agent node telegram-login.js
+```
+
+It prints a session string at the end - **treat it like a password** (it's
+equivalent to being logged into your Telegram account). Add it to `.env`:
+
+```
+TELEGRAM_SESSION=<the printed session string>
+```
+
+Then restart the persistent container so it picks up the new env vars:
+
+```bash
+docker compose up -d --build
+```
+
+That's it - no separate tunnel/domain needed, this reuses the same
+container and `LOCAL_CLAUDE_AGENT_URL`/`TOKEN` already wired into hub. The
+channel list itself (which channels to watch) is managed entirely from
+hub's UI (Центр агентов → «Telegram — отслеживание каналов»), not here -
+this container only ever does the live fetch when asked.
+
 ## Notes
 
 - **Must be running when you click the button.** This isn't a background

@@ -4476,6 +4476,7 @@ async function renderAgentSettingsForm() {
     document.getElementById('as-generator-prompt-input').value = agentSettings.generatorPrompt || '';
     updateAgentSettingsCounts();
     await loadContentRubrics();
+    await loadTelegramWatchChannels();
 }
 
 // Live counters next to the RSS-sources/keywords section titles - just
@@ -4720,6 +4721,105 @@ async function deleteRubric(id) {
         populateRubricPickerSelect();
     } catch (e) {
         showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+// TELEGRAM — ОТСЛЕЖИВАНИЕ КАНАЛОВ (Центр агентов, ниже рубрик)
+// Deliberately separate storage/UI from RSS-ИСТОЧНИКИ above: this list is
+// manual-only (typed handles, not discovered) and must never be wiped by
+// saveAgentSettingsForm() or discoverRssSources(). Scanning needs the user's
+// own Telegram session running on their Mac (local-claude-agent), so it's
+// always a manual "Обновить" click - see local-claude-agent/README.md
+// "Telegram source watching".
+let telegramWatchChannels = [];
+
+async function loadTelegramWatchChannels() {
+    try {
+        telegramWatchChannels = await api('/api/telegram-watch/channels');
+    } catch (e) {
+        telegramWatchChannels = [];
+    }
+    renderTelegramWatchChannelsList();
+}
+
+function renderTelegramWatchChannelsList() {
+    const box = document.getElementById('tgw-channels-list');
+    if (!box) return;
+    if (telegramWatchChannels.length === 0) {
+        box.innerHTML = `<p style="color:var(--text-secondary); font-size:12px; margin:0;">Список пуст — добавьте хотя бы один канал.</p>`;
+        return;
+    }
+    box.innerHTML = telegramWatchChannels.map(c => `
+        <span class="group-chip" style="display:inline-flex; align-items:center; gap:6px; margin:2px 4px 2px 0;">
+            @${escapeHtml(c.username)}${c.label && c.label !== c.username ? ` (${escapeHtml(c.label)})` : ''}
+            <a href="#" onclick="deleteTelegramWatchChannel(${c.id}); return false;" style="color:var(--accent-red);">✕</a>
+        </span>`).join('');
+}
+
+async function addTelegramWatchChannel() {
+    const input = document.getElementById('tgw-add-input');
+    const username = input.value.trim();
+    if (!username) return showToast('Введите username канала');
+    try {
+        const created = await api('/api/telegram-watch/channels', { method: 'POST', body: JSON.stringify({ username }) });
+        telegramWatchChannels.push(created);
+        renderTelegramWatchChannelsList();
+        input.value = '';
+        showToast('Канал добавлен');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function deleteTelegramWatchChannel(id) {
+    try {
+        await api(`/api/telegram-watch/channels/${id}`, { method: 'DELETE' });
+        telegramWatchChannels = telegramWatchChannels.filter(c => c.id !== id);
+        renderTelegramWatchChannelsList();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+async function scanTelegramWatch() {
+    const btn = document.getElementById('tgw-scan-btn');
+    const statusEl = document.getElementById('tgw-scan-status');
+    const feed = document.getElementById('tgw-feed');
+    if (telegramWatchChannels.length === 0) return showToast('Сначала добавьте хотя бы один канал');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Сканирую...';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Обращаюсь к Telegram-сессии на вашем Маке — это может занять минуту...';
+
+    try {
+        const result = await api('/api/telegram-watch/scan', { method: 'POST' });
+        const channels = result.channels || [];
+        feed.innerHTML = channels.map(ch => {
+            if (ch.error) {
+                return `<div class="info-box" style="border-color:var(--accent-red);"><b>@${escapeHtml(ch.username)}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(ch.error)}</p></div>`;
+            }
+            if (!ch.posts.length) {
+                return `<div class="info-box"><b>${escapeHtml(ch.title)}</b><p class="idea-desc-text">Постов не найдено.</p></div>`;
+            }
+            return ch.posts.map(p => `
+                <div class="info-box">
+                    <div class="media-asset-meta-row" style="margin-bottom:6px;">
+                        <b>${escapeHtml(ch.title)}</b>
+                        ${p.date ? `<span style="color:var(--text-secondary); font-size:11px;">${new Date(p.date).toLocaleString('ru-RU')}</span>` : ''}
+                        ${p.views !== null ? `<span class="format-tag">👁 ${p.views}</span>` : ''}
+                    </div>
+                    <p class="idea-desc-text" style="white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(p.text)}</p>
+                    <a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" style="font-size:12px;">Открыть в Telegram →</a>
+                </div>`).join('');
+        }).join('');
+        statusEl.textContent = `Готово. Каналов просканировано: ${channels.length}.`;
+    } catch (e) {
+        statusEl.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось просканировать: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Обновить';
     }
 }
 

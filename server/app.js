@@ -27,6 +27,7 @@ import marketingRouter from './routes/marketing.js';
 import socialPublishRouter from './routes/socialPublish.js';
 import authRouter from './routes/auth.js';
 import contentDraftsRouter from './routes/contentDrafts.js';
+import telegramWatchRouter from './routes/telegramWatch.js';
 import { requireAuth } from './middleware/requireAuth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,7 @@ app.use('/api/marketing', marketingRouter);
 app.use('/api/metrics-sync', metricsSyncRouter);
 app.use('/api/publish', socialPublishRouter);
 app.use('/api/content-drafts', contentDraftsRouter);
+app.use('/api/telegram-watch', telegramWatchRouter);
 
 // Traditional Node hosting (pnpm start): serve the Vite-built frontend from the
 // same process. On Vercel this branch is never hit - static files are served

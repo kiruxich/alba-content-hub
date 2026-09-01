@@ -202,6 +202,50 @@ CREATE TABLE IF NOT EXISTS vk_groups (
     created_at INTEGER DEFAULT (strftime('%s','now'))
 );
 
+-- Manually-curated Telegram channels to watch for trend inspiration (NOT the
+-- channels above, which are publish TARGETS under our own bot). Reading an
+-- arbitrary channel's posts needs a real user (MTProto) session, which only
+-- exists on the user's own Mac (local-telegram-agent, see that folder's
+-- README) - the Mac has to be running to actually scan, so this list is
+-- deliberately separate from agent_settings.sources: it must never be wiped
+-- or touched by the RSS save/discover flow, and posts are fetched live on
+-- demand (see POST /api/telegram-watch/scan) rather than cached here.
+CREATE TABLE IF NOT EXISTS telegram_watch_channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
+-- Same idea for Instagram - a manually-curated list of accounts to browse
+-- for inspiration (competitor discovery has no real API, see
+-- server/lib/socialPublishers/instagram.js's comments) - fetched live via
+-- Business Discovery on demand, never auto-populated or wiped by RSS actions.
+CREATE TABLE IF NOT EXISTS instagram_watch_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
+-- VK communities and YouTube channels Researcher scans for trend candidates
+-- alongside RSS (see server/routes/agentResearcher.js) - unlike the two
+-- tables above these ARE real public APIs, so they feed the same automatic
+-- daily pipeline as RSS sources, just kept in their own fields in the UI
+-- (Центр агентов) rather than mixed into the RSS textarea.
+CREATE TABLE IF NOT EXISTS vk_trend_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE TABLE IF NOT EXISTS youtube_trend_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
 -- Instagram: a long-lived Page access token (Meta Graph API) plus the
 -- connected Instagram Business/Creator account id it publishes to. See
 -- server/lib/socialPublishers/instagram.js.

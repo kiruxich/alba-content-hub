@@ -879,6 +879,26 @@
 
                 <div class="parser-niches-grid" id="rubrics-grid"></div>
 
+                <!-- Telegram source watching - deliberately separate from RSS-ИСТОЧНИКИ above:
+                     this list is manual-only and must never be touched by saveAgentSettingsForm()
+                     or discoverRssSources(). Scanning needs the user's own Mac running a real
+                     Telegram session (local-claude-agent/README.md "Telegram source watching"),
+                     so it's a manual "Обновить" click, never automatic. -->
+                <div style="margin-top:36px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
+                    <div class="controls-row">
+                        <div class="p-section-title" style="margin:0;">TELEGRAM — ОТСЛЕЖИВАНИЕ КАНАЛОВ</div>
+                        <button class="edit-btn" id="tgw-scan-btn" onclick="scanTelegramWatch()">🔄 Обновить</button>
+                    </div>
+                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список каналов для вдохновения — не RSS, требует запущенного Telegram-сессии на вашем Маке (local-claude-agent). Список не трогается ничем другим на этой странице.</p>
+                    <div class="controls-row">
+                        <input type="text" id="tgw-add-input" class="form-input" placeholder="@username канала" style="max-width:260px;">
+                        <button class="schedule-btn" onclick="addTelegramWatchChannel()">+ Добавить источник</button>
+                    </div>
+                    <div id="tgw-channels-list" style="margin:10px 0 16px;"></div>
+                    <div id="tgw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
+                    <div id="tgw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
+                </div>
+
                 <!-- Read-only observability - visually separated from the editable settings above -->
                 <div style="margin-top:36px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
                     <div class="p-section-title" style="margin-top:0;">НАБЛЮДАЕМОСТЬ</div>

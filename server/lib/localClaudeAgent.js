@@ -96,3 +96,17 @@ export function suggestContentTopic({ productContext, usedTopics, strategyContex
 export function reviewLegalFindings(findings, snippets) {
     return callTask('legal-review', { findings, snippets }, { timeoutMs: 60 * 1000 });
 }
+
+// Telegram-watch (see local-claude-agent/README.md "Telegram source
+// watching") - a real user (MTProto) session on the same container/tunnel,
+// not the publish bot, so it can read arbitrary public channels. Same
+// graceful-no-op pattern (isLocalClaudeAgentConfigured() gates both) - the
+// container itself further errors per-call if TELEGRAM_SESSION isn't set up
+// yet, surfaced as a normal error by callTask above.
+export function validateTelegramWatchChannel(username) {
+    return callTask('telegram-add-channel', { username }, { timeoutMs: 30 * 1000 });
+}
+
+export function scanTelegramWatchChannels(usernames, limit) {
+    return callTask('telegram-scan-channels', { usernames, limit }, { timeoutMs: 2 * 60 * 1000 });
+}

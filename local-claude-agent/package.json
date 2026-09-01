@@ -4,9 +4,11 @@
   "type": "module",
   "version": "1.0.0",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "telegram-login": "node telegram-login.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "telegram": "^2.26.16"
   }
 }
