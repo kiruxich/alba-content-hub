@@ -8,9 +8,19 @@ RUN npm install -g @anthropic-ai/claude-code@latest
 
 WORKDIR /app
 COPY package.json .
-RUN npm install --omit=dev
+# python3/make/g++ are needed only to compile native addons pulled in by the
+# `telegram` (GramJS) package (bufferutil, utf-8-validate - node-gyp
+# performance shims for its websocket transport) - node:22-slim has neither
+# by default, and npm install fails without them. Removed again right after
+# so they don't bloat the final image (they're a build-time-only need).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && npm install --omit=dev \
+    && apt-get purge -y python3 make g++ \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY server.js .
+COPY server.js telegram-login.js ./
 
 # `claude --dangerously-skip-permissions` (needed since there's no TTY here
 # to approve tool use interactively) refuses to run as root/sudo - has to be
