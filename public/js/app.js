@@ -4478,6 +4478,7 @@ async function renderAgentSettingsForm() {
     updateAgentSettingsCounts();
     await loadContentRubrics();
     await loadTelegramWatchChannels();
+    await loadInstagramWatchAccounts();
     await loadVkTrendSources();
     await loadYoutubeTrendSources();
 }
@@ -4905,6 +4906,106 @@ async function scanTelegramWatch() {
                 </div>`).join('');
         }).join('');
         statusEl.textContent = `Готово. Каналов просканировано: ${channels.length}.`;
+    } catch (e) {
+        statusEl.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось просканировать: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Обновить';
+    }
+}
+
+// INSTAGRAM — ОТСЛЕЖИВАНИЕ АККАУНТОВ (Центр агентов, ниже Telegram-панели)
+// Same pattern as telegram-watch above: manual list, own storage, never
+// touched by RSS actions. Scanning uses Business Discovery (needs a
+// configured Instagram account - see docs/inst.md), so it errors cleanly
+// with "не настроен" until that's set up, same as every other optional
+// integration in this app.
+let instagramWatchAccounts = [];
+
+async function loadInstagramWatchAccounts() {
+    try {
+        instagramWatchAccounts = await api('/api/instagram-watch/accounts');
+    } catch (e) {
+        instagramWatchAccounts = [];
+    }
+    renderInstagramWatchAccountsList();
+}
+
+function renderInstagramWatchAccountsList() {
+    const box = document.getElementById('igw-accounts-list');
+    if (!box) return;
+    if (instagramWatchAccounts.length === 0) {
+        box.innerHTML = `<p style="color:var(--text-secondary); font-size:12px; margin:0;">Список пуст — добавьте хотя бы один аккаунт.</p>`;
+        return;
+    }
+    box.innerHTML = instagramWatchAccounts.map(a => `
+        <span class="group-chip" style="display:inline-flex; align-items:center; gap:6px; margin:2px 4px 2px 0;">
+            @${escapeHtml(a.username)}${a.label && a.label !== a.username ? ` (${escapeHtml(a.label)})` : ''}
+            <a href="#" onclick="deleteInstagramWatchAccount(${a.id}); return false;" style="color:var(--accent-red);">✕</a>
+        </span>`).join('');
+}
+
+async function addInstagramWatchAccount() {
+    const input = document.getElementById('igw-add-input');
+    const username = input.value.trim();
+    if (!username) return showToast('Введите username аккаунта');
+    try {
+        const created = await api('/api/instagram-watch/accounts', { method: 'POST', body: JSON.stringify({ username }) });
+        instagramWatchAccounts.push(created);
+        renderInstagramWatchAccountsList();
+        input.value = '';
+        showToast('Аккаунт добавлен');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function deleteInstagramWatchAccount(id) {
+    try {
+        await api(`/api/instagram-watch/accounts/${id}`, { method: 'DELETE' });
+        instagramWatchAccounts = instagramWatchAccounts.filter(a => a.id !== id);
+        renderInstagramWatchAccountsList();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+async function scanInstagramWatch() {
+    const btn = document.getElementById('igw-scan-btn');
+    const statusEl = document.getElementById('igw-scan-status');
+    const feed = document.getElementById('igw-feed');
+    if (instagramWatchAccounts.length === 0) return showToast('Сначала добавьте хотя бы один аккаунт');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Сканирую...';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Запрашиваю Instagram Business Discovery...';
+
+    try {
+        const result = await api('/api/instagram-watch/scan', { method: 'POST' });
+        const accounts = result.accounts || [];
+        feed.innerHTML = accounts.map(acc => {
+            const header = `@${escapeHtml(acc.username)}${acc.followersCount !== null ? ` · ${acc.followersCount.toLocaleString('ru-RU')} подписчиков` : ''}`;
+            if (acc.error) {
+                return `<div class="info-box" style="border-color:var(--accent-red);"><b>${header}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(acc.error)}</p></div>`;
+            }
+            if (!acc.posts.length) {
+                return `<div class="info-box"><b>${header}</b><p class="idea-desc-text">Постов не найдено.</p></div>`;
+            }
+            return acc.posts.map(p => `
+                <div class="info-box">
+                    <div class="media-asset-meta-row" style="margin-bottom:6px;">
+                        <b>${header}</b>
+                        ${p.timestamp ? `<span style="color:var(--text-secondary); font-size:11px;">${new Date(p.timestamp).toLocaleString('ru-RU')}</span>` : ''}
+                        ${p.likeCount !== null ? `<span class="format-tag">❤️ ${p.likeCount}</span>` : ''}
+                        ${p.commentsCount !== null ? `<span class="format-tag">💬 ${p.commentsCount}</span>` : ''}
+                    </div>
+                    <p class="idea-desc-text" style="white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(p.caption || '')}</p>
+                    ${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" style="font-size:12px;">Открыть в Instagram →</a>` : ''}
+                </div>`).join('');
+        }).join('');
+        statusEl.textContent = `Готово. Аккаунтов просканировано: ${accounts.length}.`;
     } catch (e) {
         statusEl.textContent = 'Ошибка: ' + e.message;
         showToast('Не удалось просканировать: ' + e.message);

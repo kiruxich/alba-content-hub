@@ -924,6 +924,25 @@
                     <div id="tgw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
                 </div>
 
+                <!-- Instagram source watching - same idea as Telegram above: manual list,
+                     never touched by RSS actions, scanned on demand (not scheduled) since
+                     Business Discovery needs a configured Instagram account/token. See
+                     docs/inst.md for the Meta app setup this depends on. -->
+                <div style="margin-top:36px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
+                    <div class="controls-row">
+                        <div class="p-section-title" style="margin:0;">INSTAGRAM — ОТСЛЕЖИВАНИЕ АККАУНТОВ</div>
+                        <button class="edit-btn" id="igw-scan-btn" onclick="scanInstagramWatch()">🔄 Обновить</button>
+                    </div>
+                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список конкурентов для вдохновения — у Instagram нет открытого поиска, аккаунты нужно находить самостоятельно. Требует настроенный Instagram (см. docs/inst.md). Список не трогается ничем другим на этой странице.</p>
+                    <div class="controls-row">
+                        <input type="text" id="igw-add-input" class="form-input" placeholder="@username аккаунта" style="max-width:260px;">
+                        <button class="schedule-btn" onclick="addInstagramWatchAccount()">+ Добавить источник</button>
+                    </div>
+                    <div id="igw-accounts-list" style="margin:10px 0 16px;"></div>
+                    <div id="igw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
+                    <div id="igw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
+                </div>
+
                 <!-- Read-only observability - visually separated from the editable settings above -->
                 <div style="margin-top:36px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
                     <div class="p-section-title" style="margin-top:0;">НАБЛЮДАЕМОСТЬ</div>
