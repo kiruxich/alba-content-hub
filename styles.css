@@ -182,7 +182,7 @@ html, body {
 .ps-tab-btn.active { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); }
 
 .form-label { font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700; margin-top:12px; display:block; }
-.form-input, .form-textarea, .form-select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-size: 14px; margin-top: 6px; margin-bottom: 12px; }
+.form-input, .form-textarea, .form-select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-family: inherit; font-size: 14px; line-height: 1.5; margin-top: 6px; margin-bottom: 12px; }
 .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(10,132,255,0.15); }
 .form-textarea { min-height: 90px; resize: vertical; }
 /* Native <select> rendering (esp. Safari/WebKit) ignores the box-model padding
@@ -635,3 +635,145 @@ html, body {
 .generation-status.error .gs-dot { background: var(--accent-red); animation: none; }
 .generation-status.success .gs-dot { background: var(--accent-green); animation: none; }
 @keyframes gs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* ============================================================
+   СОЗДАНИЕ КОНТЕНТА (.cc-*)
+   Своё пространство имён вместо инлайновых стилей в шаблонах
+   renderContentDraftCard() / renderAgentContentDrafts() (app.js):
+   активное состояние вкладок и чипов раньше задавалось строками
+   вида style="background:var(--accent-blue)" прямо в разметке.
+   ============================================================ */
+
+.cc-toprow { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+
+/* Пайплайн страницы: раньше это был абзац "Тема → 4 формата → перевод → хранилище". */
+.cc-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cc-flow-step { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.cc-flow-step b { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,0.08); font-size: 10px; color: var(--text-primary); }
+.cc-flow-arrow { color: var(--text-secondary); opacity: 0.45; font-size: 12px; }
+
+/* КАРТОЧКА ЧЕРНОВИКА */
+.cc-card { background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; margin-bottom: 14px; overflow: hidden; }
+.cc-card.collapsed { background: rgba(28,28,30,0.6); }
+
+.cc-head { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; }
+.cc-collapse { flex-shrink: 0; width: 26px; height: 26px; border: none; border-radius: 8px; background: rgba(255,255,255,0.06); color: var(--text-secondary); font-size: 12px; cursor: pointer; }
+.cc-collapse:hover { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+.cc-head-main { flex: 1; min-width: 0; }
+.cc-head-title { font-size: 15px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.cc-head-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.cc-muted { color: var(--text-secondary); font-weight: 400; }
+
+.cc-pill { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 7px; background: rgba(255,255,255,0.07); color: var(--text-secondary); }
+.cc-pill-work { background: rgba(255,159,10,0.15); color: var(--accent-orange); }
+.cc-pill-ready { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
+.cc-pill-done { background: rgba(48,209,88,0.15); color: var(--accent-green); }
+.cc-pill-agent { background: rgba(191,90,242,0.15); color: var(--accent-purple); }
+
+/* Шаги внутри карточки - показывают, где именно ты сейчас в пайплайне. */
+.cc-steps { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.cc-step { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary); opacity: 0.55; }
+.cc-step:not(:last-child):after { content: '·'; margin-left: 6px; opacity: 0.5; }
+.cc-step b { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(255,255,255,0.08); font-size: 9px; }
+.cc-step.done { opacity: 0.8; color: var(--accent-green); }
+.cc-step.done b { background: rgba(48,209,88,0.18); color: var(--accent-green); }
+.cc-step.active { opacity: 1; color: var(--accent-blue); }
+.cc-step.active b { background: var(--accent-blue); color: #fff; }
+
+.cc-body { padding: 16px; }
+
+/* ФОРМА */
+.cc-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin: 18px 0 0 2px; }
+.cc-body > .cc-label:first-child, .cc-body > .cc-topic-row:first-child { margin-top: 0; }
+.cc-label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 0; }
+.cc-label-row .cc-label { margin: 0; }
+.cc-optional { text-transform: none; letter-spacing: 0; font-weight: 500; opacity: 0.65; }
+.cc-hint { font-size: 12px; color: var(--text-secondary); margin: -6px 0 0 2px; line-height: 1.45; }
+.cc-center { text-align: center; }
+.cc-input { margin-top: 8px; margin-bottom: 0; }
+.cc-textarea { min-height: 140px; }
+
+.cc-counter { font-size: 11px; font-weight: 600; color: var(--text-secondary); padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); font-variant-numeric: tabular-nums; }
+.cc-counter.over { background: rgba(255,69,58,0.15); color: var(--accent-red); }
+
+.cc-topic-row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.cc-topic-row .cc-input { flex: 1 1 260px; min-width: 0; }
+.cc-suggest { margin-top: 8px; white-space: nowrap; padding: 12px 14px; }
+
+/* Чипы выбора форматов: раньше невыбранное состояние делалось opacity:0.5,
+   из-за чего "не выбрано" читалось как "недоступно". */
+.cc-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.cc-chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 10px; border: 1px solid var(--separator); background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
+.cc-chip:hover { border-color: rgba(255,255,255,0.25); color: var(--text-primary); }
+.cc-chip-box { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--separator); font-size: 10px; color: #fff; }
+.cc-chip.on { border-color: var(--accent-blue); background: rgba(10,132,255,0.12); color: var(--text-primary); }
+.cc-chip.on .cc-chip-box { background: var(--accent-blue); border-color: var(--accent-blue); }
+
+/* СЕГМЕНТЫ (форматы и язык) - это переключатели вкладок, а не кнопки-действия */
+.cc-toolbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 14px 0 4px; }
+.cc-body > .cc-toolbar:first-child { margin-top: 0; }
+.cc-segment { display: inline-flex; gap: 2px; padding: 3px; border-radius: 11px; background: rgba(255,255,255,0.05); flex-wrap: wrap; }
+.cc-seg-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: none; border-radius: 9px; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
+.cc-seg-btn:hover { color: var(--text-primary); }
+.cc-seg-btn.on { background: var(--bg-grouped-active); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.cc-seg-btn.muted { opacity: 0.4; }
+.cc-seg-check { color: var(--accent-green); font-size: 11px; }
+.cc-segment-lang .cc-seg-btn { min-width: 44px; justify-content: center; }
+
+/* КОНТЕКСТ ТЕМЫ - раньше исчезал сразу после генерации */
+.cc-research { margin-top: 14px; border: 1px solid rgba(255,255,255,0.07); border-radius: 11px; overflow: hidden; }
+.cc-research-toggle { width: 100%; text-align: left; padding: 10px 13px; border: none; background: rgba(255,255,255,0.03); color: var(--text-secondary); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; }
+.cc-research-toggle:hover { color: var(--text-primary); }
+.cc-research-body { padding: 4px 13px 12px; font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+.cc-research-body p { margin: 8px 0 0; }
+.cc-research-body b { color: var(--text-primary); font-weight: 600; }
+
+/* ОБЛОЖКИ */
+.cc-covers { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.cc-cover { width: 68px; height: 68px; object-fit: cover; border-radius: 10px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s ease; }
+.cc-cover:hover { border-color: rgba(255,255,255,0.3); }
+.cc-cover.on { border-color: var(--accent-blue); }
+
+/* ДЕЙСТВИЯ */
+.cc-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+.cc-actions-spacer { flex: 1 1 auto; }
+.cc-primary { width: 100%; padding: 13px 18px; border: none; border-radius: 12px; background: var(--accent-blue); color: #fff; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; margin-top: 20px; transition: filter 0.15s ease; }
+.cc-primary:hover:not(:disabled) { filter: brightness(1.1); }
+.cc-primary:disabled, .cc-secondary:disabled, .cc-link:disabled { opacity: 0.5; cursor: not-allowed; }
+.cc-primary-inline { width: auto; margin-top: 0; padding: 10px 16px; font-size: 13px; border-radius: 10px; }
+.cc-secondary { padding: 10px 14px; border: 1px solid var(--separator); border-radius: 10px; background: transparent; color: var(--text-primary); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
+.cc-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.07); }
+.cc-secondary.cc-danger { color: var(--accent-red); border-color: rgba(255,69,58,0.35); }
+.cc-secondary.cc-danger:hover { background: rgba(255,69,58,0.12); }
+.cc-link { border: none; background: none; color: var(--accent-blue); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; padding: 0; }
+
+/* ПУСТЫЕ СОСТОЯНИЯ */
+.cc-placeholder { background: var(--bg-grouped); border: 1px dashed rgba(255,255,255,0.12); border-radius: 14px; padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.cc-placeholder-hero { padding: 40px 24px; }
+.cc-placeholder-hero .cc-placeholder-icon { font-size: 30px; margin-bottom: 10px; }
+.cc-placeholder-hero b { display: block; font-size: 16px; color: var(--text-primary); margin-bottom: 6px; }
+.cc-placeholder-hero p { max-width: 440px; margin: 0 auto 18px; }
+.cc-empty { font-size: 12.5px; color: var(--text-secondary); }
+.cc-empty-inline { padding: 6px 0; }
+
+/* СЕКЦИЯ "ЧЕРНОВИКИ НА ПРОВЕРКЕ" */
+.cc-section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--separator); }
+.cc-section-head h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.cc-section-count { color: var(--text-secondary); font-weight: 600; }
+.cc-section-head p { margin: 6px 0 16px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; max-width: 720px; }
+.cc-review-card { padding: 0 0 16px; }
+.cc-review-text { padding: 0 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; max-height: 110px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent); mask-image: linear-gradient(180deg, #000 60%, transparent); }
+.cc-review-cta { padding: 10px 16px 0; font-size: 12.5px; color: var(--accent-blue); }
+.cc-review-card .cc-actions { margin: 16px 16px 0; padding-top: 14px; }
+
+@media (max-width: 767px) {
+    .cc-toprow { flex-direction: column; align-items: stretch; }
+    .cc-toprow .cc-primary-inline { width: 100%; padding: 13px; font-size: 15px; }
+    .cc-flow { justify-content: center; }
+    .cc-suggest { width: 100%; }
+    .cc-toolbar { flex-direction: column; align-items: stretch; }
+    .cc-segment { justify-content: center; }
+    .cc-actions { flex-direction: column; align-items: stretch; }
+    .cc-actions .cc-secondary, .cc-actions .cc-primary-inline { width: 100%; text-align: center; }
+    .cc-actions-spacer { display: none; }
+}

@@ -118,15 +118,27 @@
                 <h1>Создание контента</h1>
             </div>
             <div class="clients-container">
-                <div class="controls-row">
-                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Тема → 4 формата на русском → перевод на английский (по желанию) → добавление в «Хранилище постов».</p>
-                    <button class="schedule-btn" onclick="addContentDraft()">+ Новая тема</button>
+                <div class="cc-toprow">
+                    <div class="cc-flow">
+                        <span class="cc-flow-step"><b>1</b>Тема</span>
+                        <span class="cc-flow-arrow">→</span>
+                        <span class="cc-flow-step"><b>2</b>Форматы</span>
+                        <span class="cc-flow-arrow">→</span>
+                        <span class="cc-flow-step"><b>3</b>Правка</span>
+                        <span class="cc-flow-arrow">→</span>
+                        <span class="cc-flow-step"><b>4</b>Хранилище</span>
+                    </div>
+                    <button class="cc-primary cc-primary-inline" onclick="addContentDraft()">+ Новая тема</button>
                 </div>
-                <div id="content-drafts-list" style="margin-top:12px;"></div>
+                <div id="content-drafts-list"></div>
 
-                <div class="p-section-title" style="margin-top:32px;">ЧЕРНОВИКИ НА ПРОВЕРКЕ</div>
-                <p style="color:var(--text-secondary); font-size:12px; margin:0 0 12px;">Идеи в статусе «Идея» — как написанные автоматическим агентом Generator, так и созданные вручную ранее — ждут проверки здесь, а не сразу попадают в хранилище.</p>
-                <div id="content-agent-drafts-list"></div>
+                <div class="cc-section">
+                    <div class="cc-section-head">
+                        <h3>Черновики на проверке <span id="content-agent-drafts-count" class="cc-section-count"></span></h3>
+                        <p>Идеи в статусе «Идея» — от автоматического агента Generator и созданные вручную ранее — ждут решения здесь и не попадают в хранилище сами.</p>
+                    </div>
+                    <div id="content-agent-drafts-list"></div>
+                </div>
             </div>
         </div>
 
@@ -996,6 +1008,7 @@
                     <option value="TG Пост">TG Пост (Лимит: 4096 симв.)</option>
                     <option value="Reels / Shorts">Reels / Shorts (Лимит сценария: 1000 симв.)</option>
                     <option value="Threads">Threads (Лимит: 500 симв./пост)</option>
+                    <option value="Pinterest">Pinterest (Лимит описания: 500 симв.)</option>
                     <option value="Лонгрид Habr/VC">Лонгрид Habr / VC (Без ограничений)</option>
                 </select>
 

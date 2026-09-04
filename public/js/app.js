@@ -45,6 +45,7 @@ function escapeHtml(str) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    loadContentDrafts();
     initApp();
     const schedInput = document.getElementById('schedule-date-input');
     if (schedInput) schedInput.value = new Date().toISOString().split('T')[0];
@@ -339,35 +340,106 @@ async function renderBankView() {
     container.innerHTML = html;
 }
 
-// СОЗДАНИЕ КОНТЕНТА - генерация с нуля (4 формата из одной темы), затем
+// СОЗДАНИЕ КОНТЕНТА - генерация с нуля (до 4 форматов из одной темы), затем
 // перевод на английский, затем перенос отдельных форматов в Хранилище.
-// Черновики хранятся только в памяти вкладки (contentDrafts) до нажатия
-// "Добавить в хранилище" - как и раньше при ручном создании идеи, ничего не
-// пишется на сервер, пока пользователь явно не решит сохранить конкретный
-// формат/язык.
+// Черновики живут на клиенте (contentDrafts) до нажатия "Добавить в
+// хранилище" - на сервер ничего не пишется, пока пользователь явно не решит
+// сохранить конкретный формат. В отличие от прошлой версии черновики ещё и
+// переживают перезагрузку страницы: см. saveContentDrafts() ниже - раньше
+// F5 после дорогой генерации просто стирал результат.
 let contentDrafts = [];
+
+const CONTENT_DRAFTS_STORAGE_KEY = 'alba.contentDrafts.v1';
+
+// ideaFormat здесь ОБЯЗАН совпадать со значениями <option> в
+// <select id="edit-idea-format-input"> (index.html) и со списком форматов в
+// аналитике - иначе идея, созданная отсюда, открывается в редакторе с пустым
+// селектом формата и теряет format при первом же сохранении. limit - лимит
+// площадки на текст, тот же, что считает validateLimits() в редакторе.
 const CONTENT_FORMAT_DEFS = [
-    { key: 'tgPost', label: 'ТГ Публикация', ideaFormat: 'TG Пост' },
-    { key: 'reelsScript', label: 'Сценарий Reels/Shorts', ideaFormat: 'Reels' },
-    { key: 'threads', label: 'Threads', ideaFormat: 'Threads' },
-    { key: 'pinterest', label: 'Pinterest', ideaFormat: 'Pinterest' },
+    { key: 'tgPost', label: 'TG Пост', icon: '✈️', ideaFormat: 'TG Пост', limit: 4096 },
+    { key: 'reelsScript', label: 'Reels / Shorts', icon: '🎬', ideaFormat: 'Reels / Shorts', limit: 1000 },
+    { key: 'threads', label: 'Threads', icon: '🧵', ideaFormat: 'Threads', limit: 500 },
+    { key: 'pinterest', label: 'Pinterest', icon: '📌', ideaFormat: 'Pinterest', limit: 500 },
 ];
 
+// Идеи, созданные до выравнивания словаря форматов, лежат в базе с 'Reels'.
+// Приводим к каноническому значению при открытии редактора, чтобы селект не
+// оказался пустым (и format не обнулился при сохранении).
+const LEGACY_FORMAT_ALIASES = { 'Reels': 'Reels / Shorts', 'Shorts': 'Reels / Shorts', 'Reels/Shorts': 'Reels / Shorts' };
+function normalizeIdeaFormat(format) {
+    return LEGACY_FORMAT_ALIASES[format] || format || 'TG Пост';
+}
+
+function formatDef(key) {
+    return CONTENT_FORMAT_DEFS.find(f => f.key === key) || CONTENT_FORMAT_DEFS[0];
+}
+
+// ЛОКАЛЬНОЕ СОХРАНЕНИЕ ЧЕРНОВИКОВ
+// Пишем по любому изменению состояния (все мутации проходят через
+// renderContentCreationView()), плюс отдельно по вводу в поля - там
+// перерисовки нет специально, чтобы не терять фокус и курсор.
+let contentDraftsLoaded = false;
+
+function saveContentDrafts() {
+    if (!contentDraftsLoaded) return;
+    try { localStorage.setItem(CONTENT_DRAFTS_STORAGE_KEY, JSON.stringify(contentDrafts)); } catch (_) {}
+}
+
+function loadContentDrafts() {
+    contentDraftsLoaded = true;
+    try {
+        const raw = localStorage.getItem(CONTENT_DRAFTS_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        // Генерация/перевод не переживают перезагрузку - иначе карточка
+        // навсегда залипнет в "Генерируем..." без живого запроса за спиной.
+        contentDrafts = parsed.map(d => ({
+            ...d,
+            status: (d.status === 'generating' || d.status === 'translating') ? (d.ru ? 'generated' : 'draft') : d.status,
+            suggestingTopic: false,
+            generatingCover: false,
+        }));
+    } catch (_) {}
+}
+
 function addContentDraft() {
-    contentDrafts.push({
+    // Новая карточка всегда сверху и раскрыта, остальные схлопываем - иначе
+    // страница с тремя сгенерированными черновиками превращается в
+    // бесконечную простыню.
+    contentDrafts.forEach(d => { d.collapsed = true; });
+    contentDrafts.unshift({
         id: `cd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         topic: '', productId: '',
         status: 'draft', // draft | generating | generated | translating
         activeFormat: null, activeLang: 'ru',
         ru: null, en: null,
-        selectedFormats: CONTENT_FORMAT_DEFS.map(f => f.key), // which formats to generate - all by default
-        usedTopics: [], suggestingTopic: false, // topics already shown by "Подобрать тему" this session, so a re-click doesn't repeat one
+        collapsed: false,
+        promoted: {}, // formatKey -> id идеи в Хранилище, чтобы не добавить дважды молча
+        selectedFormats: CONTENT_FORMAT_DEFS.map(f => f.key), // все форматы по умолчанию
+        usedTopics: [], suggestingTopic: false, // темы, уже показанные "Подобрать тему" в этой сессии - повтора не будет
     });
     renderContentCreationView();
 }
 
 function removeContentDraft(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    // Спрашиваем только если есть что терять: пустую карточку удаляем молча.
+    if (draft && draft.ru && !confirm('Удалить черновик вместе со сгенерированным текстом?')) return;
     contentDrafts = contentDrafts.filter(d => d.id !== id);
+    renderContentCreationView();
+}
+
+function toggleContentDraftCollapse(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft) draft.collapsed = !draft.collapsed;
+    renderContentCreationView();
+}
+
+function toggleContentDraftResearch(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft) draft.showResearch = !draft.showResearch;
     renderContentCreationView();
 }
 
@@ -377,9 +449,8 @@ function setContentDraftFormat(id, key) {
     renderContentCreationView();
 }
 
-// Toggles one format chip before generation (see CONTENT_FORMAT_DEFS) - at
-// least one must stay selected, since generateContentDraft() has nothing to
-// send otherwise.
+// Переключает один формат ДО генерации (см. CONTENT_FORMAT_DEFS) - хотя бы
+// один должен остаться выбранным, иначе generateContentDraft() нечего слать.
 function toggleContentDraftFormat(id, key) {
     const draft = contentDrafts.find(d => d.id === id);
     if (!draft) return;
@@ -394,12 +465,12 @@ function toggleContentDraftFormat(id, key) {
     renderContentCreationView();
 }
 
-// "Подобрать актуальную тему поста" - asks local-claude-agent (Sonnet +
-// WebSearch, see /api/content-drafts/suggest-topic) for one fresh topic and
-// fills it into the topic field. draft.usedTopics accumulates every topic
-// this card has shown/had typed so far and is sent back on the next click,
-// so re-clicking proposes something different instead of repeating - it's
-// also merged server-side with the ~20 most recent idea titles.
+// "Подобрать тему" - просит local-claude-agent (Sonnet + WebSearch, см.
+// /api/content-drafts/suggest-topic) одну свежую тему и подставляет её в
+// поле. draft.usedTopics копит всё, что карточка уже показывала или во что
+// пользователь печатал, и уходит на сервер при следующем клике, так что
+// повторный клик даёт другую тему; на сервере список ещё и мержится с ~20
+// последними заголовками идей.
 async function suggestContentDraftTopic(id) {
     const draft = contentDrafts.find(d => d.id === id);
     if (!draft) return;
@@ -418,6 +489,7 @@ async function suggestContentDraftTopic(id) {
         draft.topicSources = result.sources || [];
         draft.topicWhyRelevant = result.whyRelevant || '';
         draft.topicPublishSuggestion = result.publishSuggestion || '';
+        draft.showResearch = true;
         showToast('Тема подобрана');
     } catch (e) {
         showToast('Не удалось подобрать тему: ' + e.message);
@@ -428,13 +500,38 @@ async function suggestContentDraftTopic(id) {
 
 function setContentDraftLang(id, lang) {
     const draft = contentDrafts.find(d => d.id === id);
-    if (draft && (lang === 'ru' || draft.en)) draft.activeLang = lang;
+    if (!draft) return;
+    if (lang === 'en' && !draft.en) return showToast('Сначала переведите черновик на английский');
+    draft.activeLang = lang;
     renderContentCreationView();
 }
 
 function setContentDraftBlockField(id, lang, key, field, value) {
     const draft = contentDrafts.find(d => d.id === id);
     if (draft && draft[lang] && draft[lang][key]) draft[lang][key][field] = value;
+    saveContentDrafts();
+}
+
+// Счётчик символов обновляем точечно, без перерисовки карточки - иначе
+// каждый набранный символ убивал бы фокус и позицию курсора.
+function updateContentDraftCounter(id, textarea) {
+    const draft = contentDrafts.find(d => d.id === id);
+    const badge = document.getElementById(`cd-count-${id}`);
+    if (!draft || !badge) return;
+    const limit = formatDef(draft.activeFormat).limit;
+    const current = textarea.value.length;
+    badge.textContent = `${current} / ${limit}`;
+    badge.classList.toggle('over', current > limit);
+}
+
+function autoGrowTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(Math.max(el.scrollHeight, 140), 640) + 'px';
+}
+
+function autoGrowAllDraftTextareas() {
+    document.querySelectorAll('#content-drafts-list .cc-textarea').forEach(autoGrowTextarea);
 }
 
 async function generateContentDraft(id) {
@@ -444,7 +541,11 @@ async function generateContentDraft(id) {
     const productSelect = document.getElementById(`cd-product-${id}`);
     draft.topic = topicInput ? topicInput.value.trim() : draft.topic;
     draft.productId = productSelect ? productSelect.value : draft.productId;
-    if (!draft.topic) return showToast('Укажите тему');
+    if (!draft.topic) {
+        showToast('Укажите тему');
+        if (topicInput) topicInput.focus();
+        return;
+    }
     const formats = (draft.selectedFormats && draft.selectedFormats.length) ? draft.selectedFormats : CONTENT_FORMAT_DEFS.map(f => f.key);
 
     draft.status = 'generating';
@@ -452,14 +553,31 @@ async function generateContentDraft(id) {
     try {
         draft.ru = await api('/api/content-drafts/generate', { method: 'POST', body: JSON.stringify({ topic: draft.topic, productId: draft.productId || null, formats }) });
         draft.status = 'generated';
-        // Default the active tab to the first format actually generated -
-        // 'tgPost' isn't guaranteed to be one of them anymore.
+        draft.en = null;
+        draft.activeLang = 'ru';
+        draft.promoted = {};
+        // Активная вкладка - первый реально сгенерированный формат: 'tgPost'
+        // больше не гарантирован в выборке.
         draft.activeFormat = CONTENT_FORMAT_DEFS.find(f => draft.ru?.[f.key])?.key || formats[0];
         showToast('Черновик сгенерирован');
     } catch (e) {
         draft.status = 'draft';
         showToast('Не удалось сгенерировать: ' + e.message);
     }
+    renderContentCreationView();
+}
+
+// Возврат к настройкам темы: раньше после генерации тема становилась
+// readonly навсегда и единственным способом переделать пост было удалить
+// карточку целиком (вместе с подобранной темой и обоснованием).
+function reopenContentDraftSetup(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft) return;
+    if (draft.ru && !confirm('Вернуться к настройке темы? Сгенерированные тексты будут потеряны.')) return;
+    draft.ru = null; draft.en = null;
+    draft.status = 'draft';
+    draft.activeFormat = null; draft.activeLang = 'ru';
+    draft.promoted = {};
     renderContentCreationView();
 }
 
@@ -480,33 +598,95 @@ async function translateContentDraft(id) {
     renderContentCreationView();
 }
 
+// Переносит ОДИН формат в Хранилище. EN-версия прикладывается всегда, если
+// перевод есть - раньше она молча терялась, когда пользователь жал кнопку,
+// стоя на вкладке RU.
 async function promoteContentDraftFormat(id) {
     const draft = contentDrafts.find(d => d.id === id);
     if (!draft) return;
-    const formatDef = CONTENT_FORMAT_DEFS.find(f => f.key === draft.activeFormat);
+    const def = formatDef(draft.activeFormat);
     const ruBlock = draft.ru?.[draft.activeFormat];
-    const enBlock = draft.activeLang === 'en' ? draft.en?.[draft.activeFormat] : null;
+    const enBlock = draft.en?.[draft.activeFormat] || null;
     if (!ruBlock) return;
 
-    const body = enBlock
-        ? { title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
-            titleEn: enBlock.title, descEn: enBlock.desc, ctaEn: enBlock.cta,
-            format: formatDef.ideaFormat, status: 'ready', source: 'manual',
-            targetGroups: draft.productId ? [draft.productId] : [],
-            coverAssetId: draft.selectedCoverAssetId || null }
-        : { title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
-            format: formatDef.ideaFormat, status: 'ready', source: 'manual',
-            targetGroups: draft.productId ? [draft.productId] : [],
-            coverAssetId: draft.selectedCoverAssetId || null };
+    draft.promoted = draft.promoted || {};
+    if (draft.promoted[draft.activeFormat] && !confirm(`«${def.label}» уже добавлен в Хранилище. Добавить ещё одну копию?`)) return;
+
+    const body = {
+        title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
+        format: def.ideaFormat, status: 'ready', source: 'manual',
+        targetGroups: draft.productId ? [draft.productId] : [],
+        coverAssetId: draft.selectedCoverAssetId || null,
+    };
+    if (enBlock) Object.assign(body, { titleEn: enBlock.title, descEn: enBlock.desc, ctaEn: enBlock.cta });
 
     try {
         const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify(body) });
         ideasBank.push(created);
+        draft.promoted[draft.activeFormat] = created.id;
         renderBankView();
-        showToast(`Добавлено в хранилище: ${formatDef.label}${enBlock ? ' (RU+EN)' : ''}`);
+        renderContentCreationView();
+        showToast(`В хранилище: ${def.label}${enBlock ? ' (RU+EN)' : ''}`);
     } catch (e) {
         showToast('Не удалось добавить: ' + e.message);
     }
+}
+
+// Разом переносит все сгенерированные форматы, которых ещё нет в Хранилище -
+// раньше приходилось вручную щёлкать вкладку → кнопку → вкладку → кнопку и
+// самому помнить, что уже добавлено.
+async function promoteAllContentDraftFormats(id) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (!draft || !draft.ru) return;
+    draft.promoted = draft.promoted || {};
+    const pending = CONTENT_FORMAT_DEFS.filter(f => draft.ru[f.key] && !draft.promoted[f.key]);
+    if (!pending.length) return showToast('Все форматы уже в хранилище');
+
+    let added = 0;
+    for (const def of pending) {
+        const ruBlock = draft.ru[def.key];
+        const enBlock = draft.en?.[def.key] || null;
+        const body = {
+            title: ruBlock.title, desc: ruBlock.desc, cta: ruBlock.cta,
+            format: def.ideaFormat, status: 'ready', source: 'manual',
+            targetGroups: draft.productId ? [draft.productId] : [],
+            coverAssetId: draft.selectedCoverAssetId || null,
+        };
+        if (enBlock) Object.assign(body, { titleEn: enBlock.title, descEn: enBlock.desc, ctaEn: enBlock.cta });
+        try {
+            const created = await api('/api/ideas', { method: 'POST', body: JSON.stringify(body) });
+            ideasBank.push(created);
+            draft.promoted[def.key] = created.id;
+            added++;
+        } catch (e) {
+            showToast(`«${def.label}» не добавлен: ${e.message}`);
+        }
+    }
+    renderBankView();
+    renderContentCreationView();
+    if (added) showToast(`В хранилище добавлено форматов: ${added}`);
+}
+
+function contentDraftStatusPill(draft) {
+    if (draft.status === 'generating') return `<span class="cc-pill cc-pill-work">⏳ Генерируем</span>`;
+    if (draft.status === 'translating') return `<span class="cc-pill cc-pill-work">⏳ Переводим</span>`;
+    if (!draft.ru) return `<span class="cc-pill">Настройка</span>`;
+    const total = CONTENT_FORMAT_DEFS.filter(f => draft.ru[f.key]).length;
+    const done = Object.keys(draft.promoted || {}).length;
+    if (done >= total) return `<span class="cc-pill cc-pill-done">✓ В хранилище</span>`;
+    return `<span class="cc-pill cc-pill-ready">Правка · ${done}/${total} в хранилище</span>`;
+}
+
+// Шаг пайплайна показываем явной полоской, а не абзацем текста наверху
+// страницы: из карточки должно быть видно, где ты находишься.
+function contentDraftSteps(draft) {
+    const step = !draft.ru ? 1 : (draft.en ? 3 : 2);
+    const labels = ['Тема и форматы', 'Правка текстов', 'Перевод (по желанию)', 'В хранилище'];
+    const activeIndex = !draft.ru ? 0 : (draft.en ? 2 : 1);
+    return `<div class="cc-steps">${labels.map((l, i) => `
+        <span class="cc-step ${i < activeIndex ? 'done' : ''} ${i === activeIndex ? 'active' : ''}">
+            <b>${i < activeIndex ? '✓' : i + 1}</b>${l}
+        </span>`).join('')}</div>`;
 }
 
 function renderContentDraftCard(draft) {
@@ -518,73 +698,161 @@ function renderContentDraftCard(draft) {
     const block = hasRu ? (lang === 'en' ? draft.en?.[draft.activeFormat] : draft.ru[draft.activeFormat]) : null;
     const selectedFormats = (draft.selectedFormats && draft.selectedFormats.length) ? draft.selectedFormats : CONTENT_FORMAT_DEFS.map(f => f.key);
     const generatedFormatDefs = hasRu ? CONTENT_FORMAT_DEFS.filter(f => draft.ru?.[f.key]) : [];
+    const promoted = draft.promoted || {};
+    const def = formatDef(draft.activeFormat);
+    const hasResearch = Boolean(draft.topicWhyRelevant || (draft.topicSources && draft.topicSources.length) || draft.topicPublishSuggestion);
+    const pendingCount = generatedFormatDefs.filter(f => !promoted[f.key]).length;
+
+    const head = `
+        <div class="cc-head">
+            <button class="cc-collapse" onclick="toggleContentDraftCollapse('${draft.id}')" title="${draft.collapsed ? 'Развернуть' : 'Свернуть'}">${draft.collapsed ? '▸' : '▾'}</button>
+            <div class="cc-head-main">
+                <div class="cc-head-title">${escapeHtml(draft.topic) || '<span class="cc-muted">Без темы</span>'}</div>
+                <div class="cc-head-meta">
+                    ${contentDraftStatusPill(draft)}
+                    ${draft.productId ? `<span class="cc-pill">${escapeHtml(productsData.find(p => p.id === draft.productId)?.title || 'Продукт')}</span>` : ''}
+                    ${hasEn ? `<span class="cc-pill">RU + EN</span>` : ''}
+                </div>
+            </div>
+            <button class="delete-btn" onclick="removeContentDraft('${draft.id}')" title="Удалить черновик">🗑</button>
+        </div>`;
+
+    if (draft.collapsed) return `<div class="cc-card collapsed">${head}</div>`;
+
+    const research = hasResearch ? `
+        <div class="cc-research">
+            <button class="cc-research-toggle" onclick="toggleContentDraftResearch('${draft.id}')">${draft.showResearch ? '▾' : '▸'} Почему эта тема актуальна</button>
+            ${draft.showResearch ? `
+                <div class="cc-research-body">
+                    ${draft.topicWhyRelevant ? `<p><b>Актуальность.</b> ${escapeHtml(draft.topicWhyRelevant)}</p>` : ''}
+                    ${draft.topicPublishSuggestion ? `<p><b>Когда публиковать.</b> ${escapeHtml(draft.topicPublishSuggestion)}</p>` : ''}
+                    ${(draft.topicSources && draft.topicSources.length) ? `<p><b>Источники.</b> ${draft.topicSources.map(s => escapeHtml(s)).join(' · ')}</p>` : ''}
+                </div>` : ''}
+        </div>` : '';
+
+    if (!hasRu) {
+        return `
+        <div class="cc-card">
+            ${head}
+            ${contentDraftSteps(draft)}
+            <div class="cc-body">
+                <label class="cc-label" for="cd-topic-${draft.id}">Тема поста</label>
+                <div class="cc-topic-row">
+                    <input type="text" class="form-input cc-input" id="cd-topic-${draft.id}" placeholder="Например: как выбрать CRM для малого бизнеса" value="${escapeHtml(draft.topic)}"
+                        oninput="setContentDraftTopic('${draft.id}', this.value)">
+                    <button class="edit-btn cc-suggest" ${draft.suggestingTopic ? 'disabled' : ''} onclick="suggestContentDraftTopic('${draft.id}')">${draft.suggestingTopic ? '⏳ Подбираем…' : '🔎 Подобрать тему'}</button>
+                </div>
+                ${research}
+
+                <label class="cc-label" for="cd-product-${draft.id}">Продукт <span class="cc-optional">необязательно</span></label>
+                <select class="form-select cc-input" id="cd-product-${draft.id}" onchange="setContentDraftProduct('${draft.id}', this.value)">
+                    <option value="">— без привязки —</option>
+                    ${productsData.map(p => `<option value="${p.id}" ${draft.productId === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+                </select>
+                <p class="cc-hint">Привязка подмешивает описание продукта в промпт и проставляет его идее при переносе в Хранилище.</p>
+
+                <label class="cc-label">Какие форматы сгенерировать</label>
+                <div class="cc-chips">
+                    ${CONTENT_FORMAT_DEFS.map(f => `
+                        <button class="cc-chip ${selectedFormats.includes(f.key) ? 'on' : ''}" onclick="toggleContentDraftFormat('${draft.id}', '${f.key}')">
+                            <span class="cc-chip-box">${selectedFormats.includes(f.key) ? '✓' : ''}</span>${f.icon} ${f.label}
+                        </button>`).join('')}
+                </div>
+
+                <button class="cc-primary" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">
+                    ${isGenerating ? '⏳ Генерируем через ИИ (Sonnet)…' : `✨ Сгенерировать ${selectedFormats.length} ${pluralFormats(selectedFormats.length)}`}
+                </button>
+                ${isGenerating ? `<p class="cc-hint cc-center">Обычно занимает 30–60 секунд. Вкладку можно не держать открытой — черновик сохранится.</p>` : ''}
+            </div>
+        </div>`;
+    }
 
     return `
-    <div class="idea-card" style="margin-bottom:16px;">
-        <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px;">
-            <input type="text" class="form-input" style="margin:0;" id="cd-topic-${draft.id}" placeholder="Тема поста..." value="${escapeHtml(draft.topic)}" ${hasRu ? 'readonly' : ''}>
-            ${!hasRu ? `<button class="edit-btn" style="margin:0; white-space:nowrap; align-self:stretch;" ${draft.suggestingTopic ? 'disabled' : ''} onclick="suggestContentDraftTopic('${draft.id}')">${draft.suggestingTopic ? '⏳ Подбираем...' : '🔎 Подобрать тему'}</button>` : ''}
-            <select class="form-select" style="margin:0; max-width:220px;" id="cd-product-${draft.id}" ${hasRu ? 'disabled' : ''}>
-                <option value="">— без привязки —</option>
-                ${productsData.map(p => `<option value="${p.id}" ${draft.productId === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
-            </select>
-            <button class="delete-btn" onclick="removeContentDraft('${draft.id}')">🗑</button>
-        </div>
+    <div class="cc-card">
+        ${head}
+        ${contentDraftSteps(draft)}
+        <div class="cc-body">
+            ${research}
 
-        ${(!hasRu && (draft.topicWhyRelevant || (draft.topicSources && draft.topicSources.length))) ? `
-            <div class="info-box" style="font-size:12px; margin-bottom:10px;">
-                ${draft.topicWhyRelevant ? `<div><strong>Почему актуально:</strong> ${escapeHtml(draft.topicWhyRelevant)}</div>` : ''}
-                ${(draft.topicSources && draft.topicSources.length) ? `<div style="margin-top:4px;"><strong>Источники:</strong> ${draft.topicSources.map(s => escapeHtml(s)).join('; ')}</div>` : ''}
-                ${draft.topicPublishSuggestion ? `<div style="margin-top:4px;"><strong>Когда/как публиковать:</strong> ${escapeHtml(draft.topicPublishSuggestion)}</div>` : ''}
-            </div>
-        ` : ''}
-
-        ${!hasRu ? `
-            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-                ${CONTENT_FORMAT_DEFS.map(f => `<button class="edit-btn" style="${selectedFormats.includes(f.key) ? 'background:var(--accent-blue); color:#fff;' : 'opacity:0.5;'}" onclick="toggleContentDraftFormat('${draft.id}', '${f.key}')">${selectedFormats.includes(f.key) ? '✓ ' : ''}${f.label}</button>`).join('')}
-            </div>
-            <button class="submit-btn" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">${isGenerating ? '⏳ Генерируем через ИИ (Sonnet)...' : `✨ Сгенерировать (${selectedFormats.length})`}</button>
-        ` : `
-            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-                ${generatedFormatDefs.map(f => `<button class="edit-btn" style="${draft.activeFormat === f.key ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftFormat('${draft.id}', '${f.key}')">${f.label}</button>`).join('')}
-            </div>
-            ${hasEn ? `
-                <div style="display:flex; gap:6px; margin-bottom:10px;">
-                    <button class="edit-btn" style="${lang === 'ru' ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftLang('${draft.id}', 'ru')">🇷🇺 RU</button>
-                    <button class="edit-btn" style="${lang === 'en' ? 'background:var(--accent-blue); color:#fff;' : ''}" onclick="setContentDraftLang('${draft.id}', 'en')">🇬🇧 EN</button>
-                </div>` : ''}
-            ${block ? `
-                <input type="text" class="form-input" value="${escapeHtml(block.title)}" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'title', this.value)">
-                <textarea class="form-textarea" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'desc', this.value)">${escapeHtml(block.desc)}</textarea>
-                <input type="text" class="form-input" placeholder="CTA" value="${escapeHtml(block.cta)}" oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'cta', this.value)">
-            ` : ''}
-
-            <div class="p-section-title" style="margin-top:16px;">ОБЛОЖКА</div>
-            ${(draft.coverCandidates && draft.coverCandidates.length) ? `
-                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
-                    ${draft.coverCandidates.map(c => `
-                        <img src="${escapeHtml(c.url)}" onclick="selectDraftCover('${draft.id}', '${c.id}')"
-                            style="width:64px; height:64px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid ${draft.selectedCoverAssetId === c.id ? 'var(--accent-blue)' : 'transparent'};">
-                    `).join('')}
+            <div class="cc-toolbar">
+                <div class="cc-segment">
+                    ${generatedFormatDefs.map(f => `
+                        <button class="cc-seg-btn ${draft.activeFormat === f.key ? 'on' : ''}" onclick="setContentDraftFormat('${draft.id}', '${f.key}')">
+                            ${f.icon} ${f.label}${promoted[f.key] ? ' <span class="cc-seg-check">✓</span>' : ''}
+                        </button>`).join('')}
                 </div>
-            ` : `<div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">Вариантов пока нет.</div>`}
-            <button class="edit-btn" ${draft.generatingCover ? 'disabled' : ''} onclick="generateDraftCover('${draft.id}')">${draft.generatingCover ? '⏳ Генерируем...' : '🎨 Сгенерировать вариант обложки'}</button>
-
-            <div class="action-btn-row" style="margin-top:12px;">
-                ${!hasEn ? `<button class="edit-btn" ${isTranslating ? 'disabled' : ''} onclick="translateContentDraft('${draft.id}')">${isTranslating ? '⏳ Переводим...' : '🇬🇧 Перевести на английский'}</button>` : ''}
-                <button class="tg-btn" style="background:var(--accent-blue);" onclick="promoteContentDraftFormat('${draft.id}')">➕ Добавить в хранилище (${lang === 'en' ? 'RU+EN' : 'RU'})</button>
+                <div class="cc-segment cc-segment-lang">
+                    <button class="cc-seg-btn ${lang === 'ru' ? 'on' : ''}" onclick="setContentDraftLang('${draft.id}', 'ru')">RU</button>
+                    <button class="cc-seg-btn ${lang === 'en' ? 'on' : ''} ${hasEn ? '' : 'muted'}" onclick="setContentDraftLang('${draft.id}', 'en')" title="${hasEn ? '' : 'Сначала переведите черновик'}">EN</button>
+                </div>
             </div>
-        `}
+
+            ${block ? `
+                <label class="cc-label" for="cd-title-${draft.id}">Заголовок</label>
+                <input type="text" class="form-input cc-input" id="cd-title-${draft.id}" value="${escapeHtml(block.title)}"
+                    oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'title', this.value)">
+
+                <div class="cc-label-row">
+                    <label class="cc-label" for="cd-desc-${draft.id}">Текст · ${def.label}</label>
+                    <span class="cc-counter ${block.desc.length > def.limit ? 'over' : ''}" id="cd-count-${draft.id}">${block.desc.length} / ${def.limit}</span>
+                </div>
+                <textarea class="form-textarea cc-input cc-textarea" id="cd-desc-${draft.id}"
+                    oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'desc', this.value); updateContentDraftCounter('${draft.id}', this); autoGrowTextarea(this);">${escapeHtml(block.desc)}</textarea>
+
+                <label class="cc-label" for="cd-cta-${draft.id}">Призыв к действию (CTA)</label>
+                <input type="text" class="form-input cc-input" id="cd-cta-${draft.id}" placeholder="Например: напишите нам в личные сообщения" value="${escapeHtml(block.cta)}"
+                    oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'cta', this.value)">
+            ` : `<div class="cc-empty">Для этого формата текста нет.</div>`}
+
+            <div class="cc-label-row">
+                <span class="cc-label">Обложка <span class="cc-optional">необязательно</span></span>
+                <button class="cc-link" ${draft.generatingCover ? 'disabled' : ''} onclick="generateDraftCover('${draft.id}')">${draft.generatingCover ? '⏳ Генерируем…' : '🎨 Сгенерировать вариант'}</button>
+            </div>
+            <div class="cc-covers">
+                ${(draft.coverCandidates && draft.coverCandidates.length)
+                    ? draft.coverCandidates.map(c => `<img src="${escapeHtml(c.url)}" class="cc-cover ${draft.selectedCoverAssetId === c.id ? 'on' : ''}" onclick="selectDraftCover('${draft.id}', '${c.id}')" alt="">`).join('')
+                    : `<div class="cc-empty cc-empty-inline">Вариантов пока нет — все сгенерированные попадут в Медиатеку в папку по теме.</div>`}
+            </div>
+
+            <div class="cc-actions">
+                <button class="cc-secondary" onclick="reopenContentDraftSetup('${draft.id}')">↩︎ Другая тема</button>
+                <button class="cc-secondary" ${(isTranslating || hasEn) ? 'disabled' : ''} onclick="translateContentDraft('${draft.id}')">${isTranslating ? '⏳ Переводим…' : (hasEn ? '✓ Переведено' : '🇬🇧 Перевести на английский')}</button>
+                <div class="cc-actions-spacer"></div>
+                ${generatedFormatDefs.length > 1 && pendingCount > 1 ? `<button class="cc-secondary" onclick="promoteAllContentDraftFormats('${draft.id}')">Добавить все (${pendingCount})</button>` : ''}
+                <button class="cc-primary cc-primary-inline" onclick="promoteContentDraftFormat('${draft.id}')">
+                    ${promoted[draft.activeFormat] ? '✓ Добавлено · добавить ещё' : `➕ В хранилище: ${def.label}${hasEn ? ' (RU+EN)' : ''}`}
+                </button>
+            </div>
+        </div>
     </div>`;
+}
+
+function pluralFormats(n) {
+    if (n % 10 === 1 && n % 100 !== 11) return 'формат';
+    if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'формата';
+    return 'форматов';
+}
+
+// Тема и продукт теперь пишутся в состояние по ходу ввода, а не считываются
+// из DOM в момент генерации - иначе перерисовка карточки (например, после
+// сворачивания соседней) стирала бы набранное.
+function setContentDraftTopic(id, value) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft) draft.topic = value;
+    saveContentDrafts();
+}
+
+function setContentDraftProduct(id, value) {
+    const draft = contentDrafts.find(d => d.id === id);
+    if (draft) draft.productId = value;
+    saveContentDrafts();
 }
 
 // Генерирует ещё один вариант обложки для черновика (kie.ai через
 // server/routes/mediaAssets.js's generate-cover) - каждый вызов добавляет
-// новый вариант в draft.coverCandidates, а не заменяет предыдущий, чтобы
-// можно было выбрать любой из уже сгенерированных. Все варианты (включая
-// невыбранные) складываются в Медиатеку в одну папку по теме черновика -
-// см. folder в generate-cover - для переиспользования потом, ничего не
-// пропадает.
+// новый вариант в draft.coverCandidates, а не заменяет предыдущий. Все
+// варианты (включая невыбранные) складываются в Медиатеку в одну папку по
+// теме черновика - см. folder в generate-cover - ничего не пропадает.
 async function generateDraftCover(id) {
     const draft = contentDrafts.find(d => d.id === id);
     if (!draft) return;
@@ -611,7 +879,9 @@ async function generateDraftCover(id) {
 
 function selectDraftCover(id, assetId) {
     const draft = contentDrafts.find(d => d.id === id);
-    if (draft) draft.selectedCoverAssetId = assetId;
+    // Повторный клик по выбранной обложке снимает выбор - раньше отменить
+    // обложку было нельзя вообще.
+    if (draft) draft.selectedCoverAssetId = draft.selectedCoverAssetId === assetId ? null : assetId;
     renderContentCreationView();
 }
 
@@ -625,8 +895,10 @@ function renderAgentContentDrafts() {
     const list = document.getElementById('content-agent-drafts-list');
     if (!list) return;
     const drafts = ideasBank.filter(i => (i.status || 'idea') === 'idea');
+    const counter = document.getElementById('content-agent-drafts-count');
+    if (counter) counter.textContent = drafts.length ? `(${drafts.length})` : '';
     if (drafts.length === 0) {
-        list.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Нет черновиков на проверке.</div>`;
+        list.innerHTML = `<div class="cc-placeholder">Нет черновиков на проверке. Сюда попадают идеи в статусе «Идея» — от агента Generator и созданные вручную.</div>`;
         return;
     }
     const todayStr = new Date().toDateString();
@@ -634,20 +906,23 @@ function renderAgentContentDrafts() {
         const isAgent = idea.source === 'agent';
         const isToday = new Date(Number(idea.id)).toDateString() === todayStr;
         return `
-        <div class="idea-card" style="margin-bottom:14px;">
-            <div class="idea-header">
-                <div class="idea-title">${escapeHtml(idea.title)}</div>
-                <div>
-                    <span class="format-tag" style="background:${isAgent ? 'rgba(191,90,242,0.15)' : 'rgba(255,255,255,0.08)'}; color:${isAgent ? 'var(--accent-purple)' : 'var(--text-secondary)'};">${isAgent ? `🤖 От генератора${isToday ? ' · сегодня' : ''}` : '✍️ Черновик'}</span>
-                    <span class="format-tag">${escapeHtml(idea.format || 'TG Пост')}</span>
+        <div class="cc-card cc-review-card">
+            <div class="cc-head">
+                <div class="cc-head-main">
+                    <div class="cc-head-title">${escapeHtml(idea.title)}</div>
+                    <div class="cc-head-meta">
+                        <span class="cc-pill ${isAgent ? 'cc-pill-agent' : ''}">${isAgent ? `🤖 От генератора${isToday ? ' · сегодня' : ''}` : '✍️ Черновик'}</span>
+                        <span class="cc-pill">${escapeHtml(normalizeIdeaFormat(idea.format))}</span>
+                    </div>
                 </div>
             </div>
-            ${idea.desc ? `<div class="idea-desc-text">${escapeHtml(idea.desc)}</div>` : ''}
-            <div class="idea-cta">CTA: ${escapeHtml(idea.cta || '—')}</div>
-            <div class="action-btn-row">
-                <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
-                <button class="tg-btn" style="background:var(--accent-blue);" onclick="promoteAgentDraft('${idea.id}')">➕ Добавить в хранилище</button>
-                <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑 Отклонить</button>
+            ${idea.desc ? `<div class="cc-review-text">${escapeHtml(idea.desc)}</div>` : ''}
+            ${idea.cta ? `<div class="cc-review-cta">CTA: ${escapeHtml(idea.cta)}</div>` : ''}
+            <div class="cc-actions">
+                <button class="cc-secondary" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
+                <button class="cc-secondary cc-danger" onclick="deleteIdea('${idea.id}')">🗑 Отклонить</button>
+                <div class="cc-actions-spacer"></div>
+                <button class="cc-primary cc-primary-inline" onclick="promoteAgentDraft('${idea.id}')">➕ В хранилище</button>
             </div>
         </div>`;
     }).join('');
@@ -669,10 +944,17 @@ function renderContentCreationView() {
     const list = document.getElementById('content-drafts-list');
     if (list) {
         list.innerHTML = contentDrafts.length === 0
-            ? `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Черновиков пока нет — нажмите «+ Новая тема».</div>`
+            ? `<div class="cc-placeholder cc-placeholder-hero">
+                    <div class="cc-placeholder-icon">✍️</div>
+                    <b>Здесь рождается контент</b>
+                    <p>Одна тема — до четырёх готовых форматов. Начните с «+ Новая тема»: можно вписать тему самому или попросить ИИ подобрать актуальную.</p>
+                    <button class="cc-primary cc-primary-inline" onclick="addContentDraft()">+ Новая тема</button>
+               </div>`
             : contentDrafts.map(renderContentDraftCard).join('');
     }
     renderAgentContentDrafts();
+    autoGrowAllDraftTextareas();
+    saveContentDrafts();
 }
 
 // КАНБАН-ДОСКА (DRAG AND DROP)
@@ -891,7 +1173,7 @@ async function renderAnalyticsView() {
     // in index.html. This list used to be stale (old platform-specific
     // formats that no longer exist as choices), so every idea fell through
     // and every bucket read 0.
-    const formats = ['TG Пост', 'Reels / Shorts', 'Threads', 'Лонгрид Habr/VC'];
+    const formats = ['TG Пост', 'Reels / Shorts', 'Threads', 'Pinterest', 'Лонгрид Habr/VC'];
     let formatStats = formats.map(f => {
         const count = ideasBank.filter(i => i.format === f).length;
         return { format: f, count };
@@ -1243,7 +1525,7 @@ function validateLimits() {
 
     let limit = 4096;
     if (format.includes('Reels') || format.includes('Shorts') || format.includes('Клип')) limit = 1000;
-    if (format.includes('Threads')) limit = 500;
+    if (format.includes('Threads') || format.includes('Pinterest')) limit = 500;
     if (format.includes('История')) limit = 200;
 
     const current = desc.length;
@@ -1289,7 +1571,7 @@ function openEditIdeaModal(ideaId) {
     document.getElementById('edit-idea-id').value = idea.id;
     document.getElementById('edit-idea-title-input').value = idea.title;
     document.getElementById('edit-idea-desc-input').value = idea.desc || '';
-    document.getElementById('edit-idea-format-input').value = idea.format || 'TG Пост';
+    document.getElementById('edit-idea-format-input').value = normalizeIdeaFormat(idea.format);
     document.getElementById('edit-idea-funnel-input').value = idea.funnel || 'TOFU';
     document.getElementById('edit-idea-status-input').value = idea.status || 'idea';
     document.getElementById('edit-idea-cta-input').value = idea.cta || '';
