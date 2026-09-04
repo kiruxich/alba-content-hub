@@ -61,6 +61,14 @@ export function generateColdCallPitch({ category, prompt, toneOfVoice }) {
     return callTask('cold-call-pitch', { category, prompt, toneOfVoice }, { timeoutMs: 3 * 60 * 1000 });
 }
 
+// Подбор сайтов компаний для второй базы заказчиков (scrape-worker,
+// ScrapeGraphAI). Агент возвращает ТОЛЬКО адреса сайтов - контакты с них
+// снимает воркер с живой страницы, потому что выдуманный моделью телефон
+// здесь проверить нечем. Таймаут щедрый: под капотом несколько веб-поисков.
+export function findClientSites({ category, city, excludeDomains, limit }) {
+    return callTask('find-client-sites', { category, city, excludeDomains, limit }, { timeoutMs: 3 * 60 * 1000 });
+}
+
 export function generateNicheDescription(category) {
     return callTask('niche-description', { category });
 }

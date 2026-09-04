@@ -341,11 +341,48 @@
                 <h1>Заказчики</h1>
             </div>
             <div class="clients-container">
-                <div class="controls-row">
-                    <p style="color:var(--text-secondary); font-size:13px; margin:0;">Парсер 2ГИС по нишам — заведите карточку на каждую нишу, которую нужно собрать</p>
-                    <button class="schedule-btn" onclick="addParserNicheCard()">+ Добавить нишу</button>
+                <!-- Две базы + сводная. 2ГИС даёт широту (адрес и телефон почти
+                     по каждой карточке каталога, но без email и соцсетей),
+                     ScrapeGraph - глубину (email, telegram, чем компания живёт,
+                     но только у тех, у кого есть сайт). Сводная склеивает их по
+                     телефону/домену/названию - см. mergeRows() в
+                     server/routes/scrapeNiches.js. -->
+                <div class="cc-segment cust-tabs">
+                    <button class="cc-seg-btn on" data-cust-tab="parser" onclick="switchCustomersTab('parser')">🗺 2ГИС-парсер</button>
+                    <button class="cc-seg-btn" data-cust-tab="scrape" onclick="switchCustomersTab('scrape')">🤖 ScrapeGraph</button>
+                    <button class="cc-seg-btn" data-cust-tab="merged" onclick="switchCustomersTab('merged')">🧬 Сводная база</button>
                 </div>
-                <div class="parser-niches-grid" id="parser-niches-grid"></div>
+
+                <div id="cust-pane-parser" class="cust-pane">
+                    <div class="controls-row">
+                        <p style="color:var(--text-secondary); font-size:13px; margin:0;">Парсер 2ГИС по нишам — заведите карточку на каждую нишу, которую нужно собрать</p>
+                        <button class="schedule-btn" onclick="addParserNicheCard()">+ Добавить нишу</button>
+                    </div>
+                    <div class="parser-niches-grid" id="parser-niches-grid"></div>
+                </div>
+
+                <div id="cust-pane-scrape" class="cust-pane" style="display:none;">
+                    <div class="controls-row">
+                        <p style="color:var(--text-secondary); font-size:13px; margin:0;">Обход сайтов компаний моделью: локальный агент ищет сайты по нише и городу, воркер снимает с них контакты</p>
+                        <button class="schedule-btn" onclick="addScrapeNicheCard()">+ Добавить нишу</button>
+                    </div>
+                    <div id="scrape-worker-health" class="cc-hint" style="margin:0 0 12px;"></div>
+                    <div id="scrape-niches-list"></div>
+                </div>
+
+                <div id="cust-pane-merged" class="cust-pane" style="display:none;">
+                    <div class="controls-row">
+                        <select class="form-select" id="merged-category-select" style="max-width:280px; margin:0;" onchange="renderMergedBase()">
+                            <option value="">— все ниши —</option>
+                        </select>
+                        <div style="display:flex; gap:8px;">
+                            <button class="cc-secondary" onclick="renderMergedBase()">↻ Пересобрать</button>
+                            <button class="schedule-btn" onclick="downloadMergedBase()">⬇ Скачать XLSX</button>
+                        </div>
+                    </div>
+                    <div id="merged-stats"></div>
+                    <div id="merged-table"></div>
+                </div>
             </div>
         </div>
 

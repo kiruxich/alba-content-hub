@@ -145,7 +145,7 @@ function switchTab(tabName) {
     if (tabName === 'archive') renderArchiveView();
     if (tabName === 'contentplan') renderContentPlan();
     if (tabName === 'clients') renderClientsView();
-    if (tabName === 'customers') renderParserNiches();
+    if (tabName === 'customers') { renderParserNiches(); switchCustomersTab(currentCustomersTab); }
     if (tabName === 'mediaassets') renderMediaAssets();
     if (tabName === 'agentcenter') { renderAgentSettingsForm(); renderAgentCenter(); }
     if (tabName === 'systeminfo') renderPlatformStatuses();
@@ -170,10 +170,9 @@ function closeOverlay(id) {
 // вводе - через делегированный listener, после перерисовок - через
 // MutationObserver, потому что весь UI собирается из innerHTML в десятках
 // разных рендеров, и дописывать вызов в каждый из них смысла нет.
-const TEXTAREA_MIN_H = 96;
 const TEXTAREA_MAX_H = 1200;
 
-function autoGrowTextarea(el, min = TEXTAREA_MIN_H, max = TEXTAREA_MAX_H) {
+function autoGrowTextarea(el, min = 0, max = TEXTAREA_MAX_H) {
     if (!el || el.dataset.noAutogrow === '1') return;
     el.style.height = 'auto';
     const next = Math.min(Math.max(el.scrollHeight + 2, min), max);
@@ -3322,17 +3321,12 @@ function renderPostFormula() {
         </div>`;
 }
 
-// Textareas auto-grow to fit their content instead of showing an internal
-// scrollbar - the fixed-height boxes with a scroll-and-resize-handle look
-// were the main "ugly form" complaint about this board.
-function autoGrowTextarea(el) {
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-}
-
+// Карточки контент-плана растут тем же общим autoGrowTextarea (см. верх
+// файла) - здесь только обход контейнера, потому что эти textarea не
+// .form-textarea и делегированным listener'ом не ловятся.
 function growTextareasIn(container) {
     if (!container) return;
-    container.querySelectorAll('textarea').forEach(autoGrowTextarea);
+    container.querySelectorAll('textarea').forEach(el => autoGrowTextarea(el));
 }
 
 function planSwatchesHtml(block) {
@@ -4015,6 +4009,299 @@ let parserPollTimers = {};
 // every single poll tick for the common case.
 let parserNicheVersions = {};     // niche id -> array of version rows, once fetched
 let parserNicheVersionsOpen = {}; // niche id -> bool, whether the section is expanded
+
+// ЗАКАЗЧИКИ: ВТОРАЯ БАЗА (ScrapeGraphAI) И СВОДНАЯ
+// Вкладка «Заказчики» состоит из трёх панелей: старый 2ГИС-парсер, обход
+// произвольных сайтов моделью и сводная база поверх обоих. Сами данные
+// живут врозь (parser_niches / scrape_niches) и сливаются только на чтение -
+// см. mergeRows() в server/routes/scrapeNiches.js.
+let scrapeNiches = [];
+let currentCustomersTab = 'parser';
+const scrapePollTimers = {};
+
+function switchCustomersTab(tab) {
+    currentCustomersTab = tab;
+    document.querySelectorAll('#view-customers [data-cust-tab]').forEach(b => {
+        b.classList.toggle('on', b.dataset.custTab === tab);
+    });
+    ['parser', 'scrape', 'merged'].forEach(t => {
+        const pane = document.getElementById(`cust-pane-${t}`);
+        if (pane) pane.style.display = t === tab ? '' : 'none';
+    });
+    if (tab === 'scrape') renderScrapeNiches();
+    if (tab === 'merged') renderMergedBase();
+}
+
+const SCRAPE_STATUS_LABELS = {
+    idle: 'Не запущено', searching: 'Ищем сайты', queued: 'В очереди',
+    running: 'Обход идёт', done: 'Готово', error: 'Ошибка', cancelled: 'Остановлено',
+};
+const isScrapeNicheActive = s => ['searching', 'queued', 'running'].includes(s);
+
+async function renderScrapeNiches() {
+    const list = document.getElementById('scrape-niches-list');
+    if (!list) return;
+    try {
+        scrapeNiches = await api('/api/scrape-niches');
+    } catch (e) {
+        list.innerHTML = `<div class="cc-placeholder">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    drawScrapeNiches();
+    checkScrapeWorkerHealth();
+    scrapeNiches.forEach(n => { if (isScrapeNicheActive(n.status)) startScrapePolling(n.id); });
+}
+
+// Воркер и Ollama - отдельный compose-стек, который вполне может быть просто
+// выключен. Говорим об этом до того, как пользователь нажмёт «Найти» и
+// получит невнятную ошибку сети.
+async function checkScrapeWorkerHealth() {
+    const box = document.getElementById('scrape-worker-health');
+    if (!box) return;
+    try {
+        const h = await api('/api/scrape-niches/health');
+        if (!h.configured) {
+            box.innerHTML = `⚠️ scrape-worker не настроен — задайте SCRAPE_WORKER_URL и поднимите стек из <code>scrape-worker/docker-compose.yml</code>.`;
+        } else if (h.ok === false) {
+            box.innerHTML = `⚠️ scrape-worker не отвечает: ${escapeHtml(h.error || '')}`;
+        } else {
+            box.innerHTML = `✅ Воркер на связи, модель: <b>${escapeHtml(h.model || '—')}</b>`;
+        }
+    } catch (e) {
+        box.innerHTML = '';
+    }
+}
+
+function drawScrapeNiches() {
+    const list = document.getElementById('scrape-niches-list');
+    if (!list) return;
+    if (scrapeNiches.length === 0) {
+        list.innerHTML = `<div class="cc-placeholder cc-placeholder-hero">
+            <div class="cc-placeholder-icon">🤖</div>
+            <b>Вторая база — по сайтам компаний</b>
+            <p>Локальный агент найдёт сайты по нише и городу, воркер обойдёт их и снимет телефоны, email и соцсети. То, чего нет в 2ГИС.</p>
+            <button class="cc-primary cc-primary-inline" onclick="addScrapeNicheCard()">+ Добавить нишу</button>
+        </div>`;
+        return;
+    }
+    list.innerHTML = scrapeNiches.map(renderScrapeNicheCard).join('');
+}
+
+function renderScrapeNicheCard(n) {
+    const active = isScrapeNicheActive(n.status);
+    const stats = n.stats || {};
+    const done = stats.sites_done || 0;
+    const total = stats.sites_total || 0;
+    return `
+    <div class="cc-card">
+        <div class="cc-head">
+            <div class="cc-head-main">
+                <div class="cc-head-title">${escapeHtml(n.category)}</div>
+                <div class="cc-head-meta">
+                    <span class="parser-niche-status ${n.status}">${SCRAPE_STATUS_LABELS[n.status] || n.status}</span>
+                    ${n.city ? `<span class="cc-pill">${escapeHtml(n.city)}</span>` : ''}
+                    ${n.results.length ? `<span class="cc-pill cc-pill-done">Собрано: ${n.results.length}</span>` : ''}
+                    ${total ? `<span class="cc-pill">${done}/${total} сайтов</span>` : ''}
+                </div>
+            </div>
+            <button class="delete-btn" onclick="deleteScrapeNiche('${n.id}')" title="Удалить нишу">🗑</button>
+        </div>
+        <div class="cc-body">
+            <div class="cc-topic-row">
+                <div style="flex:1 1 200px; min-width:0;">
+                    <label class="cc-label">Ниша</label>
+                    <input type="text" class="form-input cc-input" value="${escapeHtml(n.category)}" ${active ? 'disabled' : ''}
+                        onchange="updateScrapeNiche('${n.id}', 'category', this.value)">
+                </div>
+                <div style="flex:1 1 160px; min-width:0;">
+                    <label class="cc-label">Город</label>
+                    <input type="text" class="form-input cc-input" value="${escapeHtml(n.city || '')}" placeholder="Казань" ${active ? 'disabled' : ''}
+                        onchange="updateScrapeNiche('${n.id}', 'city', this.value)">
+                </div>
+            </div>
+
+            ${n.log ? `<pre class="scrape-log">${escapeHtml(n.log)}</pre>` : ''}
+
+            ${n.results.length ? `
+                <label class="cc-label">Найденные организации</label>
+                <div class="scrape-results">
+                    ${n.results.slice(0, 50).map(r => `
+                        <div class="scrape-row">
+                            <div class="scrape-row-main">
+                                <b>${escapeHtml(r.name || '—')}</b>
+                                ${r.description ? `<span class="scrape-row-desc">${escapeHtml(r.description)}</span>` : ''}
+                            </div>
+                            <div class="scrape-row-contacts">
+                                ${r.phone ? `<span>📞 ${escapeHtml(r.phone)}</span>` : ''}
+                                ${r.email ? `<span>✉️ ${escapeHtml(r.email)}</span>` : ''}
+                                ${r.telegram ? `<span>✈️ ${escapeHtml(r.telegram)}</span>` : ''}
+                                ${r.site ? `<span>🌐 ${escapeHtml(r.site)}</span>` : ''}
+                            </div>
+                        </div>`).join('')}
+                </div>
+                ${n.results.length > 50 ? `<p class="cc-hint">Показаны первые 50 из ${n.results.length} — остальные в выгрузке.</p>` : ''}
+            ` : ''}
+
+            <div class="cc-actions">
+                ${active
+                    ? `<button class="cc-secondary cc-danger" onclick="cancelScrapeNiche('${n.id}')">⏹ Остановить</button>`
+                    : `<button class="cc-primary cc-primary-inline" onclick="runScrapeNiche('${n.id}')">${n.results.length ? '🔁 Дособрать новые' : '🔎 Найти и собрать'}</button>`}
+                ${n.results.length ? `<button class="cc-secondary" onclick="window.location='/api/scrape-niches/${n.id}/download'">⬇ XLSX</button>` : ''}
+            </div>
+        </div>
+    </div>`;
+}
+
+async function addScrapeNicheCard() {
+    const category = prompt('Название ниши (например: кальянные, барбершопы, стоматологии)');
+    if (!category || !category.trim()) return;
+    const city = prompt('Город (можно оставить пустым)') || '';
+    try {
+        await api('/api/scrape-niches', { method: 'POST', body: JSON.stringify({ category: category.trim(), city: city.trim() }) });
+        await renderScrapeNiches();
+        showToast('Ниша добавлена');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function updateScrapeNiche(id, field, value) {
+    try {
+        await api(`/api/scrape-niches/${id}`, { method: 'PUT', body: JSON.stringify({ [field]: value }) });
+        const niche = scrapeNiches.find(n => n.id === id);
+        if (niche) niche[field] = value;
+    } catch (e) {
+        showToast('Не удалось сохранить: ' + e.message);
+    }
+}
+
+async function deleteScrapeNiche(id) {
+    if (!confirm('Удалить нишу вместе с собранными данными?')) return;
+    try {
+        await api(`/api/scrape-niches/${id}`, { method: 'DELETE' });
+        stopScrapePolling(id);
+        await renderScrapeNiches();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+async function runScrapeNiche(id) {
+    try {
+        await api(`/api/scrape-niches/${id}/run`, { method: 'POST' });
+        showToast('Поиск сайтов запущен');
+        await renderScrapeNiches();
+        startScrapePolling(id);
+    } catch (e) {
+        showToast('Не удалось запустить: ' + e.message);
+        await renderScrapeNiches();
+    }
+}
+
+async function cancelScrapeNiche(id) {
+    try {
+        await api(`/api/scrape-niches/${id}/cancel`, { method: 'POST' });
+        stopScrapePolling(id);
+        await renderScrapeNiches();
+    } catch (e) {
+        showToast('Не удалось остановить: ' + e.message);
+    }
+}
+
+// Поллинг статуса - тот же подход, что у 2ГИС-ниш: интервал на карточку,
+// сам себя гасит, когда job дошёл до финального состояния.
+function startScrapePolling(id) {
+    if (scrapePollTimers[id]) return;
+    scrapePollTimers[id] = setInterval(async () => {
+        try {
+            const updated = await api(`/api/scrape-niches/${id}/status`);
+            scrapeNiches = scrapeNiches.map(n => (n.id === id ? updated : n));
+            if (currentCustomersTab === 'scrape') drawScrapeNiches();
+            if (!isScrapeNicheActive(updated.status)) {
+                stopScrapePolling(id);
+                showToast(updated.status === 'done' ? `«${updated.category}»: собрано ${updated.results.length}` : `«${updated.category}»: ${SCRAPE_STATUS_LABELS[updated.status] || updated.status}`);
+            }
+        } catch (_) {
+            // Сеть моргнула - следующий тик попробует снова, гасить нечего.
+        }
+    }, 5000);
+}
+
+function stopScrapePolling(id) {
+    if (scrapePollTimers[id]) {
+        clearInterval(scrapePollTimers[id]);
+        delete scrapePollTimers[id];
+    }
+}
+
+// СВОДНАЯ БАЗА
+const SOURCE_LABELS = { '2gis': '2ГИС', scrape: 'ScrapeGraph' };
+
+async function renderMergedBase() {
+    const statsBox = document.getElementById('merged-stats');
+    const tableBox = document.getElementById('merged-table');
+    if (!tableBox) return;
+    const category = document.getElementById('merged-category-select')?.value || '';
+    tableBox.innerHTML = `<div class="cc-placeholder">Собираем сводную базу…</div>`;
+
+    let data;
+    try {
+        data = await api(`/api/scrape-niches/merged${category ? `?category=${encodeURIComponent(category)}` : ''}`);
+    } catch (e) {
+        tableBox.innerHTML = `<div class="cc-placeholder">Не удалось собрать: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+
+    const select = document.getElementById('merged-category-select');
+    if (select) {
+        select.innerHTML = `<option value="">— все ниши —</option>` +
+            data.categories.map(c => `<option value="${escapeHtml(c)}" ${c === category ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    }
+
+    const s = data.stats;
+    statsBox.innerHTML = `
+        <div class="merged-stats">
+            <div class="merged-stat"><b>${s.total}</b><span>всего организаций</span></div>
+            <div class="merged-stat"><b class="ok">${s.both}</b><span>в обеих базах</span></div>
+            <div class="merged-stat"><b>${s.onlyParser}</b><span>только 2ГИС</span></div>
+            <div class="merged-stat"><b>${s.onlyScrape}</b><span>только ScrapeGraph</span></div>
+            <div class="merged-stat"><b>${s.withEmail}</b><span>с email</span></div>
+        </div>`;
+
+    if (!data.rows.length) {
+        tableBox.innerHTML = `<div class="cc-placeholder">Пусто. Соберите хотя бы одну нишу в 2ГИС-парсере или в ScrapeGraph — сводная строится из них.</div>`;
+        return;
+    }
+
+    tableBox.innerHTML = `
+        <div class="merged-table-wrap">
+            <table class="merged-table">
+                <thead><tr>
+                    <th>Название</th><th>Ниша</th><th>Адрес</th><th>Телефон</th><th>Сайт</th><th>Email</th><th>Соцсети</th><th>Источник</th>
+                </tr></thead>
+                <tbody>
+                    ${data.rows.map(r => `
+                        <tr>
+                            <td><b>${escapeHtml(r.name || '—')}</b></td>
+                            <td>${escapeHtml(r.category || '')}</td>
+                            <td>${escapeHtml(r.address || '')}</td>
+                            <td>${escapeHtml(r.phone || '')}</td>
+                            <td>${r.site ? `<a href="${escapeHtml(r.site)}" target="_blank" rel="noopener">${escapeHtml(r.site.replace(/^https?:\/\/(www\.)?/, ''))}</a>` : ''}</td>
+                            <td>${escapeHtml(r.email || '')}</td>
+                            <td>${[r.telegram, r.vk, r.instagram].filter(Boolean).map(escapeHtml).join('<br>')}</td>
+                            <td>${r.sources.length > 1
+                                ? `<span class="cc-pill cc-pill-done">оба</span>`
+                                : `<span class="cc-pill">${SOURCE_LABELS[r.sources[0]] || r.sources[0]}</span>`}</td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+}
+
+function downloadMergedBase() {
+    const category = document.getElementById('merged-category-select')?.value || '';
+    window.location = `/api/scrape-niches/merged/download${category ? `?category=${encodeURIComponent(category)}` : ''}`;
+}
 
 async function renderParserNiches() {
     const container = document.getElementById('parser-niches-grid');

@@ -485,6 +485,27 @@ CREATE TABLE IF NOT EXISTS parser_niche_file_versions (
 );
 CREATE INDEX IF NOT EXISTS idx_parser_niche_file_versions_niche_id ON parser_niche_file_versions(niche_id);
 
+-- Вторая база заказчиков: ниши для ScrapeGraphAI-воркера (см.
+-- scrape-worker/ и server/routes/scrapeNiches.js). Форма повторяет
+-- parser_niches, но с двумя отличиями: город здесь - просто строка для
+-- поискового запроса (никакого 2ГИС-slug и bounding box не нужно), а
+-- результаты лежат прямо в results_json, а не только в XLSX. Второе -
+-- ради сводной базы: чтобы слить обе базы, строки нужны как данные, а
+-- парсить обратно свой же выгруженный файл было бы нелепо.
+CREATE TABLE IF NOT EXISTS scrape_niches (
+    id TEXT PRIMARY KEY,
+    category TEXT NOT NULL,
+    city TEXT DEFAULT '',
+    status TEXT DEFAULT 'idle',
+    log TEXT DEFAULT '',
+    stats_json TEXT,
+    sites_json TEXT,
+    results_json TEXT,
+    job_id TEXT,
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
 -- One row per Shorts-assembly request handed to video-worker (Phase 2) - the
 -- same "hub DB row tracks a remote worker's job_id" shape as parser_niches
 -- above, just without the persistent-card lifecycle (this is a one-shot job,

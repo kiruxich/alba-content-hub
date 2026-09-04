@@ -582,6 +582,51 @@ Respond with a JSON object:
     }
 });
 
+// task: find-client-sites
+// body: { category: string, city?: string, excludeDomains?: string[], limit?: number }
+// Подбирает сайты компаний ниши в городе - это шаг «поиск» для второй базы
+// заказчиков (scrape-worker, ScrapeGraphAI). Сам обход сайтов и извлечение
+// контактов делает воркер на локальной Ollama; сюда вынесен только поиск,
+// потому что WebSearch у этого контейнера уже есть, а заводить второй
+// поисковый бэкенд с собственными ключами ради этого незачем.
+// Возвращает только URL - никаких контактов: выдумать телефон модель может,
+// а проверить его здесь нечем, поэтому контакты берутся исключительно с
+// живой страницы.
+app.post('/run/find-client-sites', requireToken, async (req, res) => {
+    const category = (req.body?.category || '').trim();
+    const city = (req.body?.city || '').trim();
+    const excludeDomains = Array.isArray(req.body?.excludeDomains)
+        ? req.body.excludeDomains.filter(d => typeof d === 'string' && d.trim()).slice(0, 100)
+        : [];
+    const limit = Math.min(Math.max(Number(req.body?.limit) || 30, 1), 60);
+    if (!category) return res.status(400).json({ error: 'category is required' });
+
+    const prompt = `Найди сайты реальных компаний ниши «${category}»${city ? ` в городе ${city}` : ''}.
+
+Используй веб-поиск. Нужны официальные сайты самих компаний, а НЕ агрегаторы, каталоги и справочники (2gis, yandex, zoon, avito, flamp, отзовики, маркетплейсы, соцсети, hh) - их отбрасывай. Только домены, которые принадлежат конкретной компании.
+
+Не выдумывай адреса сайтов: включай только те, которые реально встретились в результатах поиска. Лучше вернуть 8 проверенных, чем 30 придуманных.
+${excludeDomains.length ? `\nЭти домены уже собраны, НЕ предлагай их снова:\n${excludeDomains.map(d => `- ${d}`).join('\n')}\n` : ''}
+Верни до ${limit} штук в виде JSON-массива объектов:
+[{ "name": "название компании", "url": "https://...", "why": "коротко по-русски, почему это подходящая компания ниши" }]`;
+
+    try {
+        const result = await runClaudeForJson(prompt);
+        if (!Array.isArray(result)) throw new Error('expected a JSON array');
+        const sites = result
+            .filter(r => r && typeof r.url === 'string' && /^https?:\/\//i.test(r.url.trim()))
+            .map(r => ({
+                name: typeof r.name === 'string' ? r.name.trim() : '',
+                url: r.url.trim(),
+                why: typeof r.why === 'string' ? r.why.trim() : '',
+            }))
+            .slice(0, limit);
+        res.json({ sites });
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`local-claude-agent listening on :${PORT}`);
     if (!AGENT_TOKEN) console.warn('WARNING: AGENT_TOKEN is not set - every request will be rejected with 500 until it is.');
