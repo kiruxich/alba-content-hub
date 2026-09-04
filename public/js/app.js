@@ -340,51 +340,69 @@ async function renderBankView() {
         const statusMap = { 'idea': '💡 Идея', 'in_progress': '⚙️ В работе', 'ready': '✅ Готово', 'published': '🚀 Опубликовано' };
         const funnelColor = idea.funnel === 'TOFU' ? '#30d158' : idea.funnel === 'MOFU' ? '#ff9f0a' : '#ff453a';
 
+        // Текст поста рендерился без escapeHtml и с потерей переносов:
+        // сценарий Reels («[Кадр 1 — …]\n Закадровый текст: …») схлопывался
+        // в сплошную стену, а любой < в тексте ломал вёрстку карточки.
+        // Теперь переносы сохраняются, длинный текст сворачивается, а
+        // разметка экранируется.
+        const isLong = charCount > 400;
+        const activeProducts = productsData.filter(p => idea.targetGroups && idea.targetGroups.includes(p.id));
+
         html += `
         <div class="idea-card" draggable="true" ondragstart="handleDragStart(event, '${idea.id}')">
             <div class="idea-header">
-                <div class="idea-title">${idea.title}</div>
-                <div>
-                    <span class="funnel-badge" style="background:${funnelColor}22; color:${funnelColor};">${idea.funnel || 'TOFU'}</span>
-                    <span class="format-tag">${idea.format || 'TG Пост'}</span>
+                <div class="idea-title">${escapeHtml(idea.title)}</div>
+                <div class="idea-badges">
+                    <span class="funnel-badge" style="background:${funnelColor}22; color:${funnelColor};">${escapeHtml(idea.funnel || 'TOFU')}</span>
+                    <span class="format-tag">${escapeHtml(normalizeIdeaFormat(idea.format))}</span>
                 </div>
             </div>
-            ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
-            <div class="idea-cta">CTA: ${idea.cta || '—'}</div>
+
+            ${idea.desc ? `
+                <div class="idea-desc-text ${isLong ? 'clamped' : ''}" id="idea-desc-${idea.id}">${escapeHtml(idea.desc)}</div>
+                ${isLong ? `<button class="cc-link idea-desc-toggle" onclick="toggleIdeaText('${idea.id}', this)">Показать полностью</button>` : ''}
+            ` : ''}
+            ${idea.cta ? `<div class="idea-cta">${escapeHtml(idea.cta)}</div>` : ''}
 
             <div class="meta-stats">
                 <span>📏 ${charCount} симв.</span>
                 <span>⏱ ~${readTime} мин.</span>
-                <span>Статус: <strong>${statusMap[idea.status || 'idea']}</strong></span>
+                <span>${statusMap[idea.status || 'idea']}</span>
+                ${activeProducts.length ? `<span>🏷 ${activeProducts.map(p => escapeHtml(p.title)).join(', ')}</span>` : ''}
             </div>
 
-            <div style="margin-top:8px; padding-top:8px; border-top:0.5px solid var(--separator);">
-                <span style="font-size:11px; color:var(--text-secondary); font-weight:600; text-transform:uppercase;">Продукты:</span>
-                <div>`;
+            <details class="idea-products">
+                <summary>Продукты${activeProducts.length ? ` · ${activeProducts.length}` : ''}</summary>
+                <div class="idea-products-chips">
+                    ${productsData.map(p => {
+                        const on = idea.targetGroups && idea.targetGroups.includes(p.id);
+                        return `<button class="group-chip ${on ? 'active' : ''}" onclick="toggleGroupForIdea('${idea.id}', '${p.id}')">${on ? '✓ ' : ''}${escapeHtml(p.title)}</button>`;
+                    }).join('')}
+                </div>
+            </details>
 
-        productsData.forEach(p => {
-            const isFavorited = idea.targetGroups && idea.targetGroups.includes(p.id);
-            html += `
-                <button class="group-chip ${isFavorited ? 'active' : ''}" onclick="toggleGroupForIdea('${idea.id}', '${p.id}')">
-                    ${isFavorited ? '✓ ' : ''}${p.title}
-                </button>`;
-        });
-
-        html += `</div>
-            </div>
-
-            <div class="action-btn-row">
-                <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
-                ${(idea.status === 'ready' || idea.status === 'done') ? `<button class="tg-btn" style="background:var(--accent-purple);" ${idea.generatingVoiceover ? 'disabled' : ''} onclick="generateIdeaVoiceover('${idea.id}')">${idea.generatingVoiceover ? '⏳ Озвучиваем...' : (idea.voiceoverAssetId ? '🎙 Переозвучить' : '🎙 Сгенерировать озвучку')}</button>` : ''}
-                <button class="tg-btn" style="background:var(--accent-blue);" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
-                <button class="schedule-btn" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
-                <button class="delete-btn" onclick="deleteIdea('${idea.id}')">🗑</button>
+            <div class="cc-actions idea-actions">
+                <button class="cc-secondary" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
+                <button class="cc-secondary" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
+                ${(idea.status === 'ready' || idea.status === 'done')
+                    ? `<button class="cc-secondary" ${idea.generatingVoiceover ? 'disabled' : ''} onclick="generateIdeaVoiceover('${idea.id}')">${idea.generatingVoiceover ? '⏳ Озвучиваем…' : (idea.voiceoverAssetId ? '🎙 Переозвучить' : '🎙 Озвучка')}</button>`
+                    : ''}
+                <button class="cc-secondary cc-danger" onclick="deleteIdea('${idea.id}')">🗑</button>
+                <div class="cc-actions-spacer"></div>
+                <button class="cc-primary cc-primary-inline" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
             </div>
             <div id="idea-gen-status-${idea.id}" class="generation-status" style="display:none;"></div>
         </div>`;
     });
 
     container.innerHTML = html;
+}
+
+function toggleIdeaText(id, btn) {
+    const el = document.getElementById(`idea-desc-${id}`);
+    if (!el) return;
+    el.classList.toggle('clamped');
+    btn.textContent = el.classList.contains('clamped') ? 'Показать полностью' : 'Свернуть';
 }
 
 // СОЗДАНИЕ КОНТЕНТА - генерация с нуля (до 4 форматов из одной темы), затем
@@ -4387,49 +4405,72 @@ function renderParserNicheDetailContent(id) {
         return;
     }
 
+    // Подписи у каждого поля, действия сгруппированы по смыслу (запуск /
+    // работа с файлом / удаление), а не свалены в один ряд одинаковых
+    // кнопок - раньше «Обновить парсер», «Загрузить Excel» и «Удалить»
+    // стояли рядом и весили визуально одинаково.
+    const active = isParserNicheActive(n.status);
     body.innerHTML = `
-        <div class="parser-niche-head">
-            <input type="text" class="form-input" style="font-weight:700;" value="${escapeHtml(n.category)}"
-                placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
-            <input type="text" class="form-input" style="margin:0; max-width:180px;" value="${escapeHtml(n.city || 'Москва')}"
-                placeholder="Город (любой)" title="Город для поиска в 2ГИС — определяется автоматически при первом запуске для этого города"
-                onblur="saveParserNicheField('${n.id}','city',this.value)">
+        <div class="pn-grid">
+            <div>
+                <label class="cc-label" for="pn-category-${n.id}">Ниша</label>
+                <input type="text" class="form-input cc-input" id="pn-category-${n.id}" value="${escapeHtml(n.category)}"
+                    placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
+            </div>
+            <div>
+                <label class="cc-label" for="pn-city-${n.id}">Город</label>
+                <input type="text" class="form-input cc-input" id="pn-city-${n.id}" value="${escapeHtml(n.city || 'Москва')}"
+                    placeholder="Москва" onblur="saveParserNicheField('${n.id}','city',this.value)">
+                <p class="cc-hint">Определяется автоматически при первом запуске для этого города.</p>
+            </div>
         </div>
-        <div style="display:flex; gap:8px; align-items:flex-start;">
-            <textarea class="form-textarea" style="margin-bottom:0; min-height:52px;" id="parser-desc-${n.id}"
-                placeholder="Ключевые слова/синонимы для 2ГИС через запятую (первые 8 уникальных слов реально используются в поиске — не пишите связным текстом)"
-                onblur="saveParserNicheField('${n.id}','description',this.value)">${escapeHtml(n.description)}</textarea>
-            <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨</button>
-        </div>
-        <div id="parser-desc-status-${n.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-top:2px;"></div>
 
-        <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log || '')}</div>
-
-        <div class="parser-niche-files">
-            ${n.files.raw ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','raw')">📊 raw.xlsx</div>` : ''}
-            ${n.files.dedup ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','dedup')">✨ dedup.xlsx</div>` : ''}
-            ${n.files.archive ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','archive')">🗄 archive.zip</div>` : ''}
+        <div class="cc-label-row">
+            <label class="cc-label" for="parser-desc-${n.id}">Ключевые слова для 2ГИС</label>
+            <button class="cc-link" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨ Подобрать</button>
         </div>
+        <textarea class="form-textarea cc-input" id="parser-desc-${n.id}"
+            placeholder="кальянная, лаунж, hookah, кальян-бар"
+            onblur="saveParserNicheField('${n.id}','description',this.value)">${escapeHtml(n.description)}</textarea>
+        <p class="cc-hint">Через запятую. В поиск реально уходят только первые 8 уникальных слов — списком, не связным текстом.</p>
+        <div id="parser-desc-status-${n.id}" class="cc-hint" style="min-height:14px;"></div>
+
+        ${n.log ? `<label class="cc-label">Лог парсера</label>
+        <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log)}</div>` : ''}
+
+        ${(n.files.raw || n.files.dedup || n.files.archive) ? `
+            <label class="cc-label">Выгрузки</label>
+            <div class="parser-niche-files">
+                ${n.files.raw ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','raw')">📊 raw.xlsx</div>` : ''}
+                ${n.files.dedup ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','dedup')">✨ dedup.xlsx</div>` : ''}
+                ${n.files.archive ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','archive')">🗄 archive.zip</div>` : ''}
+            </div>` : ''}
 
         <div class="parser-niche-versions">
             <button type="button" class="parser-niche-versions-toggle" onclick="toggleParserNicheVersions('${n.id}')">
-                📜 История версий ${parserNicheVersionsOpen[n.id] ? '▴' : '▾'}
+                ${parserNicheVersionsOpen[n.id] ? '▾' : '▸'} История версий
             </button>
             ${parserNicheVersionsOpen[n.id] ? renderParserNicheVersionsList(n.id) : ''}
         </div>
 
-        <div class="parser-niche-actions">
-            <button class="schedule-btn" onclick="runParserNiche('${n.id}')" ${isParserNicheActive(n.status) ? 'disabled' : ''}>▶ Обновить парсер</button>
-            ${isParserNicheActive(n.status) ? `<button class="delete-btn" onclick="cancelParserNiche('${n.id}')">⏹ Стоп</button>` : ''}
-            ${n.status === 'captcha' ? `<a class="edit-btn" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
-            <label class="edit-btn parser-upload-btn" ${isParserNicheActive(n.status) ? 'style="opacity:.5; pointer-events:none;"' : ''}>
-                📤 Загрузить Excel
-                <input type="file" accept=".xlsx" style="display:none;" onchange="uploadParserNicheFile('${n.id}', this)">
-            </label>
-            ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNiche('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
-            ${n.canDedupeUpload && !n.files.dedup ? `<button class="edit-btn" onclick="dedupeParserNicheUpload('${n.id}')">🧹 Удалить дубликаты</button>` : ''}
-            ${n.files.raw && n.jobId ? `<button class="edit-btn" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
-            <button class="delete-btn" onclick="removeParserNiche('${n.id}')">Удалить</button>
+        <div class="pn-actions">
+            <div class="pn-actions-group">
+                ${active
+                    ? `<button class="cc-secondary cc-danger" onclick="cancelParserNiche('${n.id}')">⏹ Остановить</button>`
+                    : `<button class="cc-primary cc-primary-inline" onclick="runParserNiche('${n.id}')">▶ Обновить парсер</button>`}
+                ${n.status === 'captcha' ? `<a class="cc-secondary" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
+            </div>
+            <div class="pn-actions-group">
+                <label class="cc-secondary parser-upload-btn" ${active ? 'style="opacity:.5; pointer-events:none;"' : ''}>
+                    📤 Загрузить Excel
+                    <input type="file" accept=".xlsx" style="display:none;" onchange="uploadParserNicheFile('${n.id}', this)">
+                </label>
+                ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="cc-secondary" onclick="dedupeParserNiche('${n.id}')">🧹 Убрать дубли</button>` : ''}
+                ${n.canDedupeUpload && !n.files.dedup ? `<button class="cc-secondary" onclick="dedupeParserNicheUpload('${n.id}')">🧹 Убрать дубли</button>` : ''}
+                ${n.files.raw && n.jobId ? `<button class="cc-secondary" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
+            </div>
+            <div class="pn-actions-spacer"></div>
+            <button class="cc-secondary cc-danger" onclick="removeParserNiche('${n.id}')">🗑 Удалить нишу</button>
         </div>
     `;
 

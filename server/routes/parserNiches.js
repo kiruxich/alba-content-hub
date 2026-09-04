@@ -127,6 +127,35 @@ function extractResultCount(stats) {
     return null;
 }
 
+// Имена загруженных файлов, сохранённые ДО того, как аплоад начал
+// перекодировать multer'овский latin1 в utf8 (см. originalName ниже), лежат
+// в базе кракозябрами: «ÐºÐ°Ð»ÑÑÐ½Ð½ÑÐµ.xlsx» вместо «кальянные.xlsx».
+// Чиним на чтении, а не миграцией: операция идемпотентна, а строк с битым
+// именем немного и живут они в трёх разных местах (log, raw_upload_name,
+// parser_niche_file_versions.original_filename).
+//
+// Чинить строку целиком нельзя: в логе испорчено только имя файла, а текст
+// вокруг («Загружен файл … 170 строк») - нормальный UTF-8, и общий
+// latin1-декод превратил бы его в U+FFFD. Поэтому ищем и перекодируем ТОЛЬКО
+// участки, которые выглядят как UTF-8-последовательности, прочитанные
+// побайтово: ведущий байт C0-EF плюс его продолжения 80-BF. Одиночные
+// символы вроде «кавычек» (U+00AB) под шаблон не попадают - у них нет
+// ведущего байта, - поэтому не ломаются.
+const MOJIBAKE_RUN = /(?:[\u00C0-\u00DF][\u0080-\u00BF]|[\u00E0-\u00EF][\u0080-\u00BF]{2})+/g;
+
+function fixMojibake(text) {
+    if (typeof text !== 'string' || !text) return text;
+    return text.replace(MOJIBAKE_RUN, (run) => {
+        try {
+            const repaired = Buffer.from(run, 'latin1').toString('utf8');
+            // Берём результат, только если он и правда стал кириллицей и не
+            // рассыпался в U+FFFD - иначе участок был испорчен иначе.
+            if (!repaired.includes('\uFFFD') && /[а-яА-ЯёЁ]/.test(repaired)) return repaired;
+        } catch (_) {}
+        return run;
+    });
+}
+
 function serialize(row) {
     return {
         id: row.id,
@@ -134,7 +163,7 @@ function serialize(row) {
         description: row.description || '',
         city: row.city || 'Москва',
         status: row.status,
-        log: row.log || '',
+        log: fixMojibake(row.log || ''),
         stats: row.stats_json ? JSON.parse(row.stats_json) : null,
         files: {
             raw: Boolean(row.raw_file),
@@ -473,7 +502,7 @@ router.get('/:id/download/:kind', async (req, res) => {
     // serve it directly instead of going through fetchParserFile below.
     if (req.params.kind === 'raw' && row.raw_upload_data) {
         const buf = Buffer.from(row.raw_upload_data, 'base64');
-        const filename = (row.raw_upload_name || 'raw.xlsx').replace(/"/g, '');
+        const filename = fixMojibake(row.raw_upload_name || 'raw.xlsx').replace(/"/g, '');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         return res.send(buf);
@@ -511,7 +540,7 @@ router.get('/:id/versions', async (req, res) => {
     res.json(result.rows.map(r => ({
         id: r.id,
         kind: r.kind,
-        filename: r.original_filename || '',
+        filename: fixMojibake(r.original_filename || ''),
         createdAt: r.created_at,
     })));
 });
@@ -529,7 +558,7 @@ router.get('/:id/versions/:versionId/download', async (req, res) => {
     try {
         const s3Res = await fetch(publicUrlForKey(version.s3_key));
         if (!s3Res.ok) throw new Error(`${s3Res.status} ${s3Res.statusText}`);
-        const filename = (version.original_filename || `${version.kind}.bin`).replace(/"/g, '');
+        const filename = fixMojibake(version.original_filename || `${version.kind}.bin`).replace(/"/g, '');
         res.setHeader('Content-Type', s3Res.headers.get('content-type') || 'application/octet-stream');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         const buf = Buffer.from(await s3Res.arrayBuffer());

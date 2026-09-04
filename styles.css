@@ -869,3 +869,84 @@ html, body {
     .cust-tabs { width: 100%; justify-content: center; }
     .merged-stat { flex: 1 1 45%; }
 }
+
+/* ============================================================
+   ДОРАБОТКИ ВЁРСТКИ: карточка ниши, карточка идеи, проверка сайта
+   ============================================================ */
+
+/* КАРТОЧКА НИШИ ПАРСЕРА */
+.pn-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.pn-grid > div > .cc-label:first-child { margin-top: 0; }
+.pn-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+.pn-actions-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.pn-actions-spacer { flex: 1 1 auto; }
+/* Загрузка файла - это <label> с input внутри, кнопочные стили ему нужны, но
+   flex-выравнивание содержимого <label> не наследует. */
+.parser-upload-btn { display: inline-flex; align-items: center; cursor: pointer; }
+
+/* КАРТОЧКА ИДЕИ В ХРАНИЛИЩЕ */
+.idea-badges { display: flex; gap: 6px; flex-shrink: 0; }
+/* Сценарии Reels приходят с реальными переносами строк - без pre-wrap они
+   схлопывались в сплошную стену текста. */
+.idea-desc-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.idea-desc-text.clamped {
+    display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
+    overflow: hidden; line-clamp: 6;
+}
+.idea-desc-toggle { display: block; margin: -2px 0 10px; }
+.idea-cta { position: relative; padding-left: 22px; font-style: normal; }
+.idea-cta:before { content: '👉'; position: absolute; left: 0; }
+
+.idea-card .meta-stats { display: flex; gap: 14px; flex-wrap: wrap; }
+
+/* Семь чипов продуктов на каждой карточке - шум; активные и так видны
+   строкой выше в meta-stats, а раскрывать нужно только чтобы поменять. */
+.idea-products { margin-top: 10px; }
+.idea-products > summary {
+    cursor: pointer; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--text-secondary); list-style: none; padding: 4px 0;
+}
+.idea-products > summary::-webkit-details-marker { display: none; }
+.idea-products > summary:before { content: '▸ '; }
+.idea-products[open] > summary:before { content: '▾ '; }
+.idea-products > summary:hover { color: var(--text-primary); }
+.idea-products-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+.idea-actions { margin-top: 14px; padding-top: 14px; }
+
+/* ПРОВЕРКА САЙТА */
+.uc-form { max-width: 980px; }
+.uc-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.uc-field { flex: 0 1 180px; min-width: 0; }
+.uc-field-grow { flex: 1 1 320px; }
+.uc-field .cc-label { margin-top: 0; }
+.uc-field .cc-hint { margin-top: 6px; }
+.uc-submit { flex: 0 0 auto; height: 44px; }
+
+.uc-advanced { margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 14px; }
+.uc-advanced > summary {
+    cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    list-style: none; padding: 4px 0;
+}
+.uc-advanced > summary::-webkit-details-marker { display: none; }
+.uc-advanced > summary:before { content: '▸ '; }
+.uc-advanced[open] > summary:before { content: '▾ '; }
+.uc-advanced > summary:hover { color: var(--text-primary); }
+.uc-advanced .uc-row { margin-top: 12px; }
+
+@media (max-width: 767px) {
+    /* Общее правило .cc-actions растягивает каждую кнопку на всю ширину -
+       для карточки идеи это четыре полноэкранные полосы подряд. Здесь
+       вторичные действия ставим по две в ряд, полную ширину оставляем
+       только «Опубликовать». */
+    .idea-actions { flex-direction: row; }
+    .idea-actions .cc-secondary { flex: 1 1 calc(50% - 4px); width: auto; }
+    .idea-actions .cc-primary-inline { flex: 1 1 100%; }
+
+    .pn-grid { grid-template-columns: minmax(0, 1fr); }
+    .pn-actions, .pn-actions-group { flex-direction: column; align-items: stretch; }
+    .pn-actions-spacer { display: none; }
+    .pn-actions button, .pn-actions .parser-upload-btn { width: 100%; justify-content: center; text-align: center; }
+    .uc-field, .uc-field-grow { flex: 1 1 100%; }
+    .uc-submit { width: 100%; }
+}
