@@ -128,7 +128,7 @@
                         <span class="cc-flow-arrow">→</span>
                         <span class="cc-flow-step"><b>4</b>Хранилище</span>
                     </div>
-                    <button class="cc-primary cc-primary-inline" onclick="addContentDraft()">+ Новая тема</button>
+                    <button class="cc-primary cc-primary-inline" id="cc-add-draft-btn" onclick="addContentDraft()">+ Новая тема</button>
                 </div>
                 <div id="content-drafts-list"></div>
 
@@ -639,23 +639,23 @@
                 <div class="p-section-title">ПУБЛИКАЦИЯ (ВНЕШНИЕ API)</div>
                 <div class="parser-niches-grid">
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>VK</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <div class="parser-niche-head"><b>VK</b><span class="parser-niche-status captcha" id="ps-status-vk">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">wall.post, один community-токен на всё (как у Telegram — не два аккаунта). Публикует в любое из добавленных сообществ (vk_groups) — сообщество выбирается в модалке публикации/планирования, с подсказкой по умолчанию исходя из языка поста. Ждёт токена в настройках.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Instagram</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <div class="parser-niche-head"><b>Instagram</b><span class="parser-niche-status captcha" id="ps-status-instagram">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Graph API, нужен Business-аккаунт. Два отдельных аккаунта — RU и EN, аккаунт выбирается автоматически по языку публикуемого поста, без ручного пикера. Оба ждут токена в настройках (переключатель RU/EN в форме).</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>YouTube</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <div class="parser-niche-head"><b>YouTube</b><span class="parser-niche-status captcha" id="ps-status-youtube">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Data API v3, resumable upload. Два отдельных OAuth-аккаунта — RU и EN, выбор автоматический по языку поста. register-youtube-oauth.mjs теперь принимает --lang ru|en, нужно прогнать дважды по одному на каждый аккаунт.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Threads</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <div class="parser-niche-head"><b>Threads</b><span class="parser-niche-status captcha" id="ps-status-threads">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Отдельный API Meta (graph.threads.net), не тот же что у Instagram. Два отдельных аккаунта — RU и EN, выбор автоматический по языку поста. Ждёт App Review от Meta для обоих.</p>
                     </div>
                     <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Pinterest</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                        <div class="parser-niche-head"><b>Pinterest</b><span class="parser-niche-status captcha" id="ps-status-pinterest">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">API v5, каждый пин обязательно на доску (board_id) — доска выбирается при публикации или задаётся по умолчанию в настройках. Требует обложку, текст-онли пины не поддерживаются. Один аккаунт на оба языка (как VK) — у Pinterest нет RU/EN-разделения.</p>
                     </div>
                 </div>
@@ -987,94 +987,123 @@
                 </div>
             </div>
         </div>
-    </div>
-
-
-    <!-- EDIT / NEW IDEA MODAL -->
-    <div id="edit-idea-overlay" class="overlay">
-        <div class="drawer-content">
-            <div class="nav-bar">
-                <span style="font-weight:600; font-size:16px;" id="edit-modal-title">Редактировать идею</span>
-                <button class="back-btn" onclick="closeOverlay('edit-idea-overlay')">Отмена</button>
+        <!-- РЕДАКТОР ИДЕИ - полноценная страница, а не выдвижная модалка.
+             В модалке текст поста жил в 90-пиксельном окне с внутренним
+             скроллом: длинный пост или сценарий Reels нельзя было увидеть
+             целиком. Здесь поле растёт под содержимое (см. autoGrowTextarea
+             в app.js), а второстепенные настройки убраны в правую колонку,
+             чтобы текст занимал всю ширину, на которую способен экран.
+             id'шники полей сохранены прежние - на них завязаны
+             validateLimits(), saveIdeaChanges(), переводчик и пикеры
+             обложки/озвучки. -->
+        <div id="view-idea-editor" class="view">
+            <div class="large-header ie-header">
+                <div>
+                    <p id="edit-idea-breadcrumb">Хранилище постов</p>
+                    <h1 id="edit-modal-title">Редактировать идею</h1>
+                </div>
+                <div class="ie-header-actions">
+                    <button class="cc-secondary" onclick="closeIdeaEditorPage()">← Отмена</button>
+                    <button class="cc-primary cc-primary-inline" onclick="saveIdeaChanges()">Сохранить</button>
+                </div>
             </div>
-            <div class="modal-body">
-                <input type="hidden" id="edit-idea-id">
-                
-                <label class="form-label">Название идеи:</label>
-                <input type="text" id="edit-idea-title-input" class="form-input" placeholder="Введите название...">
 
-                <label class="form-label">Формат и адаптация:</label>
-                <select id="edit-idea-format-input" class="form-select" onchange="validateLimits()">
-                    <option value="TG Пост">TG Пост (Лимит: 4096 симв.)</option>
-                    <option value="Reels / Shorts">Reels / Shorts (Лимит сценария: 1000 симв.)</option>
-                    <option value="Threads">Threads (Лимит: 500 симв./пост)</option>
-                    <option value="Pinterest">Pinterest (Лимит описания: 500 симв.)</option>
-                    <option value="Лонгрид Habr/VC">Лонгрид Habr / VC (Без ограничений)</option>
-                </select>
+            <div class="ie-layout">
+                <div class="ie-main">
+                    <input type="hidden" id="edit-idea-id">
 
-                <label class="form-label">Этап воронки (TOFU / MOFU / BOFU):</label>
-                <select id="edit-idea-funnel-input" class="form-select">
-                    <option value="TOFU">TOFU (Охват & Привлечение)</option>
-                    <option value="MOFU">MOFU (Доверие & Экспертность)</option>
-                    <option value="BOFU">BOFU (Продажа & Кейс)</option>
-                </select>
+                    <label class="cc-label" for="edit-idea-title-input">Название идеи</label>
+                    <input type="text" id="edit-idea-title-input" class="form-input cc-input" placeholder="Введите название...">
 
-                <label class="form-label">Статус пайплайна:</label>
-                <select id="edit-idea-status-input" class="form-select">
-                    <option value="idea">💡 Идея</option>
-                    <option value="in_progress">⚙️ В работе</option>
-                    <option value="ready">✅ Готово</option>
-                    <option value="published">🚀 Опубликовано</option>
-                </select>
+                    <div class="cc-label-row">
+                        <label class="cc-label" for="edit-idea-desc-input">Суть / текст поста</label>
+                        <div class="ie-text-tools">
+                            <span id="limit-validator-badge" class="limit-badge">0 / 4096 симв.</span>
+                            <button class="cc-link" type="button" onclick="toggleIdeaEditorFocus()" id="ie-focus-btn">⤢ Во весь экран</button>
+                        </div>
+                    </div>
+                    <textarea id="edit-idea-desc-input" class="form-textarea cc-input ie-textarea" placeholder="Подробности контента или тезисы..." oninput="validateLimits()"></textarea>
 
-                <label class="form-label">Суть / Текст поста:</label>
-                <textarea id="edit-idea-desc-input" class="form-textarea" placeholder="Подробности контента или тезисы..." oninput="validateLimits()"></textarea>
-                <div id="limit-validator-badge" class="limit-badge">0 / 4096 симв.</div>
+                    <label class="cc-label" for="edit-idea-cta-input">Призыв к действию (CTA)</label>
+                    <input type="text" id="edit-idea-cta-input" class="form-input cc-input" placeholder="Укажите оффер или ссылку...">
 
-                <label class="form-label">Призыв к действию (CTA):</label>
-                <input type="text" id="edit-idea-cta-input" class="form-input" placeholder="Укажите оффер или ссылку...">
+                    <div id="edit-idea-en-section" class="ie-en" style="display:none;">
+                        <div class="cc-label-row">
+                            <span class="cc-label">English version</span>
+                            <button class="cc-link" type="button" onclick="translateIdeaToEnglish()">🌍 Перевести на английский</button>
+                        </div>
 
-                <label class="form-label">Рубрика (опционально):</label>
-                <select id="edit-idea-rubric-input" class="form-select">
-                    <option value="">— без рубрики —</option>
-                </select>
+                        <label class="cc-label" for="edit-idea-title-en-input">Title</label>
+                        <input type="text" id="edit-idea-title-en-input" class="form-input cc-input" placeholder="Translated automatically, editable">
 
-                <label class="form-label">Обложка (из Медиатеки):</label>
-                <input type="hidden" id="edit-idea-cover-asset-id">
-                <div id="edit-idea-cover-preview" style="margin-bottom:8px; color:var(--text-secondary); font-size:12px;">Не выбрана</div>
-                <div style="display:flex; gap:8px;">
-                    <button class="edit-btn" type="button" onclick="openCoverPickerModal()">🖼 Выбрать обложку</button>
-                    <button class="edit-btn" type="button" onclick="clearCoverAsset()">✕ Убрать</button>
+                        <label class="cc-label" for="edit-idea-desc-en-input">Text</label>
+                        <textarea id="edit-idea-desc-en-input" class="form-textarea cc-input ie-textarea" placeholder="Translated automatically, editable"></textarea>
+
+                        <label class="cc-label" for="edit-idea-cta-en-input">CTA</label>
+                        <input type="text" id="edit-idea-cta-en-input" class="form-input cc-input" placeholder="Translated automatically, editable">
+                    </div>
                 </div>
 
-                <label class="form-label">Озвучка (из Медиатеки):</label>
-                <input type="hidden" id="edit-idea-voiceover-asset-id">
-                <div id="edit-idea-voiceover-preview" style="margin-bottom:8px; color:var(--text-secondary); font-size:12px;">Не выбрана</div>
-                <div style="display:flex; gap:8px;">
-                    <button class="edit-btn" type="button" onclick="openVoiceoverPickerModal()">🎙 Выбрать озвучку</button>
-                    <button class="edit-btn" type="button" onclick="clearVoiceoverAsset()">✕ Убрать</button>
-                </div>
+                <aside class="ie-aside">
+                    <div class="ie-panel">
+                        <label class="cc-label" for="edit-idea-format-input">Формат и адаптация</label>
+                        <select id="edit-idea-format-input" class="form-select cc-input" onchange="validateLimits()">
+                            <option value="TG Пост">TG Пост (лимит 4096)</option>
+                            <option value="Reels / Shorts">Reels / Shorts (лимит 1000)</option>
+                            <option value="Threads">Threads (лимит 500)</option>
+                            <option value="Pinterest">Pinterest (лимит 500)</option>
+                            <option value="Лонгрид Habr/VC">Лонгрид Habr / VC (без лимита)</option>
+                        </select>
 
-                <div id="edit-idea-en-section" style="display:none;">
-                    <div class="controls-row" style="margin-top:20px; margin-bottom:0;">
-                        <label class="form-label" style="margin:0;">English version:</label>
-                        <button class="edit-btn" type="button" onclick="translateIdeaToEnglish()">🌍 Перевести на английский</button>
+                        <label class="cc-label" for="edit-idea-funnel-input">Этап воронки</label>
+                        <select id="edit-idea-funnel-input" class="form-select cc-input">
+                            <option value="TOFU">TOFU (Охват & Привлечение)</option>
+                            <option value="MOFU">MOFU (Доверие & Экспертность)</option>
+                            <option value="BOFU">BOFU (Продажа & Кейс)</option>
+                        </select>
+
+                        <label class="cc-label" for="edit-idea-status-input">Статус пайплайна</label>
+                        <select id="edit-idea-status-input" class="form-select cc-input">
+                            <option value="idea">💡 Идея</option>
+                            <option value="in_progress">⚙️ В работе</option>
+                            <option value="ready">✅ Готово</option>
+                            <option value="published">🚀 Опубликовано</option>
+                        </select>
+
+                        <label class="cc-label" for="edit-idea-rubric-input">Рубрика <span class="cc-optional">необязательно</span></label>
+                        <select id="edit-idea-rubric-input" class="form-select cc-input">
+                            <option value="">— без рубрики —</option>
+                        </select>
                     </div>
 
-                    <label class="form-label">Title:</label>
-                    <input type="text" id="edit-idea-title-en-input" class="form-input" placeholder="Translated automatically, editable">
+                    <div class="ie-panel">
+                        <span class="cc-label">Обложка <span class="cc-optional">из Медиатеки</span></span>
+                        <input type="hidden" id="edit-idea-cover-asset-id">
+                        <div id="edit-idea-cover-preview" class="ie-asset-preview">Не выбрана</div>
+                        <div class="ie-panel-actions">
+                            <button class="cc-secondary" type="button" onclick="openCoverPickerModal()">🖼 Выбрать</button>
+                            <button class="cc-secondary" type="button" onclick="clearCoverAsset()">✕ Убрать</button>
+                        </div>
 
-                    <label class="form-label">Text:</label>
-                    <textarea id="edit-idea-desc-en-input" class="form-textarea" placeholder="Translated automatically, editable"></textarea>
+                        <span class="cc-label">Озвучка <span class="cc-optional">из Медиатеки</span></span>
+                        <input type="hidden" id="edit-idea-voiceover-asset-id">
+                        <div id="edit-idea-voiceover-preview" class="ie-asset-preview">Не выбрана</div>
+                        <div class="ie-panel-actions">
+                            <button class="cc-secondary" type="button" onclick="openVoiceoverPickerModal()">🎙 Выбрать</button>
+                            <button class="cc-secondary" type="button" onclick="clearVoiceoverAsset()">✕ Убрать</button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
 
-                    <label class="form-label">CTA:</label>
-                    <input type="text" id="edit-idea-cta-en-input" class="form-input" placeholder="Translated automatically, editable">
-                </div>
-
-                <button class="submit-btn" onclick="saveIdeaChanges()">Сохранить изменения</button>
+            <div class="ie-footer">
+                <button class="cc-secondary" onclick="closeIdeaEditorPage()">Отмена</button>
+                <button class="cc-primary cc-primary-inline" onclick="saveIdeaChanges()">Сохранить изменения</button>
             </div>
         </div>
+
     </div>
+
 
     <!-- COVER PICKER (choose a media_assets row as the idea's cover, from Медиатека) -->
     <div id="cover-picker-overlay" class="overlay">

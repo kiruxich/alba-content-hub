@@ -777,3 +777,46 @@ html, body {
     .cc-actions .cc-secondary, .cc-actions .cc-primary-inline { width: 100%; text-align: center; }
     .cc-actions-spacer { display: none; }
 }
+
+/* ============================================================
+   РЕДАКТОР ИДЕИ (.ie-*) - отдельная страница вместо модалки
+   Текст поста больше не заперт в выдвижном ящике шириной 540px:
+   основная колонка тянется во всю ширину, настройки уехали в
+   правую колонку, а поле растёт под содержимое (autoGrowTextarea).
+   ============================================================ */
+
+.ie-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ie-header-actions { display: flex; gap: 8px; align-items: center; }
+
+.ie-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; padding: 24px; max-width: 1400px; margin: 0 auto; align-items: start; }
+.ie-main { min-width: 0; }
+.ie-aside { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 24px; }
+.ie-panel { background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; }
+.ie-panel > .cc-label:first-child { margin-top: 0; }
+.ie-panel-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.ie-panel-actions .cc-secondary { padding: 8px 12px; font-size: 12px; }
+.ie-asset-preview { margin-top: 8px; font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+.ie-text-tools { display: flex; align-items: center; gap: 12px; }
+.ie-textarea { min-height: 320px; line-height: 1.6; }
+.ie-en { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--separator); }
+
+.ie-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 0 24px 32px; max-width: 1400px; margin: 0 auto; }
+
+/* "Во весь экран" - для лонгридов и сценариев, где даже широкой колонки мало. */
+.ie-focus .ie-layout { grid-template-columns: minmax(0, 1fr); max-width: 1100px; }
+.ie-focus .ie-aside { display: none; }
+.ie-focus .ie-textarea { min-height: calc(100vh - 320px); }
+
+@media (max-width: 1023px) {
+    .ie-layout { grid-template-columns: minmax(0, 1fr); }
+    .ie-aside { position: static; }
+}
+@media (max-width: 767px) {
+    .ie-header { align-items: stretch; }
+    .ie-header-actions { width: 100%; }
+    .ie-header-actions button { flex: 1; }
+    .ie-layout, .ie-footer { padding-left: 16px; padding-right: 16px; }
+    .ie-footer button { flex: 1; }
+    .ie-textarea { min-height: 260px; }
+}

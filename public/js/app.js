@@ -46,6 +46,7 @@ function escapeHtml(str) {
 
 document.addEventListener("DOMContentLoaded", () => {
     loadContentDrafts();
+    startTextareaAutoGrow();
     initApp();
     const schedInput = document.getElementById('schedule-date-input');
     if (schedInput) schedInput.value = new Date().toISOString().split('T')[0];
@@ -123,7 +124,10 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
 
     const targetView = document.getElementById(`view-${tabName}`);
-    if (targetView) targetView.classList.add('active');
+    if (targetView) {
+        targetView.classList.add('active');
+        autoGrowAllTextareas(targetView); // высоту полей скрытой вкладки посчитать нельзя - только после показа
+    }
 
     const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'kanban': 3, 'analytics': 4, 'calendar': 5, 'archive': 6, 'contentplan': 7, 'clients': 8, 'customers': 9, 'mediaassets': 10, 'urlchecker': 11, 'systeminfo': 12, 'agentcenter': 13 };
     if (tabMap[tabName] !== undefined) {
@@ -144,16 +148,60 @@ function switchTab(tabName) {
     if (tabName === 'customers') renderParserNiches();
     if (tabName === 'mediaassets') renderMediaAssets();
     if (tabName === 'agentcenter') { renderAgentSettingsForm(); renderAgentCenter(); }
+    if (tabName === 'systeminfo') renderPlatformStatuses();
 }
 
 function openOverlay(id) {
     const el = document.getElementById(id);
-    if (el) el.classList.add('active');
+    if (!el) return;
+    el.classList.add('active');
+    autoGrowAllTextareas(el); // в скрытом узле scrollHeight === 0, считать высоту можно только после показа
 }
 
 function closeOverlay(id) {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active');
+}
+
+// АВТОРАСТУЩИЕ ТЕКСТОВЫЕ ПОЛЯ
+// Каждая .form-textarea жила с min-height 90px и внутренним скроллом: текст
+// поста, скрипт холодного звонка, питч ниши - всё это приходилось читать,
+// скроллясь мышью внутри крошечного окна. Поле растёт под содержимое: при
+// вводе - через делегированный listener, после перерисовок - через
+// MutationObserver, потому что весь UI собирается из innerHTML в десятках
+// разных рендеров, и дописывать вызов в каждый из них смысла нет.
+const TEXTAREA_MIN_H = 96;
+const TEXTAREA_MAX_H = 1200;
+
+function autoGrowTextarea(el, min = TEXTAREA_MIN_H, max = TEXTAREA_MAX_H) {
+    if (!el || el.dataset.noAutogrow === '1') return;
+    el.style.height = 'auto';
+    const next = Math.min(Math.max(el.scrollHeight + 2, min), max);
+    el.style.height = next + 'px';
+    // Скролл внутри поля оставляем только для совсем гигантских текстов,
+    // которые упёрлись в максимум.
+    el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
+}
+
+function autoGrowAllTextareas(root) {
+    (root || document).querySelectorAll('textarea.form-textarea').forEach(el => autoGrowTextarea(el));
+}
+
+document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el && el.tagName === 'TEXTAREA' && el.classList.contains('form-textarea')) autoGrowTextarea(el);
+});
+
+// Наблюдаем только за появлением/исчезновением узлов (attributes: false),
+// иначе установка style.height внутри autoGrowTextarea зациклила бы обход.
+let autoGrowQueued = false;
+function startTextareaAutoGrow() {
+    autoGrowAllTextareas();
+    new MutationObserver(() => {
+        if (autoGrowQueued) return;
+        autoGrowQueued = true;
+        requestAnimationFrame(() => { autoGrowQueued = false; autoGrowAllTextareas(); });
+    }).observe(document.body, { childList: true, subtree: true });
 }
 
 function showToast(text) {
@@ -524,15 +572,6 @@ function updateContentDraftCounter(id, textarea) {
     badge.classList.toggle('over', current > limit);
 }
 
-function autoGrowTextarea(el) {
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = Math.min(Math.max(el.scrollHeight, 140), 640) + 'px';
-}
-
-function autoGrowAllDraftTextareas() {
-    document.querySelectorAll('#content-drafts-list .cc-textarea').forEach(autoGrowTextarea);
-}
 
 async function generateContentDraft(id) {
     const draft = contentDrafts.find(d => d.id === id);
@@ -942,6 +981,10 @@ async function promoteAgentDraft(ideaId) {
 
 function renderContentCreationView() {
     const list = document.getElementById('content-drafts-list');
+    // Пустое состояние само предлагает "+ Новая тема" - вторая такая же
+    // кнопка в шапке в этот момент лишняя.
+    const addBtn = document.getElementById('cc-add-draft-btn');
+    if (addBtn) addBtn.style.display = contentDrafts.length === 0 ? 'none' : '';
     if (list) {
         list.innerHTML = contentDrafts.length === 0
             ? `<div class="cc-placeholder cc-placeholder-hero">
@@ -953,7 +996,7 @@ function renderContentCreationView() {
             : contentDrafts.map(renderContentDraftCard).join('');
     }
     renderAgentContentDrafts();
-    autoGrowAllDraftTextareas();
+    autoGrowAllTextareas(list);
     saveContentDrafts();
 }
 
@@ -1563,6 +1606,67 @@ async function toggleGroupForIdea(ideaId, groupId) {
     }
 }
 
+// Редактор идеи - отдельная страница (как карточка продукта), а не
+// выдвижная модалка: длинный текст поста должен быть виден целиком, а в
+// 540-пиксельном ящике это невозможно. Запоминаем, с какой вкладки пришли,
+// чтобы "Отмена" вернула туда же - редактор открывается из Хранилища,
+// Канбана, Календаря, Создания контента и карточки продукта.
+let ideaEditorReturnViewId = 'view-bank';
+
+function openIdeaEditorPage(title) {
+    const current = document.querySelector('.view.active');
+    if (current && current.id !== 'view-idea-editor') ideaEditorReturnViewId = current.id;
+
+    const titleEl = document.getElementById('edit-modal-title');
+    if (titleEl) titleEl.innerText = title;
+    const crumb = document.getElementById('edit-idea-breadcrumb');
+    if (crumb) crumb.innerText = ideaEditorViewLabel(ideaEditorReturnViewId);
+
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const view = document.getElementById('view-idea-editor');
+    view.classList.add('active');
+    view.scrollTop = 0;
+    exitIdeaEditorFocus();
+    autoGrowAllTextareas(view);
+}
+
+function closeIdeaEditorPage() {
+    exitIdeaEditorFocus();
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const back = document.getElementById(ideaEditorReturnViewId) || document.getElementById('view-bank');
+    back.classList.add('active');
+}
+
+function ideaEditorViewLabel(viewId) {
+    const labels = {
+        'view-bank': 'Хранилище постов', 'view-kanban': 'Канбан',
+        'view-contentcreation': 'Создание контента', 'view-calendar': 'Календарь',
+        'view-day-detail': 'Календарь', 'view-archive': 'Архив публикаций',
+        'view-product-detail': 'Каталог продуктов', 'view-contentplan': 'Контент план',
+    };
+    return labels[viewId] || 'Хранилище постов';
+}
+
+// Режим "во весь экран" для текста поста: прячет правую колонку и растягивает
+// поле на всю ширину страницы - для лонгридов и сценариев, где ширина колонки
+// всё равно мала.
+function toggleIdeaEditorFocus() {
+    const view = document.getElementById('view-idea-editor');
+    if (!view) return;
+    view.classList.toggle('ie-focus');
+    const btn = document.getElementById('ie-focus-btn');
+    if (btn) btn.innerText = view.classList.contains('ie-focus') ? '⤡ Свернуть' : '⤢ Во весь экран';
+    autoGrowAllTextareas(view);
+}
+
+function exitIdeaEditorFocus() {
+    const view = document.getElementById('view-idea-editor');
+    if (!view) return;
+    view.classList.remove('ie-focus');
+    const btn = document.getElementById('ie-focus-btn');
+    if (btn) btn.innerText = '⤢ Во весь экран';
+}
+
 function openEditIdeaModal(ideaId) {
     const idea = ideasBank.find(i => i.id === ideaId);
     if (!idea) return;
@@ -1586,7 +1690,7 @@ function openEditIdeaModal(ideaId) {
     setVoiceoverAssetField(idea.voiceoverAssetId || '');
 
     validateLimits();
-    openOverlay('edit-idea-overlay');
+    openIdeaEditorPage('Редактировать идею');
 }
 
 function openNewIdeaModal() {
@@ -1606,7 +1710,7 @@ function openNewIdeaModal() {
     setVoiceoverAssetField('');
 
     validateLimits();
-    openOverlay('edit-idea-overlay');
+    openIdeaEditorPage('Новая идея');
 }
 
 // COVER PICKER (choose a media_assets row as the idea's cover) - reuses the
@@ -1755,7 +1859,7 @@ async function saveIdeaChanges() {
         renderAnalyticsView();
         renderContentCreationView();
         if (currentOpenProductId) renderProductDetailContent(currentOpenProductId);
-        closeOverlay('edit-idea-overlay');
+        closeIdeaEditorPage();
     } catch (e) {
         showToast('Не удалось сохранить идею: ' + e.message);
     }
@@ -2238,6 +2342,44 @@ const PUBLISH_PLATFORMS = [
     { id: 'threads', label: '🧵 Threads', isConfigured: () => thMeta.hasToken, notConfiguredMsg: 'Threads не настроен. Укажите Access Token и User ID в настройках публикаций.' },
     { id: 'pinterest', label: '📌 Pinterest', isConfigured: () => pinMeta.hasToken, notConfiguredMsg: 'Pinterest не настроен. Укажите Access Token в настройках публикаций.' },
 ];
+
+// Статусы площадок на странице «О системе» были захардкожены в разметке как
+// «○ ждёт ключей» и не менялись после того, как ключи реально добавили -
+// YouTube показывался незаконченным, хотя публикация через него работает.
+// Читаем те же метаданные, что и модалка публикации; настройки хранятся
+// отдельно для RU и EN, поэтому спрашиваем оба языка и показываем, если
+// заполнен только один.
+async function renderPlatformStatuses() {
+    const view = document.getElementById('view-systeminfo');
+    if (!view || !document.getElementById('ps-status-youtube')) return;
+
+    const isSet = (m) => Boolean(m && (m.configured !== undefined ? m.configured : m.hasToken));
+    const endpoints = {
+        vk: 'vk', instagram: 'instagram', youtube: 'youtube', threads: 'threads', pinterest: 'pinterest',
+    };
+
+    for (const [key, path] of Object.entries(endpoints)) {
+        const el = document.getElementById(`ps-status-${key}`);
+        if (!el) continue;
+        let ru = null, en = null;
+        try {
+            [ru, en] = await Promise.all([
+                api(`/api/settings/${path}?lang=ru`),
+                api(`/api/settings/${path}?lang=en`),
+            ]);
+        } catch (_) {
+            continue; // бэкенд недоступен - оставляем то, что уже написано в разметке
+        }
+        const ruOk = isSet(ru), enOk = isSet(en);
+        // У VK и Pinterest один аккаунт на оба языка, поэтому RU/EN там не различаем.
+        const singleAccount = key === 'vk' || key === 'pinterest';
+        let cls = 'captcha', label = '○ ждёт ключей';
+        if (ruOk && (enOk || singleAccount)) { cls = 'done'; label = '● подключено'; }
+        else if (ruOk || enOk) { cls = 'running'; label = `◐ только ${ruOk ? 'RU' : 'EN'}`; }
+        el.className = `parser-niche-status ${cls}`;
+        el.innerText = label;
+    }
+}
 
 function getPublishModalIdea() {
     return ideasBank.find(i => i.id === publishModalState.ideaId) || null;
