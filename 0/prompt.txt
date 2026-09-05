@@ -1,0 +1,1 @@
+Check /tmp/prune.log on the VPS (via SSH) to see how much space the background docker builder/image prune reclaimed and current disk usage. If disk is now healthy, retrigger the hub redeploy (or ask the user to) and confirm it succeeds. Then continue setting up the automated periodic disk-cleanup cron job the user asked for.
