@@ -1,0 +1,8 @@
+<task-notification>
+<task-id>b92db4i2m</task-id>
+<tool-use-id>toolu_018y6zdx6nVyXUbgD8X1MKNN</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/b92db4i2m.output</output-file>
+<status>failed</status>
+<summary>Background command "cd /Users/kiruxa/Desktop/alba-content-hub
+node --env-file-if-exists=.env scripts/register-youtube-oauth.mjs "743808085232-vmgq2o09gadvs1qd9ei1o6mev66ro5f1.apps.googleusercontent.com" "REDACTED" --lang ru" failed with exit code 1</summary>
+</task-notification>
