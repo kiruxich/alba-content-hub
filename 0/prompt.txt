@@ -1,0 +1,1 @@
+Retry connectivity to hub.alba-creation.ru and SSH (alba host) — check if the fail2ban-style IP block has cleared, then finish verifying the Piper TTS end-to-end flow (POST /api/media-assets/generate-voiceover with provider=piper) that was blocked earlier.
