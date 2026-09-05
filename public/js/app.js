@@ -6446,6 +6446,7 @@ function renderTelegramWatchChannelsList() {
     box.innerHTML = telegramWatchChannels.map(c => `
         <span class="group-chip" style="display:inline-flex; align-items:center; gap:6px; margin:2px 4px 2px 0;">
             @${escapeHtml(c.username)}${c.label && c.label !== c.username ? ` (${escapeHtml(c.label)})` : ''}
+            <a href="https://t.me/${encodeURIComponent(c.username)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-blue);">перейти</a>
             <a href="#" onclick="deleteTelegramWatchChannel(${c.id}); return false;" style="color:var(--accent-red);">✕</a>
         </span>`).join('');
 }
