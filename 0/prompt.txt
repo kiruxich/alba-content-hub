@@ -1,0 +1,40 @@
+<task-notification>
+<task-id>a2b2ddf513466d0ab</task-id>
+<tool-use-id>toolu_01CC9SAWR7BLfqssD53VsM3o</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a2b2ddf513466d0ab.output</output-file>
+<status>completed</status>
+<summary>Agent "YouTube OAuth registration script" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>No changes crept into `data/` (the local dev DB was untracked already, and its content was verified unaffected).
+
+## Report
+
+Created `/Users/kiruxa/Desktop/alba-content-hub/scripts/register-youtube-oauth.mjs`.
+
+**OAuth flow implemented:** Google's loopback-IP redirect flow for "Desktop app" OAuth clients (`http://127.0.0.1:&lt;random free port&gt;/callback`). Confirmed via Google's own docs (`developers.google.com/identity/protocols/oauth2/native-app` and the OOB migration guide) that:
+- The old out-of-band copy-paste flow is fully deprecated/removed for all clients.
+- Custom URI schemes are also no longer supported.
+- The loopback flow is the one still supported for Desktop app clients, and Desktop app clients (unlike Web app clients) don't need to pre-register an exact port — Google matches on host, ignoring port — so the script asks the OS for any free port at startup rather than hardcoding one.
+
+Also added PKCE (S256) on top since it's Google's current recommendation, `access_type=offline` + `prompt=consent` to reliably force a refresh token on every run, and `state` for CSRF protection. Scopes requested: `youtube.upload` (what `youtube.js` needs for `videos.insert`) plus `youtube.readonly` (confirmed separately required for the `channels.list?mine=true` channel-title lookup — `youtube.upload` alone doesn't grant that read access).
+
+**CLI usage:**
+```
+node scripts/register-youtube-oauth.mjs &lt;client_id&gt; &lt;client_secret&gt;
+node scripts/register-youtube-oauth.mjs &lt;client_id&gt; &lt;client_secret&gt; --dry-run   # prints the auth URL only, no network/server
+```
+Missing/empty args print a usage banner with the Google Cloud Console steps (enable YouTube Data API v3, configure OAuth consent screen, create a Desktop app OAuth client ID).
+
+**What was verified without real Google credentials:**
+- `node --check` passes.
+- `--dry-run` prints the constructed authorization URL; params match the researched shape exactly (`client_id`, `redirect_uri`, `response_type=code`, `scope`, `access_type=offline`, `prompt=consent`, `code_challenge`/`code_challenge_method=S256`, `state`).
+- Ran the real (non-dry-run) script end-to-end against the actual local HTTP server and Google's real token endpoint: confirmed the loopback server binds to a random port, serves the printed URL, receives a simulated callback, correctly rejects a mismatched `state` and an `error=access_denied` callback with clean Russian messages (no stack traces), and correctly reaches `https://oauth2.googleapis.com/token` — Google's real response (`"The OAuth client was not found."`) confirms the POST body shape is well-formed; it only fails because the client_id is fake.
+- Confirmed no partial/bad writes ever land in `youtube_settings` when a run fails at any stage (checked the row before/after failed runs).
+
+**Bug found and fixed (in the new script, not in existing code):** the callback promise's `reject()` calls (state mismatch, `error=` param, missing code, 5-minute timeout) were unhandled at the top level, so a failed OAuth attempt printed a raw Node stack trace instead of a clean Russian error — inconsistent with this project's established style (`register-telegram-webhook.mjs`). Wrapped that `await` in try/catch; verified the fix with the same live test above.
+
+**What genuinely requires a real Google Cloud project to test:** the actual browser consent screen round-trip and a real token exchange returning a genuine `refresh_token` — that needs real `client_id`/`client_secret` from a Cloud project the user creates themselves, per the task's scope.
+
+No changes were made to `youtube.js`, `settings.js`, or `db.js` — the UPDATE statement in the new script reuses the exact SQL shape already in `server/routes/settings.js`.</result>
+<usage><subagent_tokens>101332</subagent_tokens><tool_uses>28</tool_uses><duration_ms>218251</duration_ms></usage>
+</task-notification>
