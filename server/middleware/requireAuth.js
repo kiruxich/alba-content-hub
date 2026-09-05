@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { isRequestAuthenticated, isAuthConfigured } from '../lib/auth.js';
 
 const LOGIN_PAGE = `<!DOCTYPE html>
@@ -74,6 +75,32 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 // js/app.js, ...) is correctly still gated - this is a narrow bypass.
 const PUBLIC_PATHS = new Set(['/favicon.svg', '/favicon-192.png', '/favicon-32.png']);
 
+// Timing-safe compare, same reasoning as local-claude-agent's own token
+// check (server.js timingSafeEqual) - a static token is worth comparing in
+// constant time rather than with a plain ===.
+function tokenMatches(provided, expected) {
+    if (!expected || !provided) return false;
+    const a = Buffer.from(String(provided));
+    const b = Buffer.from(String(expected));
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+}
+
+// Lets machine callers (the Generator/Researcher/Insights Claude routines -
+// see server/routes/agentResearcher.js and docs/insights-agent-routine.md)
+// authenticate without a browser session cookie once ADMIN_EMAIL/etc. lock
+// the hub down for everyone else. Optional: unset AGENT_API_TOKEN and this
+// path simply never matches, same graceful-no-op shape as every other
+// optional integration in this codebase. A routine sends
+// `Authorization: Bearer <AGENT_API_TOKEN>` instead of logging in.
+const AGENT_API_TOKEN = process.env.AGENT_API_TOKEN || '';
+
+function isAgentTokenRequest(req) {
+    const header = req.headers['authorization'] || '';
+    const provided = header.startsWith('Bearer ') ? header.slice(7) : '';
+    return tokenMatches(provided, AGENT_API_TOKEN);
+}
+
 // Gates every request. Left permanently open (no-op) if auth isn't
 // configured (ADMIN_EMAIL/ADMIN_PASSWORD_HASH/SESSION_SECRET unset), so the
 // app keeps working exactly as before for local dev where nobody's set
@@ -82,6 +109,7 @@ const PUBLIC_PATHS = new Set(['/favicon.svg', '/favicon-192.png', '/favicon-32.p
 export function requireAuth(req, res, next) {
     if (!isAuthConfigured()) return next();
     if (req.path === '/api/auth/login' || PUBLIC_PATHS.has(req.path)) return next();
+    if (isAgentTokenRequest(req)) return next();
     if (isRequestAuthenticated(req)) return next();
 
     if (req.path.startsWith('/api/')) {
