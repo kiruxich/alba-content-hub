@@ -1,0 +1,94 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "01M1RPCRD1WV7NHGM7FF24A54S",
+  "session_id": "5f1e6a8d-d78e-49d1-95b1-99f10d537035",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-05T11:48:52.375441Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "index.html",
+    "public/js/app.js",
+    "styles.css"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "01464f277134",
+  "checkpoint_transcript_start": 653,
+  "transcript_lines_at_start": 653,
+  "compact_transcript_start": 110,
+  "token_usage": {
+    "input_tokens": 10,
+    "cache_creation_tokens": 19908,
+    "cache_read_tokens": 1455195,
+    "output_tokens": 6673,
+    "api_call_count": 5
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01AipPXhxVvq7FCkPzGncCaz",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "graphify"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "2e44509bfe80",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 37,
+        "end": 38,
+        "entry_ids": [
+          "c4aaf309-f0b9-4363-b04c-6eeb0a504905"
+        ],
+        "tool_use_id": "toolu_01AipPXhxVvq7FCkPzGncCaz"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01AipPXhxVvq7FCkPzGncCaz"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: graphify",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-05T11:48:52.290452Z",
+    "agent_lines": 0,
+    "agent_removed": 71,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 145,
+    "total_committed": 8,
+    "total_lines_changed": 216,
+    "agent_percentage": 32.870370370370374,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 240,
+      "user_lines_removed": 145,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "index.html": 89,
+        "public/js/app.js": 56,
+        "styles.css": 95
+      },
+      "user_removed_per_file": {
+        "index.html": 89,
+        "public/js/app.js": 56
+      }
+    }
+  ]
+}
