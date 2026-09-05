@@ -1,0 +1,11 @@
+да, импортируй в обоих и можешь в alba-content-hub тоже?
+
+---
+
+<task-notification>
+<task-id>baijhb9ac</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/ce2c234a-a392-4523-81ee-12b7539fd8ba/tasks/baijhb9ac.output</output-file>
+<status>completed</status>
+<summary>Background command "Import Claude Code session history in InSight" completed (exit code 0)</summary>
+</task-notification>
