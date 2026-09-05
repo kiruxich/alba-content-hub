@@ -1,0 +1,10 @@
+<task-notification>
+<task-id>a007f97cfcb43862c</task-id>
+<tool-use-id>toolu_018wvouz6UDjL2QQLyt8sPwQ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a007f97cfcb43862c.output</output-file>
+<status>failed</status>
+<summary>Agent "Проверка сайта: live-scan, load-test redesign, PDF/charts" failed: Agent terminated early due to an API error: You've hit your session limit · resets 2:30am (Europe/Amsterdam) (error type rate_limit, HTTP 429, request id req_011CeZifbUmqaQEB3GKwv4qU, model sent to the API: claude-sonnet-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Let me verify the API server's `mode: 'live'` error-handling path directly via curl against my worktree's backend, since the browser pane is bound to the main checkout.</result>
+<worktree><worktreePath>/Users/kiruxa/Desktop/alba-content-hub/.claude/worktrees/agent-a007f97cfcb43862c</worktreePath><worktreeBranch>worktree-agent-a007f97cfcb43862c</worktreeBranch></worktree>
+</task-notification>
