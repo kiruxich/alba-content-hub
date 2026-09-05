@@ -43,7 +43,9 @@ docker compose exec ollama ollama pull nomic-embed-text
 
 Это compose из двух сервисов (ollama + сам воркер) — **Build pack: Docker
 Compose**, не Dockerfile (тот поднимет только один контейнер без ollama
-вообще, и SmartScraperGraph будет не с кем говорить).
+вообще, и SmartScraperGraph будет не с кем говорить). Файл называется
+`docker-compose.yaml`, не `.yml` — Coolify по умолчанию ищет именно `.yaml`
+и не находит `.yml` сам, без ручного указания пути.
 
 1. New Resource → Git Repository → этот репозиторий.
 2. Base directory: `/scrape-worker`.
@@ -52,7 +54,7 @@ Compose**, не Dockerfile (тот поднимет только один кон
 5. После первого деплоя — `ollama pull` (см. выше) нужно выполнить внутри
    контейнера `ollama` этого стека: `docker compose exec ollama ollama pull
    qwen2.5:7b` и `... nomic-embed-text` (SSH на сервер, найти папку деплоя
-   этого Coolify-ресурса, там и лежит тот же `docker-compose.yml`).
+   этого Coolify-ресурса, там и лежит тот же `docker-compose.yaml`).
 6. Открыть порт 8790 из docker-подсети Coolify (см.
    `infra/ansible/tasks/setup_selfhosted_ufw.yml`), как у остальных
    self-hosted сервисов — иначе хаб до воркера не достучится.
@@ -68,7 +70,7 @@ SCRAPE_WORKER_TOKEN=<тот же токен>
 ```
 
 Порт хоста — 8790, не 8788: тот уже занят video-worker, если оба воркера
-живут на одном сервере (см. docker-compose.yml).
+живут на одном сервере (см. docker-compose.yaml).
 
 Проверить связку можно прямо из интерфейса: «Заказчики» → ScrapeGraph, вверху
 панели видно, на связи ли воркер и какая модель поднята.
