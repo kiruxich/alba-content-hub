@@ -824,7 +824,7 @@ function renderContentDraftCard(draft) {
             ${head}
             ${contentDraftSteps(draft)}
             <div class="cc-body">
-                <label class="cc-label" for="cd-topic-${draft.id}">Тема поста</label>
+                <label class="ui-field__label" for="cd-topic-${draft.id}">Тема поста</label>
                 <div class="cc-topic-row">
                     <input type="text" class="form-input cc-input" id="cd-topic-${draft.id}" placeholder="Например: как выбрать CRM для малого бизнеса" value="${escapeHtml(draft.topic)}"
                         oninput="setContentDraftTopic('${draft.id}', this.value)">
@@ -832,14 +832,14 @@ function renderContentDraftCard(draft) {
                 </div>
                 ${research}
 
-                <label class="cc-label" for="cd-product-${draft.id}">Продукт <span class="cc-optional">необязательно</span></label>
+                <label class="ui-field__label" for="cd-product-${draft.id}">Продукт <span class="ui-field__optional">необязательно</span></label>
                 <select class="form-select cc-input" id="cd-product-${draft.id}" onchange="setContentDraftProduct('${draft.id}', this.value)">
                     <option value="">— без привязки —</option>
                     ${productsData.map(p => `<option value="${p.id}" ${draft.productId === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
                 </select>
-                <p class="cc-hint">Привязка подмешивает описание продукта в промпт и проставляет его идее при переносе в Хранилище.</p>
+                <p class="ui-field__hint">Привязка подмешивает описание продукта в промпт и проставляет его идее при переносе в Хранилище.</p>
 
-                <label class="cc-label">Какие форматы сгенерировать</label>
+                <label class="ui-field__label">Какие форматы сгенерировать</label>
                 <div class="cc-chips">
                     ${CONTENT_FORMAT_DEFS.map(f => `
                         <button class="cc-chip ${selectedFormats.includes(f.key) ? 'on' : ''}" onclick="toggleContentDraftFormat('${draft.id}', '${f.key}')">
@@ -850,7 +850,7 @@ function renderContentDraftCard(draft) {
                 <button class="ui-btn ui-btn--primary ui-btn--block" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">
                     ${isGenerating ? '⏳ Генерируем через ИИ (Sonnet)…' : `✨ Сгенерировать ${selectedFormats.length} ${pluralFormats(selectedFormats.length)}`}
                 </button>
-                ${isGenerating ? `<p class="cc-hint cc-center">Обычно занимает 30–60 секунд. Вкладку можно не держать открытой — черновик сохранится.</p>` : ''}
+                ${isGenerating ? `<p class="ui-field__hint cc-center">Обычно занимает 30–60 секунд. Вкладку можно не держать открытой — черновик сохранится.</p>` : ''}
             </div>
         </div>`;
     }
@@ -863,37 +863,37 @@ function renderContentDraftCard(draft) {
             ${research}
 
             <div class="cc-toolbar">
-                <div class="cc-segment">
+                <div class="ui-seg">
                     ${generatedFormatDefs.map(f => `
-                        <button class="cc-seg-btn ${draft.activeFormat === f.key ? 'on' : ''}" onclick="setContentDraftFormat('${draft.id}', '${f.key}')">
+                        <button class="ui-seg__btn ${draft.activeFormat === f.key ? 'on' : ''}" onclick="setContentDraftFormat('${draft.id}', '${f.key}')">
                             ${f.icon} ${f.label}${promoted[f.key] ? ' <span class="cc-seg-check">✓</span>' : ''}
                         </button>`).join('')}
                 </div>
-                <div class="cc-segment cc-segment-lang">
-                    <button class="cc-seg-btn ${lang === 'ru' ? 'on' : ''}" onclick="setContentDraftLang('${draft.id}', 'ru')">RU</button>
-                    <button class="cc-seg-btn ${lang === 'en' ? 'on' : ''} ${hasEn ? '' : 'muted'}" onclick="setContentDraftLang('${draft.id}', 'en')" title="${hasEn ? '' : 'Сначала переведите черновик'}">EN</button>
+                <div class="ui-seg ui-seg--lang">
+                    <button class="ui-seg__btn ${lang === 'ru' ? 'on' : ''}" onclick="setContentDraftLang('${draft.id}', 'ru')">RU</button>
+                    <button class="ui-seg__btn ${lang === 'en' ? 'on' : ''} ${hasEn ? '' : 'muted'}" onclick="setContentDraftLang('${draft.id}', 'en')" title="${hasEn ? '' : 'Сначала переведите черновик'}">EN</button>
                 </div>
             </div>
 
             ${block ? `
-                <label class="cc-label" for="cd-title-${draft.id}">Заголовок</label>
+                <label class="ui-field__label" for="cd-title-${draft.id}">Заголовок</label>
                 <input type="text" class="form-input cc-input" id="cd-title-${draft.id}" value="${escapeHtml(block.title)}"
                     oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'title', this.value)">
 
-                <div class="cc-label-row">
-                    <label class="cc-label" for="cd-desc-${draft.id}">Текст · ${def.label}</label>
+                <div class="ui-field__head">
+                    <label class="ui-field__label" for="cd-desc-${draft.id}">Текст · ${def.label}</label>
                     <span class="cc-counter ${block.desc.length > def.limit ? 'over' : ''}" id="cd-count-${draft.id}">${block.desc.length} / ${def.limit}</span>
                 </div>
                 <textarea class="form-textarea cc-input cc-textarea" id="cd-desc-${draft.id}"
                     oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'desc', this.value); updateContentDraftCounter('${draft.id}', this); autoGrowTextarea(this);">${escapeHtml(block.desc)}</textarea>
 
-                <label class="cc-label" for="cd-cta-${draft.id}">Призыв к действию (CTA)</label>
+                <label class="ui-field__label" for="cd-cta-${draft.id}">Призыв к действию (CTA)</label>
                 <input type="text" class="form-input cc-input" id="cd-cta-${draft.id}" placeholder="Например: напишите нам в личные сообщения" value="${escapeHtml(block.cta)}"
                     oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'cta', this.value)">
             ` : `<div class="ui-empty ui-empty--inline">Для этого формата текста нет.</div>`}
 
-            <div class="cc-label-row">
-                <span class="cc-label">Обложка <span class="cc-optional">необязательно</span></span>
+            <div class="ui-field__head">
+                <span class="ui-field__label">Обложка <span class="ui-field__optional">необязательно</span></span>
                 <button class="ui-btn ui-btn--link" ${draft.generatingCover ? 'disabled' : ''} onclick="generateDraftCover('${draft.id}')">${draft.generatingCover ? '⏳ Генерируем…' : '🎨 Сгенерировать вариант'}</button>
             </div>
             <div class="cc-covers">
@@ -1142,9 +1142,9 @@ function renderCrmHeaderActions() {
         companies: `<button class="ui-btn ui-btn--secondary" onclick="importCrmFromMerged()">⬇ Импорт из сводной базы</button>
                     <button class="ui-btn ui-btn--primary" onclick="createCrmRecord('company')">+ Компания</button>`,
         contacts: `<button class="ui-btn ui-btn--primary" onclick="createCrmRecord('contact')">+ Контакт</button>`,
-        deals: `<div class="cc-segment">
-                    <button class="cc-seg-btn ${crmDealsView === 'board' ? 'on' : ''}" onclick="setCrmDealsView('board')">Доска</button>
-                    <button class="cc-seg-btn ${crmDealsView === 'table' ? 'on' : ''}" onclick="setCrmDealsView('table')">Таблица</button>
+        deals: `<div class="ui-seg">
+                    <button class="ui-seg__btn ${crmDealsView === 'board' ? 'on' : ''}" onclick="setCrmDealsView('board')">Доска</button>
+                    <button class="ui-seg__btn ${crmDealsView === 'table' ? 'on' : ''}" onclick="setCrmDealsView('table')">Таблица</button>
                 </div>
                 <button class="ui-btn ui-btn--primary" onclick="createCrmRecord('deal')">+ Сделка</button>`,
         tasks: `<button class="ui-btn ui-btn--primary" onclick="createCrmTask()">+ Задача</button>`,
@@ -1231,8 +1231,8 @@ function renderCrmOverview() {
 function crmTable(rows, columns, type, emptyText) {
     if (!rows.length) return `<div class="ui-empty">${emptyText}</div>`;
     return `
-    <div class="crm-table-wrap">
-        <table class="crm-table">
+    <div class="ui-table-wrap">
+        <table class="ui-table ui-table--dense">
             <thead><tr>${columns.map(c => `<th style="${c.width ? `width:${c.width}` : ''}">${c.title}</th>`).join('')}</tr></thead>
             <tbody>
                 ${rows.map(r => `<tr>${columns.map(c => `<td>${c.render(r, type)}</td>`).join('')}</tr>`).join('')}
@@ -1242,12 +1242,12 @@ function crmTable(rows, columns, type, emptyText) {
 }
 
 function crmCell(record, type, field, placeholder = '') {
-    return `<input class="crm-cell" value="${escapeHtml(record[field] || '')}" placeholder="${escapeHtml(placeholder)}"
+    return `<input class="ui-cell" value="${escapeHtml(record[field] || '')}" placeholder="${escapeHtml(placeholder)}"
         onblur="updateCrmField('${type}', '${record.id}', '${field}', this.value)">`;
 }
 
 function crmLinkCell(record, type, field) {
-    return `<button class="crm-link" onclick="openCrmRecord('${type}', '${record.id}')">${escapeHtml(record[field] || '—')}</button>`;
+    return `<button class="ui-table__link" onclick="openCrmRecord('${type}', '${record.id}')">${escapeHtml(record[field] || '—')}</button>`;
 }
 
 function crmSearchBar(placeholder) {
@@ -1286,7 +1286,7 @@ function renderCrmContacts() {
 }
 
 function crmCompanySelect(record, type) {
-    return `<select class="crm-cell" onchange="updateCrmField('${type}', '${record.id}', 'companyId', this.value)">
+    return `<select class="ui-cell" onchange="updateCrmField('${type}', '${record.id}', 'companyId', this.value)">
         <option value="">— не выбрана —</option>
         ${crmCompanies.map(c => `<option value="${c.id}" ${record.companyId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
     </select>`;
@@ -1302,7 +1302,7 @@ function renderCrmDeals() {
             { title: 'Сделка', width: '24%', render: r => crmLinkCell(r, 'deal', 'title') },
             { title: 'Компания', render: r => crmCompanySelect(r, 'deal') },
             { title: 'Стадия', width: '160px', render: r => crmStageSelect(r) },
-            { title: 'Сумма', width: '140px', render: r => `<input class="crm-cell" type="number" value="${r.amount || 0}" onblur="updateCrmField('deal','${r.id}','amount',this.value)">` },
+            { title: 'Сумма', width: '140px', render: r => `<input class="ui-cell" type="number" value="${r.amount || 0}" onblur="updateCrmField('deal','${r.id}','amount',this.value)">` },
         ], 'deal', crmSearch ? 'Ничего не найдено.' : 'Сделок пока нет.');
         return;
     }
@@ -1333,7 +1333,7 @@ function renderCrmDeals() {
 }
 
 function crmStageSelect(record) {
-    return `<select class="crm-cell" onchange="moveCrmDeal('${record.id}', this.value)">
+    return `<select class="ui-cell" onchange="moveCrmDeal('${record.id}', this.value)">
         ${crmMeta.stages.map(s => `<option value="${s.id}" ${record.stage === s.id ? 'selected' : ''}>${escapeHtml(s.title)}</option>`).join('')}
     </select>`;
 }
@@ -1503,15 +1503,15 @@ function crmRecordData() {
 
 function crmField(type, id, field, label, value, opts = {}) {
     if (opts.select) {
-        return `<div class="crm-field">
-            <label class="cc-label">${label}</label>
+        return `<div class="ui-field">
+            <label class="ui-field__label">${label}</label>
             <select class="form-select cc-input" onchange="updateCrmField('${type}','${id}','${field}',this.value)">
                 ${opts.select.map(o => `<option value="${escapeHtml(o.value)}" ${String(value) === String(o.value) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
             </select>
         </div>`;
     }
-    return `<div class="crm-field">
-        <label class="cc-label">${label}</label>
+    return `<div class="ui-field">
+        <label class="ui-field__label">${label}</label>
         <input type="${opts.type || 'text'}" class="form-input cc-input" value="${escapeHtml(value ?? '')}" placeholder="${escapeHtml(opts.placeholder || '')}"
             onblur="updateCrmField('${type}','${id}','${field}',this.value)">
     </div>`;
@@ -2782,7 +2782,7 @@ function switchPublishSettingsTab(tab) {
         const content = document.getElementById(`ps-tab-${t}`);
         if (content) content.style.display = t === tab ? '' : 'none';
         const btn = document.querySelector(`.ps-tab-btn[data-ps-tab="${t}"]`);
-        if (btn) btn.classList.toggle('active', t === tab);
+        if (btn) btn.classList.toggle('on', t === tab);
     });
 }
 
@@ -3615,22 +3615,22 @@ function renderProductDetailContent(productId) {
 
         <div class="p-section-title">О ПРОЕКТЕ</div>
 
-        <label class="form-label">Описание проекта:</label>
+        <label class="ui-field__label">Описание проекта:</label>
         <textarea id="pi-about-input" class="form-textarea" style="min-height:140px;" placeholder="Расскажите про проект: что это, для кого, как устроено...">${escapeHtml(about)}</textarea>
 
-        <label class="form-label">Целевая аудитория (ЦА):</label>
+        <label class="ui-field__label">Целевая аудитория (ЦА):</label>
         <input type="text" id="pi-target-audience-input" class="form-input" placeholder="Кто клиент этого продукта" value="${escapeHtml(targetAudience)}">
 
-        <label class="form-label">Главный посыл (value proposition):</label>
+        <label class="ui-field__label">Главный посыл (value proposition):</label>
         <input type="text" id="pi-value-proposition-input" class="form-input" placeholder="Какую ценность продукт даёт клиенту" value="${escapeHtml(valueProposition)}">
 
-        <label class="form-label">Что отличает от конкурентов:</label>
+        <label class="ui-field__label">Что отличает от конкурентов:</label>
         <textarea id="pi-key-differentiators-input" class="form-textarea" style="min-height:80px;" placeholder="Чем продукт объективно лучше или отличается от альтернатив">${escapeHtml(keyDifferentiators)}</textarea>
 
-        <label class="form-label">Частые возражения клиентов:</label>
+        <label class="ui-field__label">Частые возражения клиентов:</label>
         <textarea id="pi-common-objections-input" class="form-textarea" style="min-height:80px;" placeholder="С какими сомнениями чаще всего сталкиваетесь на продажах">${escapeHtml(commonObjections)}</textarea>
 
-        <label class="form-label">Ключевые слова (через запятую):</label>
+        <label class="ui-field__label">Ключевые слова (через запятую):</label>
         <input type="text" id="pi-keywords-input" class="form-input" placeholder="ключевое слово 1, ключевое слово 2, ..." value="${escapeHtml(keywords)}">
 
         <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:4px;" onclick="saveProjectInfo('${productId}')">💾 Сохранить</button>
@@ -3648,13 +3648,13 @@ function renderProductDetailContent(productId) {
 
         <div id="roadmap-item-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
             <input type="hidden" id="ri-id-input">
-            <label class="form-label">Название этапа:</label>
+            <label class="ui-field__label">Название этапа:</label>
             <input type="text" id="ri-title-input" class="form-input" placeholder="MVP">
 
-            <label class="form-label">Описание:</label>
+            <label class="ui-field__label">Описание:</label>
             <textarea id="ri-description-input" class="form-textarea" style="min-height:60px;" placeholder="Что входит в этот этап"></textarea>
 
-            <label class="form-label">Статус:</label>
+            <label class="ui-field__label">Статус:</label>
             <select id="ri-status-input" class="form-select">
                 <option value="planned">Запланировано</option>
                 <option value="in_progress">В работе</option>
@@ -4407,10 +4407,10 @@ function scrollToCallSection(id) {
 // РЕЖИМ РЕДАКТИРОВАНИЯ: аккордеон, чтобы длинные разделы не превращали страницу в стену textarea
 function renderEditModeHtml(niche) {
     let html = `
-        <label class="form-label" style="margin-top:0;">Название ниши:</label>
+        <label class="ui-field__label" style="margin-top:0;">Название ниши:</label>
         <input type="text" id="niche-name-input" class="form-input" value="${escapeHtml(niche.name)}">
 
-        <label class="form-label">Описание / когда использовать:</label>
+        <label class="ui-field__label">Описание / когда использовать:</label>
         <input type="text" id="niche-subtitle-input" class="form-input" value="${escapeHtml(niche.subtitle || '')}" placeholder="Например: холодные звонки владельцам кальянных">
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px;">
@@ -4963,12 +4963,12 @@ function renderScrapeNicheCard(n) {
         <div class="cc-body">
             <div class="cc-topic-row">
                 <div style="flex:1 1 200px; min-width:0;">
-                    <label class="cc-label">Ниша</label>
+                    <label class="ui-field__label">Ниша</label>
                     <input type="text" class="form-input cc-input" value="${escapeHtml(n.category)}" ${active ? 'disabled' : ''}
                         onchange="updateScrapeNiche('${n.id}', 'category', this.value)">
                 </div>
                 <div style="flex:1 1 160px; min-width:0;">
-                    <label class="cc-label">Город</label>
+                    <label class="ui-field__label">Город</label>
                     <input type="text" class="form-input cc-input" value="${escapeHtml(n.city || '')}" placeholder="Казань" ${active ? 'disabled' : ''}
                         onchange="updateScrapeNiche('${n.id}', 'city', this.value)">
                 </div>
@@ -4977,7 +4977,7 @@ function renderScrapeNicheCard(n) {
             ${n.log ? `<pre class="scrape-log">${escapeHtml(n.log)}</pre>` : ''}
 
             ${n.results.length ? `
-                <label class="cc-label">Найденные организации</label>
+                <label class="ui-field__label">Найденные организации</label>
                 <div class="scrape-results">
                     ${n.results.slice(0, 50).map(r => `
                         <div class="scrape-row">
@@ -4993,7 +4993,7 @@ function renderScrapeNicheCard(n) {
                             </div>
                         </div>`).join('')}
                 </div>
-                ${n.results.length > 50 ? `<p class="cc-hint">Показаны первые 50 из ${n.results.length} — остальные в выгрузке.</p>` : ''}
+                ${n.results.length > 50 ? `<p class="ui-field__hint">Показаны первые 50 из ${n.results.length} — остальные в выгрузке.</p>` : ''}
             ` : ''}
 
             <div class="cc-actions">
@@ -5128,8 +5128,8 @@ async function renderMergedBase() {
     }
 
     tableBox.innerHTML = `
-        <div class="merged-table-wrap">
-            <table class="merged-table">
+        <div class="ui-table-wrap">
+            <table class="ui-table ui-table--top">
                 <thead><tr>
                     <th>Название</th><th>Ниша</th><th>Адрес</th><th>Телефон</th><th>Сайт</th><th>Email</th><th>Соцсети</th><th>Источник</th>
                 </tr></thead>
@@ -5262,33 +5262,33 @@ function renderParserNicheDetailContent(id) {
     body.innerHTML = `
         <div class="pn-grid">
             <div>
-                <label class="cc-label" for="pn-category-${n.id}">Ниша</label>
+                <label class="ui-field__label" for="pn-category-${n.id}">Ниша</label>
                 <input type="text" class="form-input cc-input" id="pn-category-${n.id}" value="${escapeHtml(n.category)}"
                     placeholder="Например: кальянные" onblur="saveParserNicheField('${n.id}','category',this.value)">
             </div>
             <div>
-                <label class="cc-label" for="pn-city-${n.id}">Город</label>
+                <label class="ui-field__label" for="pn-city-${n.id}">Город</label>
                 <input type="text" class="form-input cc-input" id="pn-city-${n.id}" value="${escapeHtml(n.city || 'Москва')}"
                     placeholder="Москва" onblur="saveParserNicheField('${n.id}','city',this.value)">
-                <p class="cc-hint">Определяется автоматически при первом запуске для этого города.</p>
+                <p class="ui-field__hint">Определяется автоматически при первом запуске для этого города.</p>
             </div>
         </div>
 
-        <div class="cc-label-row">
-            <label class="cc-label" for="parser-desc-${n.id}">Ключевые слова для 2ГИС</label>
+        <div class="ui-field__head">
+            <label class="ui-field__label" for="parser-desc-${n.id}">Ключевые слова для 2ГИС</label>
             <button class="ui-btn ui-btn--link" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨ Подобрать</button>
         </div>
         <textarea class="form-textarea cc-input" id="parser-desc-${n.id}"
             placeholder="кальянная, лаунж, hookah, кальян-бар"
             onblur="saveParserNicheField('${n.id}','description',this.value)">${escapeHtml(n.description)}</textarea>
-        <p class="cc-hint">Через запятую. В поиск реально уходят только первые 8 уникальных слов — списком, не связным текстом.</p>
-        <div id="parser-desc-status-${n.id}" class="cc-hint" style="min-height:14px;"></div>
+        <p class="ui-field__hint">Через запятую. В поиск реально уходят только первые 8 уникальных слов — списком, не связным текстом.</p>
+        <div id="parser-desc-status-${n.id}" class="ui-field__hint" style="min-height:14px;"></div>
 
-        ${n.log ? `<label class="cc-label">Лог парсера</label>
+        ${n.log ? `<label class="ui-field__label">Лог парсера</label>
         <div class="parser-niche-console" id="parser-log-${n.id}">${escapeHtml(n.log)}</div>` : ''}
 
         ${(n.files.raw || n.files.dedup || n.files.archive) ? `
-            <label class="cc-label">Выгрузки</label>
+            <label class="ui-field__label">Выгрузки</label>
             <div class="parser-niche-files">
                 ${n.files.raw ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','raw')">📊 raw.xlsx</div>` : ''}
                 ${n.files.dedup ? `<div class="parser-file-badge" onclick="downloadParserFile('${n.id}','dedup')">✨ dedup.xlsx</div>` : ''}

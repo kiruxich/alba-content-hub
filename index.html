@@ -197,13 +197,13 @@
                 <div class="crm-header-actions" id="crm-header-actions"></div>
             </div>
 
-            <div class="crm-objects">
-                <button class="crm-obj" data-crm-obj="overview" onclick="switchCrmObject('overview')">Обзор</button>
-                <button class="crm-obj" data-crm-obj="companies" onclick="switchCrmObject('companies')">Компании <span class="ui-badge" id="crm-count-companies"></span></button>
-                <button class="crm-obj" data-crm-obj="contacts" onclick="switchCrmObject('contacts')">Контакты <span class="ui-badge" id="crm-count-contacts"></span></button>
-                <button class="crm-obj" data-crm-obj="deals" onclick="switchCrmObject('deals')">Сделки <span class="ui-badge" id="crm-count-deals"></span></button>
-                <button class="crm-obj" data-crm-obj="tasks" onclick="switchCrmObject('tasks')">Задачи <span class="ui-badge" id="crm-count-tasks"></span></button>
-                <button class="crm-obj" data-crm-obj="content" onclick="switchCrmObject('content')">Контент</button>
+            <div class="ui-tabs">
+                <button class="ui-tabs__btn" data-crm-obj="overview" onclick="switchCrmObject('overview')">Обзор</button>
+                <button class="ui-tabs__btn" data-crm-obj="companies" onclick="switchCrmObject('companies')">Компании <span class="ui-badge" id="crm-count-companies"></span></button>
+                <button class="ui-tabs__btn" data-crm-obj="contacts" onclick="switchCrmObject('contacts')">Контакты <span class="ui-badge" id="crm-count-contacts"></span></button>
+                <button class="ui-tabs__btn" data-crm-obj="deals" onclick="switchCrmObject('deals')">Сделки <span class="ui-badge" id="crm-count-deals"></span></button>
+                <button class="ui-tabs__btn" data-crm-obj="tasks" onclick="switchCrmObject('tasks')">Задачи <span class="ui-badge" id="crm-count-tasks"></span></button>
+                <button class="ui-tabs__btn" data-crm-obj="content" onclick="switchCrmObject('content')">Контент</button>
             </div>
 
             <div class="crm-body">
@@ -259,11 +259,11 @@
                 <div class="plan-settings-card">
                     <div class="plan-inputs-row">
                         <div class="plan-field">
-                            <label class="form-label" style="margin-top:0;">План на день (постов):</label>
+                            <label class="ui-field__label" style="margin-top:0;">План на день (постов):</label>
                             <input type="number" id="plan-daily-input" class="form-input" min="1" value="1">
                         </div>
                         <div class="plan-field">
-                            <label class="form-label" style="margin-top:0;">План на неделю (постов):</label>
+                            <label class="ui-field__label" style="margin-top:0;">План на неделю (постов):</label>
                             <input type="number" id="plan-weekly-input" class="form-input" min="1" value="7">
                         </div>
                         <button class="ui-btn ui-btn--primary" style="height:42px; margin-top:18px;" onclick="savePlanSettings()">Применить</button>
@@ -408,10 +408,10 @@
                      но только у тех, у кого есть сайт). Сводная склеивает их по
                      телефону/домену/названию - см. mergeRows() в
                      server/routes/scrapeNiches.js. -->
-                <div class="cc-segment cust-tabs">
-                    <button class="cc-seg-btn on" data-cust-tab="parser" onclick="switchCustomersTab('parser')">🗺 2ГИС-парсер</button>
-                    <button class="cc-seg-btn" data-cust-tab="scrape" onclick="switchCustomersTab('scrape')">🤖 ScrapeGraph</button>
-                    <button class="cc-seg-btn" data-cust-tab="merged" onclick="switchCustomersTab('merged')">🧬 Сводная база</button>
+                <div class="ui-seg cust-tabs">
+                    <button class="ui-seg__btn on" data-cust-tab="parser" onclick="switchCustomersTab('parser')">🗺 2ГИС-парсер</button>
+                    <button class="ui-seg__btn" data-cust-tab="scrape" onclick="switchCustomersTab('scrape')">🤖 ScrapeGraph</button>
+                    <button class="ui-seg__btn" data-cust-tab="merged" onclick="switchCustomersTab('merged')">🧬 Сводная база</button>
                 </div>
 
                 <div id="cust-pane-parser" class="cust-pane">
@@ -427,7 +427,7 @@
                         <p style="color:var(--text-secondary); font-size:13px; margin:0;">Обход сайтов компаний моделью: локальный агент ищет сайты по нише и городу, воркер снимает с них контакты</p>
                         <button class="ui-btn ui-btn--primary" onclick="addScrapeNicheCard()">+ Добавить нишу</button>
                     </div>
-                    <div id="scrape-worker-health" class="cc-hint" style="margin:0 0 12px;"></div>
+                    <div id="scrape-worker-health" class="ui-field__hint" style="margin:0 0 12px;"></div>
                     <div id="scrape-niches-list"></div>
                 </div>
 
@@ -478,26 +478,26 @@
                 </div>
 
                 <div id="media-asset-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
-                    <label class="form-label">URL изображения/видео:</label>
+                    <label class="ui-field__label">URL изображения/видео:</label>
                     <input type="text" id="ma-url-input" class="form-input" placeholder="https://alba-creation.ru/assets/cover.jpg" oninput="onMediaAssetUrlInput()">
 
-                    <label class="form-label">или загрузите файл напрямую:</label>
+                    <label class="ui-field__label">или загрузите файл напрямую:</label>
                     <input type="file" id="ma-file-input" class="form-input" accept="image/*,video/*" onchange="onMediaAssetFileInput()">
                     <p id="ma-file-hint" style="color:var(--text-secondary); font-size:12px; margin:-8px 0 12px;">Заполните либо ссылку, либо файл — не оба сразу</p>
 
-                    <label class="form-label">Тип:</label>
+                    <label class="ui-field__label">Тип:</label>
                     <select id="ma-type-input" class="form-select">
                         <option value="image">Изображение</option>
                         <option value="video">Видео</option>
                         <option value="gif">GIF</option>
                     </select>
 
-                    <label class="form-label">Продукт (необязательно):</label>
+                    <label class="ui-field__label">Продукт (необязательно):</label>
                     <select id="ma-product-input" class="form-select">
                         <option value="">— без привязки —</option>
                     </select>
 
-                    <label class="form-label">Теги (через запятую):</label>
+                    <label class="ui-field__label">Теги (через запятую):</label>
                     <input type="text" id="ma-tags-input" class="form-input" placeholder="обложка, промо, reels">
 
                     <div style="display:flex; gap:8px;">
@@ -507,21 +507,21 @@
                 </div>
 
                 <div id="media-asset-generate-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
-                    <label class="form-label">Опишите, что должно быть на обложке:</label>
+                    <label class="ui-field__label">Опишите, что должно быть на обложке:</label>
                     <textarea id="ma-gen-prompt-input" class="form-textarea" style="min-height:70px;" placeholder="Например: минималистичная обложка для поста про AI-аналитику, тёмный фон, синие акценты"></textarea>
 
-                    <label class="form-label">Тип генерации:</label>
+                    <label class="ui-field__label">Тип генерации:</label>
                     <select id="ma-gen-type-input" class="form-select">
                         <option value="image">Изображение (Flux)</option>
                         <option value="video">Видео (Kling, дольше и дороже)</option>
                     </select>
 
-                    <label class="form-label">Продукт (необязательно):</label>
+                    <label class="ui-field__label">Продукт (необязательно):</label>
                     <select id="ma-gen-product-input" class="form-select">
                         <option value="">— без привязки —</option>
                     </select>
 
-                    <label class="form-label">Идея (необязательно):</label>
+                    <label class="ui-field__label">Идея (необязательно):</label>
                     <select id="ma-gen-idea-input" class="form-select" onchange="onGenIdeaSelectChange()">
                         <option value="">— без привязки —</option>
                     </select>
@@ -540,24 +540,24 @@
                      behind ELEVENLABS_API_KEY; the "not configured" case surfaces as a normal
                      error toast, same as the Telegram integration elsewhere in this app. -->
                 <div id="voiceover-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
-                    <label class="form-label">Текст для озвучки:</label>
+                    <label class="ui-field__label">Текст для озвучки:</label>
                     <textarea id="vo-text-input" class="form-textarea" placeholder="Текст, который нужно озвучить..."></textarea>
 
-                    <label class="form-label">Провайдер:</label>
+                    <label class="ui-field__label">Провайдер:</label>
                     <select id="vo-provider-input" class="form-select">
                         <option value="elevenlabs">ElevenLabs (платно, выше качество)</option>
                         <option value="piper">Piper (бесплатно, self-hosted)</option>
                     </select>
 
-                    <label class="form-label">Voice ID (необязательно):</label>
+                    <label class="ui-field__label">Voice ID (необязательно):</label>
                     <input type="text" id="vo-voiceid-input" class="form-input" placeholder="по умолчанию — стандартный голос выбранного провайдера">
 
-                    <label class="form-label">Продукт (необязательно):</label>
+                    <label class="ui-field__label">Продукт (необязательно):</label>
                     <select id="vo-product-input" class="form-select">
                         <option value="">— без привязки —</option>
                     </select>
 
-                    <label class="form-label">Идея (необязательно):</label>
+                    <label class="ui-field__label">Идея (необязательно):</label>
                     <select id="vo-idea-input" class="form-select" onchange="onVoiceoverIdeaSelectChange()">
                         <option value="">— без привязки —</option>
                     </select>
@@ -591,11 +591,11 @@
                 <div class="uc-form">
                     <div class="uc-row">
                         <div class="uc-field uc-field-grow">
-                            <label class="cc-label" for="url-checker-input">URL сайта</label>
+                            <label class="ui-field__label" for="url-checker-input">URL сайта</label>
                             <input type="text" id="url-checker-input" class="form-input cc-input" placeholder="alba-creation.ru или https://example.com">
                         </div>
                         <div class="uc-field">
-                            <label class="cc-label" for="url-checker-mode-input">Режим проверки</label>
+                            <label class="ui-field__label" for="url-checker-mode-input">Режим проверки</label>
                             <select id="url-checker-mode-input" class="form-select cc-input">
                                 <option value="fast" selected>Быстрая проверка</option>
                                 <option value="live">Полная проверка (с браузером)</option>
@@ -612,18 +612,18 @@
                         <summary>Параметры нагрузочного теста</summary>
                         <div class="uc-row">
                             <div class="uc-field">
-                                <label class="cc-label" for="url-checker-requestcount-input">Количество запросов</label>
+                                <label class="ui-field__label" for="url-checker-requestcount-input">Количество запросов</label>
                                 <input type="number" id="url-checker-requestcount-input" class="form-input cc-input" value="100" min="1" max="5000" step="1">
                             </div>
                             <div class="uc-field">
-                                <label class="cc-label" for="url-checker-concurrency-input">Одновременно</label>
+                                <label class="ui-field__label" for="url-checker-concurrency-input">Одновременно</label>
                                 <input type="number" id="url-checker-concurrency-input" class="form-input cc-input" placeholder="авто" min="1" max="50" step="1">
-                                <p class="cc-hint">Пусто — подберётся само</p>
+                                <p class="ui-field__hint">Пусто — подберётся само</p>
                             </div>
                             <div class="uc-field">
-                                <label class="cc-label" for="url-checker-duration-input">Макс. время, сек</label>
+                                <label class="ui-field__label" for="url-checker-duration-input">Макс. время, сек</label>
                                 <input type="number" id="url-checker-duration-input" class="form-input cc-input" value="15" min="1" max="120" step="1">
-                                <p class="cc-hint">Жёсткий потолок по времени</p>
+                                <p class="ui-field__hint">Жёсткий потолок по времени</p>
                             </div>
                         </div>
                     </details>
@@ -977,16 +977,16 @@
 
                 <div id="rubric-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
                     <input type="hidden" id="rb-id-input">
-                    <label class="form-label">Название:</label>
+                    <label class="ui-field__label">Название:</label>
                     <input type="text" id="rb-name-input" class="form-input" placeholder="Кейс недели">
 
-                    <label class="form-label">Описание:</label>
+                    <label class="ui-field__label">Описание:</label>
                     <textarea id="rb-description-input" class="form-textarea" style="min-height:60px;" placeholder="Когда и зачем использовать эту рубрику"></textarea>
 
-                    <label class="form-label">Структура (по одному пункту на строку):</label>
+                    <label class="ui-field__label">Структура (по одному пункту на строку):</label>
                     <textarea id="rb-structure-input" class="form-textarea" style="min-height:80px;" placeholder="Проблема клиента&#10;Что сделали&#10;Результат с цифрами"></textarea>
 
-                    <label class="form-label">Этап воронки:</label>
+                    <label class="ui-field__label">Этап воронки:</label>
                     <select id="rb-funnel-input" class="form-select">
                         <option value="TOFU">TOFU (Охват & Привлечение)</option>
                         <option value="MOFU">MOFU (Доверие & Экспертность)</option>
@@ -1142,11 +1142,11 @@
                 <div class="ie-main">
                     <input type="hidden" id="edit-idea-id">
 
-                    <label class="cc-label" for="edit-idea-title-input">Название идеи</label>
+                    <label class="ui-field__label" for="edit-idea-title-input">Название идеи</label>
                     <input type="text" id="edit-idea-title-input" class="form-input cc-input" placeholder="Введите название...">
 
-                    <div class="cc-label-row">
-                        <label class="cc-label" for="edit-idea-desc-input">Суть / текст поста</label>
+                    <div class="ui-field__head">
+                        <label class="ui-field__label" for="edit-idea-desc-input">Суть / текст поста</label>
                         <div class="ie-text-tools">
                             <span id="limit-validator-badge" class="ui-badge ui-badge--green ui-badge--outline">0 / 4096 симв.</span>
                             <button class="ui-btn ui-btn--link" type="button" onclick="toggleIdeaEditorFocus()" id="ie-focus-btn">⤢ Во весь экран</button>
@@ -1154,29 +1154,29 @@
                     </div>
                     <textarea id="edit-idea-desc-input" class="form-textarea cc-input ie-textarea" placeholder="Подробности контента или тезисы..." oninput="validateLimits()"></textarea>
 
-                    <label class="cc-label" for="edit-idea-cta-input">Призыв к действию (CTA)</label>
+                    <label class="ui-field__label" for="edit-idea-cta-input">Призыв к действию (CTA)</label>
                     <input type="text" id="edit-idea-cta-input" class="form-input cc-input" placeholder="Укажите оффер или ссылку...">
 
                     <div id="edit-idea-en-section" class="ie-en" style="display:none;">
-                        <div class="cc-label-row">
-                            <span class="cc-label">English version</span>
+                        <div class="ui-field__head">
+                            <span class="ui-field__label">English version</span>
                             <button class="ui-btn ui-btn--link" type="button" onclick="translateIdeaToEnglish()">🌍 Перевести на английский</button>
                         </div>
 
-                        <label class="cc-label" for="edit-idea-title-en-input">Title</label>
+                        <label class="ui-field__label" for="edit-idea-title-en-input">Title</label>
                         <input type="text" id="edit-idea-title-en-input" class="form-input cc-input" placeholder="Translated automatically, editable">
 
-                        <label class="cc-label" for="edit-idea-desc-en-input">Text</label>
+                        <label class="ui-field__label" for="edit-idea-desc-en-input">Text</label>
                         <textarea id="edit-idea-desc-en-input" class="form-textarea cc-input ie-textarea" placeholder="Translated automatically, editable"></textarea>
 
-                        <label class="cc-label" for="edit-idea-cta-en-input">CTA</label>
+                        <label class="ui-field__label" for="edit-idea-cta-en-input">CTA</label>
                         <input type="text" id="edit-idea-cta-en-input" class="form-input cc-input" placeholder="Translated automatically, editable">
                     </div>
                 </div>
 
                 <aside class="ie-aside">
                     <div class="ie-panel">
-                        <label class="cc-label" for="edit-idea-format-input">Формат и адаптация</label>
+                        <label class="ui-field__label" for="edit-idea-format-input">Формат и адаптация</label>
                         <select id="edit-idea-format-input" class="form-select cc-input" onchange="validateLimits()">
                             <option value="TG Пост">TG Пост (лимит 4096)</option>
                             <option value="Reels / Shorts">Reels / Shorts (лимит 1000)</option>
@@ -1185,14 +1185,14 @@
                             <option value="Лонгрид Habr/VC">Лонгрид Habr / VC (без лимита)</option>
                         </select>
 
-                        <label class="cc-label" for="edit-idea-funnel-input">Этап воронки</label>
+                        <label class="ui-field__label" for="edit-idea-funnel-input">Этап воронки</label>
                         <select id="edit-idea-funnel-input" class="form-select cc-input">
                             <option value="TOFU">TOFU (Охват & Привлечение)</option>
                             <option value="MOFU">MOFU (Доверие & Экспертность)</option>
                             <option value="BOFU">BOFU (Продажа & Кейс)</option>
                         </select>
 
-                        <label class="cc-label" for="edit-idea-status-input">Статус пайплайна</label>
+                        <label class="ui-field__label" for="edit-idea-status-input">Статус пайплайна</label>
                         <select id="edit-idea-status-input" class="form-select cc-input">
                             <option value="idea">💡 Идея</option>
                             <option value="in_progress">⚙️ В работе</option>
@@ -1200,14 +1200,14 @@
                             <option value="published">🚀 Опубликовано</option>
                         </select>
 
-                        <label class="cc-label" for="edit-idea-rubric-input">Рубрика <span class="cc-optional">необязательно</span></label>
+                        <label class="ui-field__label" for="edit-idea-rubric-input">Рубрика <span class="ui-field__optional">необязательно</span></label>
                         <select id="edit-idea-rubric-input" class="form-select cc-input">
                             <option value="">— без рубрики —</option>
                         </select>
                     </div>
 
                     <div class="ie-panel">
-                        <span class="cc-label">Обложка <span class="cc-optional">из Медиатеки</span></span>
+                        <span class="ui-field__label">Обложка <span class="ui-field__optional">из Медиатеки</span></span>
                         <input type="hidden" id="edit-idea-cover-asset-id">
                         <div id="edit-idea-cover-preview" class="ie-asset-preview">Не выбрана</div>
                         <div class="ie-panel-actions">
@@ -1215,7 +1215,7 @@
                             <button class="ui-btn ui-btn--secondary" type="button" onclick="clearCoverAsset()">✕ Убрать</button>
                         </div>
 
-                        <span class="cc-label">Озвучка <span class="cc-optional">из Медиатеки</span></span>
+                        <span class="ui-field__label">Озвучка <span class="ui-field__optional">из Медиатеки</span></span>
                         <input type="hidden" id="edit-idea-voiceover-asset-id">
                         <div id="edit-idea-voiceover-preview" class="ie-asset-preview">Не выбрана</div>
                         <div class="ie-panel-actions">
@@ -1270,7 +1270,7 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="use-asset-id">
-                <label class="form-label" style="margin-top:0;">Идея:</label>
+                <label class="ui-field__label" style="margin-top:0;">Идея:</label>
                 <select id="use-asset-idea-select" class="form-select"></select>
                 <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="confirmUseAsset()">Прикрепить</button>
             </div>
@@ -1303,34 +1303,34 @@
 
                 <div style="margin-top:20px; display:flex; gap:12px;">
                     <div style="flex:1;">
-                        <label class="form-label">Дата публикации:</label>
+                        <label class="ui-field__label">Дата публикации:</label>
                         <input type="date" id="schedule-date-input" class="date-picker-input" oninput="onScheduleDateChange()">
                     </div>
                     <div style="flex:1;">
-                        <label class="form-label">Время:</label>
+                        <label class="ui-field__label">Время:</label>
                         <input type="time" id="schedule-time-input" class="date-picker-input" value="12:00">
                     </div>
                 </div>
                 <!-- Тема дня из недельного расписания (Центр агентов) для выбранной даты -->
                 <div id="schedule-day-theme" style="font-size:12px; color:var(--text-secondary); margin-top:6px;"></div>
 
-                <label class="form-label" style="margin-top:16px;">Платформа:</label>
+                <label class="ui-field__label" style="margin-top:16px;">Платформа:</label>
                 <div id="schedule-platform-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
 
                 <div id="schedule-channel-row" style="display:none;">
-                    <label class="form-label">Канал Telegram:</label>
+                    <label class="ui-field__label">Канал Telegram:</label>
                     <select id="schedule-channel-select" class="form-select" onchange="onScheduleChannelChange()"></select>
                 </div>
                 <div id="schedule-board-row" style="display:none;">
-                    <label class="form-label">Доска Pinterest:</label>
+                    <label class="ui-field__label">Доска Pinterest:</label>
                     <select id="schedule-board-select" class="form-select" onchange="onScheduleBoardChange()"></select>
                 </div>
                 <div id="schedule-vk-group-row" style="display:none;">
-                    <label class="form-label">Сообщество VK:</label>
+                    <label class="ui-field__label">Сообщество VK:</label>
                     <select id="schedule-vk-group-select" class="form-select" onchange="onScheduleVkGroupChange()"></select>
                 </div>
 
-                <label class="form-label" style="margin-top:8px;">Язык:</label>
+                <label class="ui-field__label" style="margin-top:8px;">Язык:</label>
                 <div style="display:flex; gap:8px; margin-bottom:12px;">
                     <button id="schedule-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setScheduleLang('ru')">🇷🇺 RU</button>
                     <button id="schedule-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setScheduleLang('en')">🇬🇧 EN</button>
@@ -1351,10 +1351,10 @@
                 <button class="ui-btn ui-btn--link" onclick="closeOverlay('new-niche-overlay')">Отмена</button>
             </div>
             <div class="modal-body">
-                <label class="form-label" style="margin-top:0;">Название ниши:</label>
+                <label class="ui-field__label" style="margin-top:0;">Название ниши:</label>
                 <input type="text" id="new-niche-name-input" class="form-input" placeholder="Например: Кальянные">
 
-                <label class="form-label">Описание:</label>
+                <label class="ui-field__label">Описание:</label>
                 <input type="text" id="new-niche-subtitle-input" class="form-input" placeholder="Когда и для чего использовать скрипт">
 
                 <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="createNiche()">Создать нишу</button>
@@ -1373,21 +1373,21 @@
                 <button class="ui-btn ui-btn--link" onclick="closeOverlay('publish-settings-overlay')">Закрыть ✕</button>
             </div>
             <div class="modal-body">
-                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px;">
-                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="tg" onclick="switchPublishSettingsTab('tg')">✈️ Telegram</button>
-                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="vk" onclick="switchPublishSettingsTab('vk')">🔵 VK</button>
-                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="ig" onclick="switchPublishSettingsTab('ig')">📸 Instagram</button>
-                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="yt" onclick="switchPublishSettingsTab('yt')">▶️ YouTube</button>
-                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="th" onclick="switchPublishSettingsTab('th')">🧵 Threads</button>
-                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="pin" onclick="switchPublishSettingsTab('pin')">📌 Pinterest</button>
+                <div class="ui-seg" style="margin-bottom:20px;">
+                    <button class="ui-seg__btn ps-tab-btn" data-ps-tab="tg" onclick="switchPublishSettingsTab('tg')">✈️ Telegram</button>
+                    <button class="ui-seg__btn ps-tab-btn" data-ps-tab="vk" onclick="switchPublishSettingsTab('vk')">🔵 VK</button>
+                    <button class="ui-seg__btn ps-tab-btn" data-ps-tab="ig" onclick="switchPublishSettingsTab('ig')">📸 Instagram</button>
+                    <button class="ui-seg__btn ps-tab-btn" data-ps-tab="yt" onclick="switchPublishSettingsTab('yt')">▶️ YouTube</button>
+                    <button class="ui-seg__btn ps-tab-btn" data-ps-tab="th" onclick="switchPublishSettingsTab('th')">🧵 Threads</button>
+                    <button class="ui-seg__btn ps-tab-btn" data-ps-tab="pin" onclick="switchPublishSettingsTab('pin')">📌 Pinterest</button>
                 </div>
 
                 <!-- TELEGRAM TAB -->
                 <div id="ps-tab-tg" class="ps-tab-content">
-                    <label class="form-label" style="margin-top:0;">Bot API Token:</label>
+                    <label class="ui-field__label" style="margin-top:0;">Bot API Token:</label>
                     <input type="text" id="tg-token-input" class="form-input" placeholder="123456789:ABCdefGHI...">
 
-                    <label class="form-label">Chat ID / @ChannelUsername (админ-чат для уведомлений и модерации, не публикация):</label>
+                    <label class="ui-field__label">Chat ID / @ChannelUsername (админ-чат для уведомлений и модерации, не публикация):</label>
                     <input type="text" id="tg-chat-input" class="form-input" placeholder="@my_channel или -10012345678">
 
                     <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveTgSettings()">Сохранить токен</button>
@@ -1425,7 +1425,7 @@
                     <details style="margin-top:16px;">
                         <summary style="cursor:pointer; color:var(--text-secondary); font-size:12px;">Общий токен (редкий случай — пользовательский токен с правами groups+wall на несколько сообществ сразу)</summary>
                         <div style="margin-top:10px;">
-                            <label class="form-label">Access Token:</label>
+                            <label class="ui-field__label">Access Token:</label>
                             <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
                             <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveVkSettings()">Сохранить общий токен</button>
                         </div>
@@ -1439,10 +1439,10 @@
                         <button id="ig-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('ig','ru')">🇷🇺 RU-аккаунт</button>
                         <button id="ig-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('ig','en')">🇬🇧 EN-аккаунт</button>
                     </div>
-                    <label class="form-label">Page Access Token:</label>
+                    <label class="ui-field__label">Page Access Token:</label>
                     <input type="text" id="ig-token-input" class="form-input" placeholder="EAAxxxxxxxx...">
 
-                    <label class="form-label">Instagram Business Account ID:</label>
+                    <label class="ui-field__label">Instagram Business Account ID:</label>
                     <input type="text" id="ig-account-input" class="form-input" placeholder="17841400000000000">
 
                     <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveIgSettings()">Сохранить настройки</button>
@@ -1455,16 +1455,16 @@
                         <button id="yt-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('yt','ru')">🇷🇺 RU-канал</button>
                         <button id="yt-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('yt','en')">🇬🇧 EN-канал</button>
                     </div>
-                    <label class="form-label">OAuth Client ID:</label>
+                    <label class="ui-field__label">OAuth Client ID:</label>
                     <input type="text" id="yt-client-id-input" class="form-input" placeholder="xxxxx.apps.googleusercontent.com">
 
-                    <label class="form-label">OAuth Client Secret:</label>
+                    <label class="ui-field__label">OAuth Client Secret:</label>
                     <input type="text" id="yt-client-secret-input" class="form-input" placeholder="GOCSPX-xxxxxxxx...">
 
-                    <label class="form-label">Refresh Token:</label>
+                    <label class="ui-field__label">Refresh Token:</label>
                     <input type="text" id="yt-refresh-token-input" class="form-input" placeholder="1//0gxxxxxxxx...">
 
-                    <label class="form-label">Название канала (опционально, для справки):</label>
+                    <label class="ui-field__label">Название канала (опционально, для справки):</label>
                     <input type="text" id="yt-channel-title-input" class="form-input" placeholder="Alba Creation">
 
                     <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveYtSettings()">Сохранить настройки</button>
@@ -1477,10 +1477,10 @@
                         <button id="th-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('th','ru')">🇷🇺 RU-аккаунт</button>
                         <button id="th-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('th','en')">🇬🇧 EN-аккаунт</button>
                     </div>
-                    <label class="form-label">Threads Access Token:</label>
+                    <label class="ui-field__label">Threads Access Token:</label>
                     <input type="text" id="th-token-input" class="form-input" placeholder="THQVJ...xxxxxxxx...">
 
-                    <label class="form-label">Threads User ID:</label>
+                    <label class="ui-field__label">Threads User ID:</label>
                     <input type="text" id="th-user-input" class="form-input" placeholder="17841400000000000">
 
                     <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveThSettings()">Сохранить настройки</button>
@@ -1489,10 +1489,10 @@
                 <!-- PINTEREST TAB -->
                 <div id="ps-tab-pin" class="ps-tab-content" style="display:none;">
                     <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">User access token из приложения Pinterest Developers со скоупами pins:read, pins:write, boards:read, boards:write. Каждый пин обязательно публикуется на доску — выберите доску по умолчанию или создайте новую ниже; конкретную доску можно также выбрать прямо при публикации идеи.</p>
-                    <label class="form-label">Access Token:</label>
+                    <label class="ui-field__label">Access Token:</label>
                     <input type="text" id="pin-token-input" class="form-input" placeholder="pina_xxxxxxxx...">
 
-                    <label class="form-label">Доска по умолчанию:</label>
+                    <label class="ui-field__label">Доска по умолчанию:</label>
                     <select id="pin-board-select" class="form-select"></select>
 
                     <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="savePinSettings()">Сохранить настройки</button>
@@ -1522,34 +1522,34 @@
             <div class="modal-body">
                 <h3 id="publish-idea-title" style="margin-top:0;">Название идеи</h3>
 
-                <label class="form-label" style="margin-top:0;">Платформа:</label>
+                <label class="ui-field__label" style="margin-top:0;">Платформа:</label>
                 <div id="publish-platform-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;"></div>
 
                 <div id="publish-channel-row" style="display:none;">
-                    <label class="form-label">Канал:</label>
+                    <label class="ui-field__label">Канал:</label>
                     <select id="publish-channel-select" class="form-select" onchange="onPublishChannelChange()"></select>
                 </div>
 
                 <div id="publish-board-row" style="display:none;">
-                    <label class="form-label">Доска Pinterest:</label>
+                    <label class="ui-field__label">Доска Pinterest:</label>
                     <select id="publish-board-select" class="form-select" onchange="onPublishBoardChange()"></select>
                 </div>
 
                 <div id="publish-vk-group-row" style="display:none;">
-                    <label class="form-label">Сообщество VK:</label>
+                    <label class="ui-field__label">Сообщество VK:</label>
                     <select id="publish-vk-group-select" class="form-select" onchange="onPublishVkGroupChange()"></select>
                 </div>
 
                 <div id="publish-not-configured-box" class="ui-card info-box" style="display:none; margin-bottom:16px; border-color: rgba(255,69,58,0.35);"></div>
 
-                <label class="form-label">Язык публикации:</label>
+                <label class="ui-field__label">Язык публикации:</label>
                 <div style="display:flex; gap:8px; margin-bottom:6px;">
                     <button id="publish-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishLang('ru')">🇷🇺 RU</button>
                     <button id="publish-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishLang('en')">🇬🇧 EN</button>
                 </div>
                 <p id="publish-lang-hint" style="color:var(--text-secondary); font-size:12px; margin:0 0 16px;"></p>
 
-                <label class="form-label" style="margin-top:0;">Предпросмотр:</label>
+                <label class="ui-field__label" style="margin-top:0;">Предпросмотр:</label>
                 <div class="ui-card info-box">
                     <strong id="publish-preview-title"></strong>
                     <p id="publish-preview-desc" style="margin:8px 0; white-space:pre-wrap;"></p>
