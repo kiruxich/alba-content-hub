@@ -1,0 +1,9 @@
+<task-notification>
+<task-id>abcf974519078a630</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/abcf974519078a630.output</output-file>
+<status>failed</status>
+<summary>Agent "Metrics sync job for published posts" failed: Agent terminated early due to an API error: You've hit your session limit · resets 5:40am (Europe/Amsterdam) (error type rate_limit, HTTP 429, request id req_011CeXwAfixqBWCGYs7r92G9, model sent to the API: claude-sonnet-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Test row inserted (id `1788050853645`, platform `vk`, `metrics_synced_at` null). Now trigger the sync endpoint.</result>
+</task-notification>
