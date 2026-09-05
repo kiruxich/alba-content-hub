@@ -19,6 +19,10 @@
     --surface-solid: #17171a;
     --border-subtle: rgba(255, 255, 255, 0.055);
     --border-strong: rgba(255, 255, 255, 0.16);
+    /* Тени всегда со смещением и мягким размытием. Цветной ореол без
+       смещения - украшение, а не глубина, и в системе его нет. */
+    --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --text-on-accent: #08080a;
     --danger-surface: rgba(255, 69, 58, 0.14);
     --danger-border: rgba(255, 69, 58, 0.3);
     --rose-300: #ff8f88;
@@ -367,6 +371,15 @@ body:before {
 .submit-btn:not(:disabled):active, .cc-primary:not(:disabled):active,
 .cc-secondary:not(:disabled):active { transform: scale(0.97); transition-duration: 100ms; }
 
+.schedule-btn:not(:disabled):active, .tg-btn:not(:disabled):active,
+.submit-btn:not(:disabled):active, .cc-primary:not(:disabled):active {
+    transform: translateY(1px) scale(0.985);
+    filter: brightness(0.94);
+    box-shadow:
+        inset 0 1px 2px rgba(0, 0, 0, 0.18),
+        0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
 .schedule-btn:disabled, .tg-btn:disabled, .edit-btn:disabled, .delete-btn:disabled,
 .submit-btn:disabled, .cc-primary:disabled, .cc-secondary:disabled, .cc-link:disabled {
     opacity: 0.35; cursor: not-allowed; transform: none;
@@ -374,13 +387,32 @@ body:before {
 .schedule-btn:focus-visible, .tg-btn:focus-visible, .edit-btn:focus-visible,
 .delete-btn:focus-visible, .submit-btn:focus-visible,
 .cc-primary:focus-visible, .cc-secondary:focus-visible {
-    outline: none; box-shadow: 0 0 0 2px var(--bg-canvas), 0 0 0 4px rgba(10, 132, 255, 0.7);
+    outline: none; box-shadow: 0 0 0 2px var(--bg-canvas), 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
-/* Главное действие - единственная сплошная плоскость в ряду. */
+/* Главное действие - единственная сплошная БЕЛАЯ плоскость в ряду. Цветом
+   здесь ничего не выделяется: рядом со стеклянными кнопками белая читается
+   мгновенно, а синяя заливка спорила с ними за внимание и тянула на себя
+   больше, чем стоит одно действие. Плюс синий в интерфейсе уже занят -
+   ссылки, выделения, информационные числа; кнопка, покрашенная тем же
+   цветом, переставала быть заметной именно как кнопка. */
 .schedule-btn, .tg-btn, .submit-btn, .cc-primary {
-    --btn-bg: var(--accent-blue); --btn-fg: #fff; --btn-border: transparent;
-    box-shadow: 0 2px 10px rgba(10, 132, 255, 0.22);
+    --btn-bg: linear-gradient(180deg, #ffffff 0%, #e9e9ee 100%);
+    --btn-fg: var(--text-on-accent);
+    --btn-border: transparent;
+    /* Четыре слоя, а не одна тень. Изнутри: светлая кромка по верху и
+       тёмная по низу дают клавише толщину - плоская заливка выглядит
+       наклейкой. Снаружи: широкая мягкая тень со смещением сажает её над
+       поверхностью, узкая держит контакт с ней. Градиент едва заметен
+       (белый -> #e9e9ee), но именно он читается как выпуклость. */
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+        0 6px 18px -6px rgba(0, 0, 0, 0.65),
+        0 1px 2px rgba(0, 0, 0, 0.45);
+    letter-spacing: -0.01em;
+    transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out),
+                filter 140ms var(--ease-out), opacity 140ms var(--ease-out);
 }
 .edit-btn, .cc-secondary {
     --btn-bg: var(--control); --btn-fg: var(--text-primary); --btn-border: var(--border-subtle);
@@ -390,10 +422,26 @@ body:before {
     --btn-bg: var(--danger-surface); --btn-fg: var(--rose-300); --btn-border: var(--danger-border);
     box-shadow: none;
 }
+/* Выбранное состояние переключателя (площадка, язык) - поднятая поверхность
+   и белый текст, как у сегментов в CRM и активного пункта меню. Красить его
+   заливкой главной кнопки нельзя: это уравняло бы «я выбрал Telegram» и
+   «отправить пост». */
+.edit-btn.on {
+    --btn-bg: var(--control-hover); --btn-fg: rgba(255, 255, 255, 0.96); --btn-border: var(--border-strong);
+}
 
 @media (hover: hover) and (pointer: fine) {
+    /* Наведение - подъём: клавиша отрывается от поверхности, тень уходит
+       глубже. Осветлять белое некуда, поэтому работает только глубина. */
     .schedule-btn:not(:disabled):hover, .tg-btn:not(:disabled):hover,
-    .submit-btn:not(:disabled):hover, .cc-primary:not(:disabled):hover { --btn-bg: #2b96ff; }
+    .submit-btn:not(:disabled):hover, .cc-primary:not(:disabled):hover {
+        transform: translateY(-1px);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+            0 10px 26px -8px rgba(0, 0, 0, 0.7),
+            0 2px 4px rgba(0, 0, 0, 0.45);
+    }
     .edit-btn:not(:disabled):hover, .cc-secondary:not(:disabled):hover {
         --btn-bg: var(--control-hover); --btn-border: var(--border-strong);
     }

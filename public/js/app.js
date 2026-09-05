@@ -2988,10 +2988,8 @@ function updatePlatformLangToggle(platform) {
     const lang = publishSettingsLang[platform];
     const ruBtn = document.getElementById(`${platform}-lang-ru-btn`);
     const enBtn = document.getElementById(`${platform}-lang-en-btn`);
-    if (ruBtn) ruBtn.style.background = lang === 'ru' ? 'var(--accent-blue)' : '';
-    if (ruBtn) ruBtn.style.color = lang === 'ru' ? '#fff' : '';
-    if (enBtn) enBtn.style.background = lang === 'en' ? 'var(--accent-blue)' : '';
-    if (enBtn) enBtn.style.color = lang === 'en' ? '#fff' : '';
+    if (ruBtn) ruBtn.classList.toggle('on', lang === 'ru');
+    if (enBtn) enBtn.classList.toggle('on', lang === 'en');
 }
 
 const PLATFORM_FILL_FN = { ig: fillIgForm, yt: fillYtForm, th: fillThForm };
@@ -3244,9 +3242,8 @@ function renderPublishModal() {
     platformRow.innerHTML = PUBLISH_PLATFORMS.map(p => {
         const configured = p.isConfigured();
         const active = publishModalState.platform === p.id;
-        const activeStyle = active ? 'background:var(--accent-blue); color:#fff;' : '';
         const dimStyle = configured ? '' : 'opacity:0.55;';
-        return `<button class="edit-btn" style="${activeStyle}${dimStyle}" onclick="setPublishPlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
+        return `<button class="edit-btn${active ? ' on' : ''}" style="${dimStyle}" onclick="setPublishPlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
     }).join('');
 
     const currentPlatform = PUBLISH_PLATFORMS.find(p => p.id === publishModalState.platform);
@@ -3310,10 +3307,8 @@ function renderPublishModal() {
     if (!hasEn && publishModalState.lang === 'en') publishModalState.lang = 'ru';
     const ruBtn = document.getElementById('publish-lang-ru-btn');
     const enBtn = document.getElementById('publish-lang-en-btn');
-    ruBtn.style.background = publishModalState.lang === 'ru' ? 'var(--accent-blue)' : '';
-    ruBtn.style.color = publishModalState.lang === 'ru' ? '#fff' : '';
-    enBtn.style.background = publishModalState.lang === 'en' ? 'var(--accent-blue)' : '';
-    enBtn.style.color = publishModalState.lang === 'en' ? '#fff' : '';
+    ruBtn.classList.toggle('on', publishModalState.lang === 'ru');
+    enBtn.classList.toggle('on', publishModalState.lang === 'en');
     enBtn.disabled = !hasEn;
     enBtn.style.opacity = hasEn ? '1' : '0.4';
     enBtn.style.cursor = hasEn ? 'pointer' : 'not-allowed';
@@ -3799,9 +3794,8 @@ function renderScheduleModal() {
     platformRow.innerHTML = PUBLISH_PLATFORMS.map(p => {
         const configured = p.isConfigured();
         const active = scheduleModalState.platform === p.id;
-        const activeStyle = active ? 'background:var(--accent-blue); color:#fff;' : '';
         const dimStyle = configured ? '' : 'opacity:0.55;';
-        return `<button class="edit-btn" style="${activeStyle}${dimStyle}" onclick="setSchedulePlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
+        return `<button class="edit-btn${active ? ' on' : ''}" style="${dimStyle}" onclick="setSchedulePlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
     }).join('');
 
     const currentPlatform = PUBLISH_PLATFORMS.find(p => p.id === scheduleModalState.platform);
@@ -3858,10 +3852,8 @@ function renderScheduleModal() {
     if (!hasEn && scheduleModalState.lang === 'en') scheduleModalState.lang = 'ru';
     const ruBtn = document.getElementById('schedule-lang-ru-btn');
     const enBtn = document.getElementById('schedule-lang-en-btn');
-    ruBtn.style.background = scheduleModalState.lang === 'ru' ? 'var(--accent-blue)' : '';
-    ruBtn.style.color = scheduleModalState.lang === 'ru' ? '#fff' : '';
-    enBtn.style.background = scheduleModalState.lang === 'en' ? 'var(--accent-blue)' : '';
-    enBtn.style.color = scheduleModalState.lang === 'en' ? '#fff' : '';
+    ruBtn.classList.toggle('on', scheduleModalState.lang === 'ru');
+    enBtn.classList.toggle('on', scheduleModalState.lang === 'en');
     enBtn.disabled = !hasEn;
     enBtn.style.opacity = hasEn ? '1' : '0.4';
 
@@ -6075,6 +6067,7 @@ async function renderAgentSettingsForm() {
     await loadContentRubrics();
     await loadTelegramWatchChannels();
     await loadInstagramWatchAccounts();
+    await loadPinterestWatchBoards();
     await loadVkTrendSources();
     await loadYoutubeTrendSources();
 }
@@ -6602,6 +6595,102 @@ async function scanInstagramWatch() {
                 </div>`).join('');
         }).join('');
         statusEl.textContent = `Готово. Аккаунтов просканировано: ${accounts.length}.`;
+    } catch (e) {
+        statusEl.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось просканировать: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Обновить';
+    }
+}
+
+// PINTEREST — ОТСЛЕЖИВАНИЕ БОРДОВ (Центр агентов, ниже Instagram-панели)
+// Same manual-list pattern as Telegram/Instagram above, but scanning needs no
+// token: Pinterest exposes a public RSS feed per profile/board, so the scan
+// hits that directly (server/routes/pinterestWatch.js) instead of an OAuth API.
+let pinterestWatchBoards = [];
+
+async function loadPinterestWatchBoards() {
+    try {
+        pinterestWatchBoards = await api('/api/pinterest-watch/boards');
+    } catch (e) {
+        pinterestWatchBoards = [];
+    }
+    renderPinterestWatchBoardsList();
+}
+
+function renderPinterestWatchBoardsList() {
+    const box = document.getElementById('ptw-boards-list');
+    if (!box) return;
+    if (pinterestWatchBoards.length === 0) {
+        box.innerHTML = `<p style="color:var(--text-secondary); font-size:12px; margin:0;">Список пуст — добавьте хотя бы один борд.</p>`;
+        return;
+    }
+    box.innerHTML = pinterestWatchBoards.map(b => `
+        <span class="group-chip" style="display:inline-flex; align-items:center; gap:6px; margin:2px 4px 2px 0;">
+            ${escapeHtml(b.label && b.label !== b.path ? `${b.label} (${b.path})` : b.path)}
+            <a href="#" onclick="deletePinterestWatchBoard(${b.id}); return false;" style="color:var(--accent-red);">✕</a>
+        </span>`).join('');
+}
+
+async function addPinterestWatchBoard() {
+    const input = document.getElementById('ptw-add-input');
+    const path = input.value.trim();
+    if (!path) return showToast('Введите username или username/board');
+    try {
+        const created = await api('/api/pinterest-watch/boards', { method: 'POST', body: JSON.stringify({ path }) });
+        pinterestWatchBoards.push(created);
+        renderPinterestWatchBoardsList();
+        input.value = '';
+        showToast('Борд добавлен');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function deletePinterestWatchBoard(id) {
+    try {
+        await api(`/api/pinterest-watch/boards/${id}`, { method: 'DELETE' });
+        pinterestWatchBoards = pinterestWatchBoards.filter(b => b.id !== id);
+        renderPinterestWatchBoardsList();
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+async function scanPinterestWatch() {
+    const btn = document.getElementById('ptw-scan-btn');
+    const statusEl = document.getElementById('ptw-scan-status');
+    const feed = document.getElementById('ptw-feed');
+    if (pinterestWatchBoards.length === 0) return showToast('Сначала добавьте хотя бы один борд');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Сканирую...';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Читаю публичные RSS-фиды бордов...';
+
+    try {
+        const result = await api('/api/pinterest-watch/scan', { method: 'POST' });
+        const boards = result.boards || [];
+        feed.innerHTML = boards.map(b => {
+            const header = escapeHtml(b.label || b.path);
+            if (b.error) {
+                return `<div class="info-box" style="border-color:var(--accent-red);"><b>${header}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(b.error)}</p></div>`;
+            }
+            if (!b.posts.length) {
+                return `<div class="info-box"><b>${header}</b><p class="idea-desc-text">Пинов не найдено.</p></div>`;
+            }
+            return b.posts.map(p => `
+                <div class="info-box">
+                    <div class="media-asset-meta-row" style="margin-bottom:6px;">
+                        <b>${header}</b>
+                        ${p.pubDate ? `<span style="color:var(--text-secondary); font-size:11px;">${new Date(p.pubDate).toLocaleString('ru-RU')}</span>` : ''}
+                    </div>
+                    <p class="idea-desc-text" style="white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(p.title || '')}</p>
+                    ${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" style="font-size:12px;">Открыть в Pinterest →</a>` : ''}
+                </div>`).join('');
+        }).join('');
+        statusEl.textContent = `Готово. Бордов просканировано: ${boards.length}.`;
     } catch (e) {
         statusEl.textContent = 'Ошибка: ' + e.message;
         showToast('Не удалось просканировать: ' + e.message);

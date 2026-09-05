@@ -253,6 +253,20 @@ CREATE TABLE IF NOT EXISTS youtube_trend_sources (
     created_at INTEGER DEFAULT (strftime('%s','now'))
 );
 
+-- Pinterest: no OAuth-gated Business Discovery equivalent for arbitrary
+-- accounts (same problem as Instagram - see instagram_watch_accounts above),
+-- but Pinterest exposes a public, tokenless RSS feed per profile/board
+-- (https://www.pinterest.com/<path>.rss), so watching reuses the same
+-- rss-parser dependency as agent_settings.sources instead of needing OAuth.
+-- Kept as its own table/endpoints (mirrors telegram_watch_channels /
+-- instagram_watch_accounts) so it's never touched by RSS save/discover.
+CREATE TABLE IF NOT EXISTS pinterest_watch_boards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+);
+
 -- Instagram: a long-lived Page access token (Meta Graph API) plus the
 -- connected Instagram Business/Creator account id it publishes to. See
 -- server/lib/socialPublishers/instagram.js.

@@ -951,31 +951,6 @@
                      never resaves/touches the rest of the list). -->
                 <div id="as-sources-preview" style="display:none; margin:0 0 20px;"></div>
 
-                <!-- VK/YouTube trend sources - real public APIs, so Researcher scans these
-                     automatically alongside RSS above (server/routes/agentResearcher.js).
-                     Own fields/storage (vk_trend_sources/youtube_trend_sources), not mixed
-                     into the RSS textarea. -->
-                <div class="controls-row" style="margin-top:20px; align-items:flex-end;">
-                    <div class="p-section-title" style="margin:0;">VK-СООБЩЕСТВА ДЛЯ RESEARCHER'А</div>
-                </div>
-                <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Стены этих сообществ Researcher сканирует автоматически, как RSS — использует токен из настроек публикации VK.</p>
-                <div class="controls-row">
-                    <input type="text" id="vkts-add-input" class="form-input" placeholder="короткое имя или ID сообщества" style="max-width:260px;">
-                    <button class="schedule-btn" onclick="addVkTrendSource()">+ Добавить</button>
-                </div>
-                <div id="vkts-list" style="margin:10px 0 20px;"></div>
-
-                <div class="controls-row" style="align-items:flex-end;">
-                    <div class="p-section-title" style="margin:0;">YOUTUBE-КАНАЛЫ ДЛЯ RESEARCHER'А</div>
-                </div>
-                <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Требует отдельный API-ключ (не тот, что для публикации) — YouTube Data API v3 ключ из Google Cloud Console.</p>
-                <input type="text" id="as-youtube-api-key-input" class="form-input" placeholder="YouTube Data API v3 key" style="margin-bottom:10px;">
-                <div class="controls-row">
-                    <input type="text" id="ytts-add-input" class="form-input" placeholder="ID канала (UC...)" style="max-width:260px;">
-                    <button class="schedule-btn" onclick="addYoutubeTrendSource()">+ Добавить</button>
-                </div>
-                <div id="ytts-list" style="margin:10px 0 20px;"></div>
-
                 <div class="controls-row" style="margin-top:20px; align-items:flex-end;">
                     <div class="p-section-title" style="margin:0;">КЛЮЧЕВЫЕ СЛОВА (через запятую) — <span id="as-keywords-count">0</span></div>
                     <button class="edit-btn" id="as-keywords-discover-btn" onclick="discoverKeywords()" title="Предложить новые ключевые слова через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
@@ -1030,43 +1005,84 @@
 
                 <div class="parser-niches-grid" id="rubrics-grid"></div>
 
-                <!-- Telegram source watching - deliberately separate from RSS-ИСТОЧНИКИ above:
-                     this list is manual-only and must never be touched by saveAgentSettingsForm()
-                     or discoverRssSources(). Scanning needs the user's own Mac running a real
-                     Telegram session (local-claude-agent/README.md "Telegram source watching"),
-                     so it's a manual "Обновить" click, never automatic. -->
+                <!-- ОТСЛЕЖИВАНИЕ ИСТОЧНИКОВ - all five platforms' watch/trend-source lists
+                     grouped under one heading instead of split across the page (VK/YouTube
+                     used to sit right after RSS-ИСТОЧНИКИ above, Telegram/Instagram down
+                     here - annoying to manage as two disconnected sections). VK/YouTube are
+                     real public APIs Researcher scans automatically alongside RSS
+                     (server/routes/agentResearcher.js, vk_trend_sources/youtube_trend_sources);
+                     Telegram/Instagram/Pinterest have no open discovery API, so those three
+                     are manual lists scanned on click - each keeps its own storage and is
+                     never touched by saveAgentSettingsForm()/discoverRssSources(). -->
                 <div style="margin-top:36px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
-                    <div class="controls-row">
-                        <div class="p-section-title" style="margin:0;">TELEGRAM — ОТСЛЕЖИВАНИЕ КАНАЛОВ</div>
-                        <button class="edit-btn" id="tgw-scan-btn" onclick="scanTelegramWatch()">🔄 Обновить</button>
-                    </div>
-                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список каналов для вдохновения — не RSS, требует запущенного Telegram-сессии на вашем Маке (local-claude-agent). Список не трогается ничем другим на этой странице.</p>
-                    <div class="controls-row">
-                        <input type="text" id="tgw-add-input" class="form-input" placeholder="@username канала" style="max-width:260px;">
-                        <button class="schedule-btn" onclick="addTelegramWatchChannel()">+ Добавить источник</button>
-                    </div>
-                    <div id="tgw-channels-list" style="margin:10px 0 16px;"></div>
-                    <div id="tgw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
-                    <div id="tgw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
-                </div>
+                    <div class="p-section-title" style="margin:0 0 4px; font-size:15px;">ОТСЛЕЖИВАНИЕ ИСТОЧНИКОВ</div>
+                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 20px;">Сообщества/каналы/аккаунты конкурентов и трендов для Researcher'а. VK и YouTube сканируются автоматически как RSS; Telegram, Instagram и Pinterest — вручную по кнопке «Обновить».</p>
 
-                <!-- Instagram source watching - same idea as Telegram above: manual list,
-                     never touched by RSS actions, scanned on demand (not scheduled) since
-                     Business Discovery needs a configured Instagram account/token. See
-                     docs/inst.md for the Meta app setup this depends on. -->
-                <div style="margin-top:36px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
-                    <div class="controls-row">
-                        <div class="p-section-title" style="margin:0;">INSTAGRAM — ОТСЛЕЖИВАНИЕ АККАУНТОВ</div>
-                        <button class="edit-btn" id="igw-scan-btn" onclick="scanInstagramWatch()">🔄 Обновить</button>
+                    <div class="controls-row" style="align-items:flex-end;">
+                        <div class="p-section-title" style="margin:0;">VK-СООБЩЕСТВА ДЛЯ RESEARCHER'А</div>
                     </div>
-                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список конкурентов для вдохновения — у Instagram нет открытого поиска, аккаунты нужно находить самостоятельно. Требует настроенный Instagram (см. docs/inst.md). Список не трогается ничем другим на этой странице.</p>
+                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Стены этих сообществ Researcher сканирует автоматически, как RSS — использует токен из настроек публикации VK.</p>
                     <div class="controls-row">
-                        <input type="text" id="igw-add-input" class="form-input" placeholder="@username аккаунта" style="max-width:260px;">
-                        <button class="schedule-btn" onclick="addInstagramWatchAccount()">+ Добавить источник</button>
+                        <input type="text" id="vkts-add-input" class="form-input" placeholder="короткое имя или ID сообщества" style="max-width:260px;">
+                        <button class="schedule-btn" onclick="addVkTrendSource()">+ Добавить</button>
                     </div>
-                    <div id="igw-accounts-list" style="margin:10px 0 16px;"></div>
-                    <div id="igw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
-                    <div id="igw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
+                    <div id="vkts-list" style="margin:10px 0 20px;"></div>
+
+                    <div class="controls-row" style="align-items:flex-end;">
+                        <div class="p-section-title" style="margin:0;">YOUTUBE-КАНАЛЫ ДЛЯ RESEARCHER'А</div>
+                    </div>
+                    <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Требует отдельный API-ключ (не тот, что для публикации) — YouTube Data API v3 ключ из Google Cloud Console.</p>
+                    <input type="text" id="as-youtube-api-key-input" class="form-input" placeholder="YouTube Data API v3 key" style="margin-bottom:10px;">
+                    <div class="controls-row">
+                        <input type="text" id="ytts-add-input" class="form-input" placeholder="ID канала (UC...)" style="max-width:260px;">
+                        <button class="schedule-btn" onclick="addYoutubeTrendSource()">+ Добавить</button>
+                    </div>
+                    <div id="ytts-list" style="margin:10px 0 20px;"></div>
+
+                    <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
+                        <div class="controls-row">
+                            <div class="p-section-title" style="margin:0;">TELEGRAM — ОТСЛЕЖИВАНИЕ КАНАЛОВ</div>
+                            <button class="edit-btn" id="tgw-scan-btn" onclick="scanTelegramWatch()">🔄 Обновить</button>
+                        </div>
+                        <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список каналов для вдохновения — не RSS, требует запущенного Telegram-сессии на вашем Маке (local-claude-agent). Список не трогается ничем другим на этой странице.</p>
+                        <div class="controls-row">
+                            <input type="text" id="tgw-add-input" class="form-input" placeholder="@username канала" style="max-width:260px;">
+                            <button class="schedule-btn" onclick="addTelegramWatchChannel()">+ Добавить источник</button>
+                        </div>
+                        <div id="tgw-channels-list" style="margin:10px 0 16px;"></div>
+                        <div id="tgw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
+                        <div id="tgw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
+                    </div>
+
+                    <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
+                        <div class="controls-row">
+                            <div class="p-section-title" style="margin:0;">INSTAGRAM — ОТСЛЕЖИВАНИЕ АККАУНТОВ</div>
+                            <button class="edit-btn" id="igw-scan-btn" onclick="scanInstagramWatch()">🔄 Обновить</button>
+                        </div>
+                        <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список конкурентов для вдохновения — у Instagram нет открытого поиска, аккаунты нужно находить самостоятельно. Требует настроенный Instagram (см. docs/inst.md). Список не трогается ничем другим на этой странице.</p>
+                        <div class="controls-row">
+                            <input type="text" id="igw-add-input" class="form-input" placeholder="@username аккаунта" style="max-width:260px;">
+                            <button class="schedule-btn" onclick="addInstagramWatchAccount()">+ Добавить источник</button>
+                        </div>
+                        <div id="igw-accounts-list" style="margin:10px 0 16px;"></div>
+                        <div id="igw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
+                        <div id="igw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
+                    </div>
+
+                    <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
+                        <div class="controls-row">
+                            <div class="p-section-title" style="margin:0;">PINTEREST — ОТСЛЕЖИВАНИЕ БОРДОВ</div>
+                            <button class="edit-btn" id="ptw-scan-btn" onclick="scanPinterestWatch()">🔄 Обновить</button>
+                        </div>
+                        <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список бордов/профилей для вдохновения — у Pinterest нет открытого поиска по API, но есть публичный RSS-фид на профиль/борд, поэтому «Обновить» не требует токена.</p>
+                        <div class="controls-row">
+                            <input type="text" id="ptw-add-input" class="form-input" placeholder="username или username/board" style="max-width:260px;">
+                            <button class="schedule-btn" onclick="addPinterestWatchBoard()">+ Добавить источник</button>
+                        </div>
+                        <div id="ptw-boards-list" style="margin:10px 0 16px;"></div>
+                        <div id="ptw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
+                        <div id="ptw-feed" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;"></div>
+                    </div>
                 </div>
 
                 <!-- Read-only observability - visually separated from the editable settings above -->
