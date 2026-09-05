@@ -1,0 +1,10 @@
+<task-notification>
+<task-id>a67fa09d5de095894</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a67fa09d5de095894.output</output-file>
+<status>failed</status>
+<summary>Agent "ElevenLabs voice-over integration" failed: Agent terminated early due to an API error: You've hit your session limit · resets 5:40am (Europe/Amsterdam) (error type rate_limit, HTTP 429, request id req_011CeXwAL3nSCCBMed3zymhh, model sent to the API: claude-sonnet-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Just the two expected 400s from the not-configured tests (both handled gracefully with toasts) — no real JS errors, no unhandled exceptions. Testing is complete. Let's stop the background dev server now.</result>
+<worktree><worktreePath>/Users/kiruxa/Desktop/alba-content-hub/.claude/worktrees/agent-a67fa09d5de095894</worktreePath><worktreeBranch>worktree-agent-a67fa09d5de095894</worktreeBranch></worktree>
+</task-notification>
