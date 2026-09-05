@@ -3096,8 +3096,33 @@ async function renderPlatformStatuses() {
 
     const isSet = (m) => Boolean(m && (m.configured !== undefined ? m.configured : m.hasToken));
     const endpoints = {
-        vk: 'vk', instagram: 'instagram', youtube: 'youtube', threads: 'threads', pinterest: 'pinterest',
+        instagram: 'instagram', youtube: 'youtube', threads: 'threads', pinterest: 'pinterest',
     };
+
+    // VK's real "is it connected" signal lives in vk-groups (per-community
+    // tokens, the flow the settings tab actually recommends), not the
+    // legacy single vk_settings token that GET /api/settings/vk reports on
+    // (that field stays empty for anyone who only ever added groups - which
+    // is the normal case, see the "общий токен" details being marked
+    // "редкий случай" in the settings modal). A group with lang=null covers
+    // either language.
+    (async () => {
+        const el = document.getElementById('ps-status-vk');
+        if (!el) return;
+        let groups;
+        try {
+            groups = await api('/api/settings/vk-groups');
+        } catch (_) {
+            return;
+        }
+        const connected = (lang) => groups.some(g => g.hasToken && (g.lang === lang || !g.lang));
+        const ruOk = connected('ru'), enOk = connected('en');
+        let cls = 'captcha', label = '○ ждёт ключей';
+        if (ruOk && enOk) { cls = 'done'; label = '● подключено'; }
+        else if (ruOk || enOk) { cls = 'running'; label = `◐ только ${ruOk ? 'RU' : 'EN'}`; }
+        el.className = `parser-niche-status ${cls}`;
+        el.innerText = label;
+    })();
 
     for (const [key, path] of Object.entries(endpoints)) {
         const el = document.getElementById(`ps-status-${key}`);
@@ -3112,8 +3137,8 @@ async function renderPlatformStatuses() {
             continue; // бэкенд недоступен - оставляем то, что уже написано в разметке
         }
         const ruOk = isSet(ru), enOk = isSet(en);
-        // У VK и Pinterest один аккаунт на оба языка, поэтому RU/EN там не различаем.
-        const singleAccount = key === 'vk' || key === 'pinterest';
+        // У Pinterest один аккаунт на оба языка, поэтому RU/EN там не различаем.
+        const singleAccount = key === 'pinterest';
         let cls = 'captcha', label = '○ ждёт ключей';
         if (ruOk && (enOk || singleAccount)) { cls = 'done'; label = '● подключено'; }
         else if (ruOk || enOk) { cls = 'running'; label = `◐ только ${ruOk ? 'RU' : 'EN'}`; }
