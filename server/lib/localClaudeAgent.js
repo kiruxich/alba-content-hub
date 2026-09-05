@@ -73,6 +73,14 @@ export function generateNicheDescription(category) {
     return callTask('niche-description', { category });
 }
 
+// "✨ Сгенерировать через ИИ" on a product's ROADMAP ПРОДВИЖЕНИЯ - suggests
+// new milestones grounded in that product's own project-info fields
+// (about/target audience/value proposition/differentiators), same
+// preview-then-confirm shape as discoverRssSources/discoverKeywords.
+export function generateRoadmap({ productName, about, targetAudience, valueProposition, keyDifferentiators, existingTitles }) {
+    return callTask('roadmap', { productName, about, targetAudience, valueProposition, keyDifferentiators, existingTitles }, { timeoutMs: 3 * 60 * 1000 });
+}
+
 export function generateReelsScript(title, postText) {
     return callTask('reels-script', { title, postText });
 }

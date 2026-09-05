@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { isLocalClaudeAgentConfigured, generateRoadmap } from '../lib/localClaudeAgent.js';
 
 const router = Router();
 
@@ -74,6 +75,44 @@ router.put('/:productId/roadmap', async (req, res) => {
     });
 
     res.json({ productId: req.params.productId, roadmap: items });
+});
+
+// "✨ Сгенерировать через ИИ" next to "+ Добавить этап" - proposes new
+// milestones grounded in this product's own О ПРОЕКТЕ fields above the
+// roadmap on the same page. Preview-only like discoverRssSources/
+// discoverKeywords in agentSettings.js: nothing is saved here, the client
+// shows a checklist and the user confirms via the existing PUT .../roadmap.
+router.post('/:productId/roadmap/generate', async (req, res) => {
+    if (!isLocalClaudeAgentConfigured()) {
+        return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
+    }
+    const productName = (req.body?.productName || '').trim();
+    if (!productName) return res.status(400).json({ error: 'productName is required' });
+
+    const row = (await db.execute({
+        sql: 'SELECT about, target_audience, value_proposition, key_differentiators, roadmap_json FROM project_info WHERE product_id = ?',
+        args: [req.params.productId],
+    })).rows[0];
+    const existingTitles = row ? JSON.parse(row.roadmap_json || '[]').map(r => r.title).filter(Boolean) : [];
+
+    try {
+        const result = await generateRoadmap({
+            productName,
+            about: row?.about || '',
+            targetAudience: row?.target_audience || '',
+            valueProposition: row?.value_proposition || '',
+            keyDifferentiators: row?.key_differentiators || '',
+            existingTitles,
+        });
+        const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+        res.json({
+            candidates: candidates
+                .map(c => ({ title: String(c?.title || '').trim(), description: String(c?.description || '').trim() }))
+                .filter(c => c.title),
+        });
+    } catch (e) {
+        res.status(502).json({ error: e.message });
+    }
 });
 
 export default router;

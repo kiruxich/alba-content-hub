@@ -47,6 +47,7 @@ function escapeHtml(str) {
 document.addEventListener("DOMContentLoaded", () => {
     loadContentDrafts();
     startTextareaAutoGrow();
+    moveNavIndicator(document.querySelector('.tab-item.active'));
     initApp();
     const schedInput = document.getElementById('schedule-date-input');
     if (schedInput) schedInput.value = new Date().toISOString().split('T')[0];
@@ -129,10 +130,13 @@ function switchTab(tabName) {
         autoGrowAllTextareas(targetView); // высоту полей скрытой вкладки посчитать нельзя - только после показа
     }
 
-    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'crm': 3, 'analytics': 4, 'calendar': 5, 'archive': 6, 'contentplan': 7, 'clients': 8, 'customers': 9, 'mediaassets': 10, 'urlchecker': 11, 'systeminfo': 12, 'agentcenter': 13 };
-    if (tabMap[tabName] !== undefined) {
-        const tabs = document.querySelectorAll('.tab-item');
-        if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
+    // Кнопка ищется по data-tab, а не по порядковому номеру в NodeList:
+    // прежняя карта индексов ломалась от любой вставки пункта в меню -
+    // подсветка уезжала на соседний.
+    const tabButton = document.querySelector(`.tab-item[data-tab="${tabName}"]`);
+    if (tabButton) {
+        tabButton.classList.add('active');
+        moveNavIndicator(tabButton);
     }
 
     if (tabName === 'contentcreation') renderContentCreationView();
@@ -150,6 +154,34 @@ function switchTab(tabName) {
     if (tabName === 'agentcenter') { renderAgentSettingsForm(); renderAgentCenter(); }
     if (tabName === 'systeminfo') renderPlatformStatuses();
 }
+
+// Подложка активного пункта меню переезжает между кнопками отдельным слоем
+// (см. .nav-indicator в styles.css). Позиция берётся из offsetTop, а не из
+// getBoundingClientRect: список скроллится, и координаты относительно окна
+// уехали бы вместе со скроллом.
+function moveNavIndicator(button) {
+    const indicator = document.getElementById('nav-indicator');
+    if (!indicator || !button || !button.offsetParent) return;
+    // Первое позиционирование - без анимации, иначе подложка проезжает через
+    // весь список от нулевой координаты.
+    const firstRun = !indicator.classList.contains('ready');
+    if (firstRun) indicator.classList.add('instant');
+    indicator.style.height = `${button.offsetHeight}px`;
+    indicator.style.transform = `translateY(${button.offsetTop}px)`;
+    indicator.classList.add('ready');
+    if (firstRun) {
+        // Снимаем «мгновенный» режим только после того, как браузер применил
+        // стартовую позицию - иначе переход всё равно сыграет.
+        requestAnimationFrame(() => requestAnimationFrame(() => indicator.classList.remove('instant')));
+    }
+}
+
+// Ширина рельса и высота пунктов меняются при смене раскладки - подложку
+// нужно пересчитать, иначе она остаётся на старой координате.
+window.addEventListener('resize', () => {
+    const active = document.querySelector('.tab-item.active');
+    if (active) moveNavIndicator(active);
+});
 
 function openOverlay(id) {
     const el = document.getElementById(id);
@@ -3415,6 +3447,95 @@ async function deleteRoadmapItem(productId, itemId) {
     }
 }
 
+// "✨ Сгенерировать через ИИ" рядом с roadmap - просит local-claude-agent (на
+// ПК пользователя) предложить новые этапы по уже заполненным полям О ПРОЕКТЕ
+// (описание/ЦА/посыл/отличия) выше на этой же странице. Тот же
+// preview-затем-confirm принцип, что и "✨ Предложить новые" у RSS-источников
+// и ключевых слов (см. discoverRssSources/renderSourcesPreview) - кандидаты
+// не сохраняются сами, пользователь отмечает нужные и подтверждает, после
+// чего они уходят через тот же persistRoadmap, что и ручное добавление.
+let roadmapPreviewChecked = new Set();
+let roadmapPreviewCandidates = [];
+
+async function generateRoadmapSteps(productId, productName) {
+    const btn = document.getElementById('roadmap-generate-btn');
+    const status = document.getElementById('roadmap-generate-status');
+    const preview = document.getElementById('roadmap-generate-preview');
+    btn.disabled = true;
+    btn.textContent = '⏳ Генерирую...';
+    status.style.display = 'block';
+    status.textContent = 'Обращаюсь к local-claude-agent на вашем ПК — это может занять пару минут...';
+    preview.style.display = 'none';
+
+    try {
+        const result = await api(`/api/project-info/${productId}/roadmap/generate`, {
+            method: 'POST',
+            body: JSON.stringify({ productName }),
+        });
+        const candidates = result.candidates || [];
+        if (candidates.length > 0) {
+            renderRoadmapPreview(productId, candidates);
+            status.textContent = `Предложено этапов: ${candidates.length}. Отметьте нужные и подтвердите.`;
+        } else {
+            status.textContent = 'Не удалось предложить новые этапы в этот раз.';
+        }
+    } catch (e) {
+        status.textContent = 'Ошибка: ' + e.message;
+        showToast('Не удалось сгенерировать этапы: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ Сгенерировать через ИИ';
+    }
+}
+
+function renderRoadmapPreview(productId, candidates) {
+    const box = document.getElementById('roadmap-generate-preview');
+    if (!candidates.length) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+    }
+    roadmapPreviewCandidates = candidates;
+    roadmapPreviewChecked = new Set(candidates.map((c, i) => i));
+    box.style.display = 'block';
+    box.innerHTML = `
+        <div class="info-box">
+            ${candidates.map((c, i) => `
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:4px 0;">
+                    <input type="checkbox" style="margin-top:3px;" checked
+                        onchange="togglePreviewChecked(roadmapPreviewChecked, ${i}, this.checked)">
+                    <span>
+                        <div style="font-weight:600;">${escapeHtml(c.title)}</div>
+                        ${c.description ? `<div style="color:var(--text-secondary); font-size:12px;">${escapeHtml(c.description)}</div>` : ''}
+                    </span>
+                </label>`).join('')}
+            <div style="margin-top:10px; display:flex; gap:8px;">
+                <button class="submit-btn" style="margin-top:0;" onclick="confirmRoadmapPreview('${productId}')">Добавить выбранные</button>
+                <button class="edit-btn" onclick="document.getElementById('roadmap-generate-preview').style.display='none';">Отмена</button>
+            </div>
+        </div>`;
+}
+
+async function confirmRoadmapPreview(productId) {
+    const chosen = roadmapPreviewCandidates.filter((c, i) => roadmapPreviewChecked.has(i));
+    if (!chosen.length) return showToast('Ничего не выбрано');
+    const newItems = chosen.map(c => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title: c.title,
+        description: c.description || '',
+        status: 'planned',
+    }));
+    try {
+        await persistRoadmap(productId, [...currentRoadmap(productId), ...newItems]);
+        document.getElementById('roadmap-generate-preview').style.display = 'none';
+        document.getElementById('roadmap-generate-status').style.display = 'none';
+        showToast(`Добавлено этапов: ${newItems.length}`);
+        renderProductDetailContent(productId);
+    } catch (e) {
+        showToast('Не удалось добавить этапы: ' + e.message);
+    }
+}
+
 function renderProductsGrid() {
     const container = document.getElementById('products-grid');
     if (!container) return;
@@ -3496,8 +3617,14 @@ function renderProductDetailContent(productId) {
 
         <div class="controls-row" style="margin-top:28px;">
             <div class="p-section-title" style="margin:0;">ROADMAP ПРОДВИЖЕНИЯ</div>
-            <button class="schedule-btn" onclick="openAddRoadmapItemForm()">+ Добавить этап</button>
+            <div style="display:flex; gap:8px;">
+                <button class="edit-btn" id="roadmap-generate-btn" title="Сгенерировать через local-claude-agent на вашем ПК, по описанию проекта выше" onclick="generateRoadmapSteps('${productId}', '${escapeHtml(product.title).replace(/'/g, "\\'")}')">✨ Сгенерировать через ИИ</button>
+                <button class="schedule-btn" onclick="openAddRoadmapItemForm()">+ Добавить этап</button>
+            </div>
         </div>
+
+        <div id="roadmap-generate-status" style="display:none; font-size:12px; color:var(--text-secondary); margin-bottom:8px;"></div>
+        <div id="roadmap-generate-preview" style="display:none; margin-bottom:16px;"></div>
 
         <div id="roadmap-item-form" class="info-box" style="display:none; margin-bottom:16px;">
             <input type="hidden" id="ri-id-input">

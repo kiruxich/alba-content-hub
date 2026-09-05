@@ -285,6 +285,41 @@ Respond with a JSON array of objects: [{ "keyword": "...", "reason": "short reas
     }
 });
 
+// task: roadmap
+// body: { productName: string, about?, targetAudience?, valueProposition?,
+//         keyDifferentiators?: string, existingTitles?: string[] }
+// Suggests promotion-roadmap milestones for a product's "ROADMAP
+// ПРОДВИЖЕНИЯ" checklist (see server/routes/projectInfo.js), grounded in
+// the same project-info fields the user fills in above it on that page.
+// Sonnet, not Haiku - like cold-call-pitch/content-draft, this is real
+// planning content the user reviews and keeps, not disposable discovery
+// output.
+app.post('/run/roadmap', requireToken, async (req, res) => {
+    const productName = (req.body?.productName || '').trim();
+    if (!productName) return res.status(400).json({ error: 'productName is required' });
+    const about = (req.body?.about || '').trim();
+    const targetAudience = (req.body?.targetAudience || '').trim();
+    const valueProposition = (req.body?.valueProposition || '').trim();
+    const keyDifferentiators = (req.body?.keyDifferentiators || '').trim();
+    const existingTitles = Array.isArray(req.body?.existingTitles) ? req.body.existingTitles.filter(Boolean) : [];
+
+    const prompt = `You are helping plan a product promotion roadmap for "${productName}".
+
+${about ? `About the product: ${about}\n` : ''}${targetAudience ? `Target audience: ${targetAudience}\n` : ''}${valueProposition ? `Value proposition: ${valueProposition}\n` : ''}${keyDifferentiators ? `Key differentiators: ${keyDifferentiators}\n` : ''}
+${existingTitles.length ? `Roadmap steps already planned (do NOT repeat these or close variants):\n${existingTitles.map(t => `- ${t}`).join('\n')}\n` : ''}
+Suggest 3-6 NEW, concrete, sequential roadmap milestones for promoting this product (e.g. "MVP", "Первые 10 клиентов", "Запуск партнёрской программы") - each a short title plus a 1-2 sentence description of what it actually involves. Order them roughly by when they'd happen. Write in Russian.
+
+Respond with a JSON array of objects: [{ "title": "...", "description": "..." }, ...]`;
+
+    try {
+        const result = await runClaudeForJson(prompt, { model: 'claude-sonnet-5' });
+        if (!Array.isArray(result)) throw new Error('expected a JSON array');
+        res.json({ candidates: result });
+    } catch (e) {
+        res.status(502).json({ error: e.message, rawText: e.rawText });
+    }
+});
+
 // task: niche-description
 // body: { category: string }
 // Writes a description for generateParserQueries.js (server/lib) to build

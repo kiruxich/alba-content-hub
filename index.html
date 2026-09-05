@@ -22,65 +22,80 @@
 
     <nav class="navigation-bar">
         <div class="sidebar-brand">
-            <p>Alba Creation</p>
-            <h2>Content Hub</h2>
+            <span class="sidebar-mark">A</span>
+            <div class="sidebar-brand-text">
+                <p>Alba Creation</p>
+                <h2>Content Hub</h2>
+            </div>
         </div>
-        <button class="tab-item active" onclick="switchTab('products')">
-            <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
-            <span>Продукты</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('contentcreation')">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-            <span>Создание контента</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('bank')">
-            <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
-            <span>Хранилище постов (<span id="tab-bank-count">0</span>)</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('crm')">
-            <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-            <span>CRM</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('analytics')">
-            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-            <span>Дашборд & Аналитика</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('calendar')">
-            <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
-            <span>Календарь</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('archive')">
-            <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
-            <span>Архив публикаций</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('contentplan')">
-            <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>
-            <span>Контент план</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('clients')">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-            <span>Скрипты</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('customers')">
-            <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-            <span>Заказчики</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('mediaassets')">
-            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-            <span>Медиатека</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('urlchecker')">
-            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-            <span>Проверка сайта</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('systeminfo')">
-            <svg viewBox="0 0 24 24"><path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z"/></svg>
-            <span>О системе</span>
-        </button>
-        <button class="tab-item" onclick="switchTab('agentcenter')">
-            <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2v1.09a7.01 7.01 0 0 1 3.3 1.91l.95-.55a2 2 0 1 1 2 3.46l-.95.55a6.97 6.97 0 0 1 0 3.28l.95.55a2 2 0 1 1-2 3.46l-.95-.55A7.01 7.01 0 0 1 14 18.91V20a2 2 0 1 1-4 0v-1.09a7.01 7.01 0 0 1-3.3-1.91l-.95.55a2 2 0 1 1-2-3.46l.95-.55a6.97 6.97 0 0 1 0-3.28l-.95-.55a2 2 0 1 1 2-3.46l.95.55A7.01 7.01 0 0 1 10 5.09V4a2 2 0 0 1 2-2zm0 6.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5z"/></svg>
-            <span>Центр агентов</span>
-        </button>
+
+        <!-- data-tab, а не порядковый номер: switchTab() раньше искал кнопку
+             по индексу в NodeList, и любая вставка пункта (или заголовка
+             группы) сдвигала подсветку у всех следующих. -->
+        <div class="sidebar-scroll">
+            <div class="nav-indicator" id="nav-indicator"></div>
+            <div class="sidebar-group-title">Контент</div>
+            <button class="tab-item active" data-tab="products" onclick="switchTab('products')">
+                <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+                <span>Продукты</span>
+            </button>
+            <button class="tab-item" data-tab="contentcreation" onclick="switchTab('contentcreation')">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                <span>Создание контента</span>
+            </button>
+            <button class="tab-item" data-tab="bank" onclick="switchTab('bank')">
+                <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                <span>Хранилище постов (<span id="tab-bank-count">0</span>)</span>
+            </button>
+            <button class="tab-item" data-tab="contentplan" onclick="switchTab('contentplan')">
+                <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>
+                <span>Контент план</span>
+            </button>
+            <button class="tab-item" data-tab="calendar" onclick="switchTab('calendar')">
+                <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+                <span>Календарь</span>
+            </button>
+            <button class="tab-item" data-tab="archive" onclick="switchTab('archive')">
+                <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+                <span>Архив публикаций</span>
+            </button>
+            <div class="sidebar-group-title">Клиенты и продажи</div>
+            <button class="tab-item" data-tab="crm" onclick="switchTab('crm')">
+                <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                <span>CRM</span>
+            </button>
+            <button class="tab-item" data-tab="customers" onclick="switchTab('customers')">
+                <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                <span>Заказчики</span>
+            </button>
+            <button class="tab-item" data-tab="clients" onclick="switchTab('clients')">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                <span>Скрипты</span>
+            </button>
+            <div class="sidebar-group-title">Аналитика</div>
+            <button class="tab-item" data-tab="analytics" onclick="switchTab('analytics')">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                <span>Дашборд & Аналитика</span>
+            </button>
+            <div class="sidebar-group-title">Инструменты</div>
+            <button class="tab-item" data-tab="mediaassets" onclick="switchTab('mediaassets')">
+                <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                <span>Медиатека</span>
+            </button>
+            <button class="tab-item" data-tab="urlchecker" onclick="switchTab('urlchecker')">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                <span>Проверка сайта</span>
+            </button>
+            <div class="sidebar-group-title">Система</div>
+            <button class="tab-item" data-tab="agentcenter" onclick="switchTab('agentcenter')">
+                <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2v1.09a7.01 7.01 0 0 1 3.3 1.91l.95-.55a2 2 0 1 1 2 3.46l-.95.55a6.97 6.97 0 0 1 0 3.28l.95.55a2 2 0 1 1-2 3.46l-.95-.55A7.01 7.01 0 0 1 14 18.91V20a2 2 0 1 1-4 0v-1.09a7.01 7.01 0 0 1-3.3-1.91l-.95.55a2 2 0 1 1-2-3.46l.95-.55a6.97 6.97 0 0 1 0-3.28l-.95-.55a2 2 0 1 1 2-3.46l.95.55A7.01 7.01 0 0 1 10 5.09V4a2 2 0 0 1 2-2zm0 6.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5z"/></svg>
+                <span>Центр агентов</span>
+            </button>
+            <button class="tab-item" data-tab="systeminfo" onclick="switchTab('systeminfo')">
+                <svg viewBox="0 0 24 24"><path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z"/></svg>
+                <span>О системе</span>
+            </button>
+        </div>
     </nav>
 
     <div class="view-container">

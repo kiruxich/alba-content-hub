@@ -1,5 +1,22 @@
 :root {
     --bg-base: #000000;
+    /* Рельс меню по материальной модели InSights (см. DESIGN.md и
+       tokens.css в apps/web): интерфейс - стопка слоёв над фоновой средой,
+       и глубина берётся из того, что слой пропускает сквозь себя нижние.
+       Хром при этом ПРИТЕМНЯЕТ подложку, а не поднимает её: панель должна
+       читаться как рама, а не как ещё один лист контента. Отсюда и
+       «потемнее» - рельс уходит назад, холст остаётся впереди. */
+    --bg-canvas: #0d0d0f;
+    --rail-env: #050506;
+    --material-chrome: rgba(0, 0, 0, 0.55);
+    --control: rgba(255, 255, 255, 0.07);
+    --control-hover: rgba(255, 255, 255, 0.12);
+    --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --rail-text: rgba(235, 235, 245, 0.8);
+    --rail-text-dim: rgba(235, 235, 245, 0.6);
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
     --bg-grouped: #1c1c1e;
     --bg-grouped-active: #2c2c2e;
     --text-primary: #ffffff;
@@ -27,50 +44,147 @@ html, body {
 
 .app-container { width: 100%; height: 100vh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 
+/* Два слоя: снизу фоновая среда из бледных пятен, сверху притемняющий хром.
+   Прозрачность видна только тогда, когда за ней что-то есть - на плоской
+   заливке тот же слой выглядел бы просто серым прямоугольником.
+   backdrop-filter здесь намеренно нет: под хромом лежит собственный мягкий
+   градиент, размывать в нём нечего, а каждое размытие стоит отдельного
+   прохода композитора. */
 .navigation-bar {
-    background: rgba(28, 28, 30, 0.92);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
-    border-top: 0.5px solid var(--separator);
+    position: relative;
     z-index: 100; display: flex;
+    background-color: var(--rail-env);
+    background-image:
+        radial-gradient(30rem 26rem at 30% 2%, rgba(255, 255, 255, 0.15), transparent 66%),
+        radial-gradient(26rem 24rem at 78% 46%, rgba(255, 255, 255, 0.1), transparent 64%),
+        radial-gradient(34rem 30rem at 12% 96%, rgba(255, 255, 255, 0.085), transparent 68%);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.navigation-bar:before {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: var(--material-chrome);
+}
+.sidebar-brand, .sidebar-scroll { position: relative; z-index: 1; }
+
+/* Пятна очень медленно дышат - период выбран так, чтобы движение нельзя было
+   заметить намеренно, только почувствовать. */
+@keyframes rail-ambient-drift {
+    from { background-position: 0 0, 0 0, 0 0; }
+    to { background-position: 6% -4%, -5% 5%, 4% 3%; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .navigation-bar { animation: rail-ambient-drift 72s var(--ease-in-out) infinite alternate; }
 }
 
 @media (max-width: 767px) {
     .app-container { flex-direction: column; }
-    .navigation-bar { position: absolute; bottom: 0; left: 0; right: 0; height: var(--tab-bar-height); justify-content: space-around; align-items: center; padding-bottom: 8px; }
-    .sidebar-brand { display: none; }
-    .view-container { position: absolute; top: 0; left: 0; right: 0; bottom: var(--tab-bar-height); }
+    /* Четырнадцать пунктов в 375px не помещаются: раньше они сжимались и
+       подписи наезжали друг на друга. Теперь панель скроллится по
+       горизонтали, а пункт держит свою минимальную ширину. */
+    .navigation-bar {
+        position: absolute; bottom: 0; left: 0; right: 0; height: var(--tab-bar-height);
+        align-items: stretch; padding: 0; overflow: hidden;
+    }
+    .sidebar-brand, .sidebar-group-title { display: none; }
+    .sidebar-scroll {
+        display: flex; align-items: stretch; gap: 2px; width: 100%;
+        overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+        padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+        -webkit-overflow-scrolling: touch;
+    }
+    .sidebar-scroll::-webkit-scrollbar { display: none; }
+    .view-container { position: absolute; top: 0; left: 0; right: 0; bottom: var(--tab-bar-height); background: var(--bg-canvas); }
 }
 
 @media (min-width: 768px) {
     .app-container { flex-direction: row; }
-    .navigation-bar { width: var(--sidebar-width); height: 100%; flex-direction: column; justify-content: flex-start; border-top: none; border-right: 0.5px solid var(--separator); padding: 24px 16px; gap: 8px; }
-    .sidebar-brand { display: block; padding: 0 12px 20px 12px; border-bottom: 0.5px solid var(--separator); margin-bottom: 12px; }
-    .sidebar-brand p { margin: 0; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
-    .sidebar-brand h2 { margin: 4px 0 0 0; font-size: 18px; font-weight: 700; }
-    .view-container { flex: 1; height: 100%; position: relative; }
+    .navigation-bar {
+        width: var(--sidebar-width); height: 100%; flex-direction: column; justify-content: flex-start;
+        border-top: none; border-right: 1px solid rgba(255, 255, 255, 0.06); padding: 18px 12px 12px; gap: 0;
+    }
+    .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 20px; }
+    /* Марка белая, а не градиентно-синяя: акцент в этой системе монохромный,
+       выделяется плотностью материала и контрастом, а не цветом. */
+    .sidebar-mark {
+        display: grid; place-items: center; flex-shrink: 0;
+        width: 32px; height: 32px; border-radius: 11px;
+        font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
+        background: #fff; color: #000;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    }
+    .sidebar-brand-text { min-width: 0; }
+    .sidebar-brand p { margin: 0; font-size: 11px; color: var(--rail-text-dim); font-weight: 500; letter-spacing: 0; text-transform: none; }
+    .sidebar-brand h2 { margin: 0 0 1px; font-size: 15px; font-weight: 600; letter-spacing: -0.2px; order: -1; }
+
+    /* Четырнадцать пунктов не помещаются на невысоких экранах - список
+       скроллится сам, а полосу прячем, чтобы она не резала рельс. */
+    .sidebar-scroll { position: relative; flex: 1; overflow-y: auto; scrollbar-width: none; display: grid; align-content: start; gap: 2px; }
+    .sidebar-scroll::-webkit-scrollbar { display: none; }
+
+    .sidebar-group-title {
+        padding: 16px 10px 6px; font-size: 11px; font-weight: 600;
+        letter-spacing: 0; color: rgba(235, 235, 245, 0.3);
+    }
+    .sidebar-group-title:first-child { padding-top: 2px; }
+
+    .view-container { flex: 1; height: 100%; position: relative; background: var(--bg-canvas); }
 }
 
 .tab-item {
-    display: flex; align-items: center; color: var(--text-secondary); font-size: 13px; font-weight: 500;
-    cursor: pointer; border: none; background: none; padding: 10px 14px; border-radius: 10px; gap: 12px;
-    transition: all 0.2s ease; width: 100%; text-align: left;
+    position: relative; z-index: 1;
+    display: flex; align-items: center; color: var(--rail-text); font-size: 14px; font-weight: 500;
+    cursor: pointer; border: none; background: none; min-height: 36px; padding: 0 10px;
+    border-radius: 11px; gap: 10px; width: 100%; text-align: left;
+    transition: transform 140ms var(--ease-out), background-color 140ms var(--ease-out), color 200ms var(--ease-out);
 }
+.tab-item:active { transform: scale(0.97); transition-duration: 100ms; }
 @media (max-width: 767px) {
-    .tab-item { flex-direction: column; justify-content: center; font-size: 10px; padding: 6px 0; gap: 3px; border-radius: 0; width: auto; }
+    .tab-item {
+        flex-direction: column; justify-content: center; align-items: center;
+        font-size: 9.5px; line-height: 1.15; text-align: center; padding: 5px 6px; gap: 4px;
+        border-radius: 9px; width: auto; flex: 0 0 auto; min-width: 66px;
+    }
+    .tab-item > span { display: block; max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tab-item.active { background: var(--control); }
+    .nav-indicator { display: none; }
 }
-.tab-item svg { width: 22px; height: 22px; fill: currentColor; flex-shrink: 0; }
-.tab-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-primary); }
-.tab-item.active { color: var(--accent-blue); background: rgba(10, 132, 255, 0.15); font-weight: 600; }
+.tab-item svg {
+    width: 19px; height: 19px; fill: currentColor; flex-shrink: 0; color: var(--rail-text-dim);
+    transition: color 200ms var(--ease-out), transform 280ms var(--ease-spring);
+}
+/* Активный пункт - белый текст и иконка, а не заливка синим: акцент в этой
+   системе монохромный, и синий пласт в списке из четырнадцати пунктов
+   перетягивал бы на себя всё внимание. Подложку рисует .nav-indicator. */
+.tab-item.active { color: rgba(255, 255, 255, 0.96); }
+.tab-item.active svg { color: rgba(255, 255, 255, 0.96); transform: scale(1.08); }
+
+@media (hover: hover) and (pointer: fine) {
+    .tab-item:hover { color: rgba(255, 255, 255, 0.96); }
+    .tab-item:not(.active):hover { background: var(--control); }
+    .tab-item:hover svg { color: var(--rail-text); }
+}
+
+/* Подложка активного пункта - отдельный слой под кнопками. Она переезжает
+   между пунктами, а не гаснет и зажигается: взгляд отслеживает движение и не
+   теряет, где он оказался. */
+.nav-indicator {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 0;
+    border-radius: 11px; background: var(--control-hover); box-shadow: var(--hairline-top);
+    pointer-events: none; opacity: 0;
+    transition: transform 280ms var(--ease-spring), height 280ms var(--ease-out), opacity 140ms var(--ease-out);
+}
+.nav-indicator.ready { opacity: 1; }
+/* Первое появление не должно проезжать через весь список. */
+.nav-indicator.instant { transition: opacity 140ms var(--ease-out); }
 
 .view {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow-y: auto; overflow-x: hidden;
-    background-color: var(--bg-base); display: none; opacity: 0; transition: opacity 0.2s ease; padding-bottom: 40px;
+    background-color: var(--bg-canvas); display: none; opacity: 0; transition: opacity 0.2s ease; padding-bottom: 40px;
 }
 .view.active { display: block; opacity: 1; }
 
 .large-header {
-    padding: 28px 24px 16px 24px; position: sticky; top: 0; background: rgba(0, 0, 0, 0.85);
+    padding: 28px 24px 16px 24px; position: sticky; top: 0; background: color-mix(in srgb, var(--bg-canvas) 88%, transparent);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 10; border-bottom: 0.5px solid var(--separator);
 }
 .large-header p { margin: 0 0 2px 0; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
