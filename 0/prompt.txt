@@ -1,0 +1,8 @@
+<task-notification>
+<task-id>b971iee3p</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/b971iee3p.output</output-file>
+<status>completed</status>
+<summary>Background command "cd /Users/kiruxa/Desktop/alba-content-hub
+node --env-file-if-exists=.env scripts/register-youtube-oauth.mjs "743808085232-vmgq2o09gadvs1qd9ei1o6mev66ro5f1.apps.googleusercontent.com" "REDACTED" --lang en" completed (exit code 0)</summary>
+</task-notification>
