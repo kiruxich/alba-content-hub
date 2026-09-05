@@ -694,7 +694,7 @@
                 <!-- Layer: hub (hero) -->
                 <div class="ui-card ui-card--gradient parser-niche-card" style="background:linear-gradient(165deg, rgba(10,132,255,0.16), rgba(10,132,255,0.03) 65%); border-color:rgba(10,132,255,0.4);">
                     <div class="parser-niche-head"><b style="font-size:15px;">hub — Express API</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
-                    <p class="idea-desc-text" style="margin-bottom:0;">Coolify-контейнер с основной бизнес-логикой: REST API, статика фронтенда, Editor-валидация черновиков без AI, auth-гейт (signed cookie + bcrypt) перед всеми роутами. Обращается ко всем сервисам и внешним API ниже.</p>
+                    <p class="idea-desc-text" style="margin-bottom:0;">Coolify-контейнер с основной бизнес-логикой: REST API, статика фронтенда, Editor-валидация черновиков без AI, auth-гейт (signed cookie + bcrypt) перед всеми роутами. У Generator/Researcher/Insights/Маркетолога нет браузерной сессии — им отдельная лазейка через AGENT_API_TOKEN (заголовок Authorization: Bearer, см. server/middleware/requireAuth.js), иначе с введением логина все четыре получали бы 401. Обращается ко всем сервисам и внешним API ниже.</p>
                 </div>
                 <div style="text-align:center; color:var(--accent-blue); opacity:0.7; font-size:12px; margin:10px 0 22px;">↓ hub обращается ко всем блокам ниже (они не связаны между собой напрямую)</div>
 
@@ -731,8 +731,8 @@
                         <p class="idea-desc-text">FFmpeg-сборка Shorts: видео-клип + озвучка + субтитры → готовый вертикальный ролик. Порт 8788 опубликован, VIDEO_WORKER_URL настроен — финальная сборка ролика в кнопке «Сгенерировать» доступна.</p>
                     </div>
                     <div class="ui-card ui-card--gradient parser-niche-card">
-                        <div class="parser-niche-head"><b>scrape-worker (ScrapeGraphAI)</b><span class="ui-badge ui-badge--caps ui-badge--orange">○ ждёт ключей</span></div>
-                        <p class="idea-desc-text">Вторая база заказчиков — обходит произвольные сайты компаний Playwright'ом и разбирает контакты моделью на локальной Ollama (не 2ГИС, дополняет его). Отдельный docker compose (см. scrape-worker/README.md): поднять контейнеры, один раз выполнить <code>ollama pull qwen2.5:7b</code> и <code>ollama pull nomic-embed-text</code> (иначе первый job падает с «model not found»), затем в `.env` хаба — SCRAPE_WORKER_URL и тот же SCRAPE_WORKER_TOKEN, что задан воркеру. Проверить связку — «Заказчики» → ScrapeGraph, вверху панели видно, на связи ли воркер.</p>
+                        <div class="parser-niche-head"><b>scrape-worker (ScrapeGraphAI)</b><span class="ui-badge ui-badge--caps ui-badge--orange">○ ждёт ключей в hub</span></div>
+                        <p class="idea-desc-text">Вторая база заказчиков — обходит произвольные сайты компаний Playwright'ом и разбирает контакты моделью на локальной Ollama (не 2ГИС, дополняет его). Coolify-ресурс с Build pack «Docker Compose» (два сервиса — ollama + сам воркер, см. scrape-worker/README.md), порт 8790 (не 8788 — тот занят video-worker). Контейнеры подняты, обе модели (qwen2.5:7b + nomic-embed-text) скачаны — сам воркер уже отвечает. Осталось прописать SCRAPE_WORKER_URL=http://10.0.1.1:8790 и тот же SCRAPE_WORKER_TOKEN в env самого hub (не воркера) и передеплоить hub. Статус связки — «Заказчики» → ScrapeGraph, вверху панели (GET /api/scrape-niches/health).</p>
                     </div>
                 </div>
 
@@ -781,7 +781,7 @@
                 <div class="parser-niches-grid">
                     <div class="ui-card ui-card--gradient parser-niche-card">
                         <div class="parser-niche-head"><b>local-claude-agent</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
-                        <p class="idea-desc-text">Обёртка над настоящим `claude` CLI (не root, --allowedTools WebSearch, авторизован вашей подпиской через CLAUDE_CODE_OAUTH_TOKEN). Фиксированный набор задач, не generic-исполнение промптов: поиск RSS-источников и ключевых слов, описание ниши парсера, сценарий для Reels, определение города для 2ГИС-парсера, питч для холодных звонков, генерация раздела скрипта звонка, AI-ревью юридических находок, «с чистого листа» генерация поста (4 формата + перевод), подбор актуальной темы с источниками.</p>
+                        <p class="idea-desc-text">Обёртка над настоящим `claude` CLI (не root, --allowedTools WebSearch, авторизован вашей подпиской через CLAUDE_CODE_OAUTH_TOKEN). Фиксированный набор задач, не generic-исполнение промптов: поиск RSS-источников и ключевых слов, описание ниши парсера, сценарий для Reels, определение города для 2ГИС-парсера, питч для холодных звонков, генерация раздела скрипта звонка, AI-ревью юридических находок, «с чистого листа» генерация поста (4 формата + перевод), подбор актуальной темы с источниками, подбор сайтов компаний для scrape-worker, чтение постов из отслеживаемых Telegram-каналов (Центр агентов → своя MTProto-сессия, не тот же бот что публикует).</p>
                     </div>
                     <div class="ui-card ui-card--gradient parser-niche-card">
                         <div class="parser-niche-head"><b>ngrok-туннель</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
@@ -811,6 +811,10 @@
                     <div class="ui-card ui-card--gradient parser-niche-card">
                         <div class="parser-niche-head"><b>Metrics Sync</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">System cron на VPS, каждые 6 часов. Подтягивает просмотры/лайки/сохранения с VK/Instagram/YouTube/Pinterest обратно в scheduled_events по опубликованным постам. Telegram — исключение: Bot API физически не отдаёт число просмотров, это ограничение платформы, не баг.</p>
+                    </div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Docker cleanup</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
+                        <p class="idea-desc-text">System cron на VPS, каждый день в 4:00. Coolify билдит новый образ на каждый деплой (hub, parser-worker, piper-tts, video-worker, seaweedfs, scrape-worker) и сам никогда не чистит старые слои — 30 августа диск забился до 100% и уронил деплой хаба. Крон чистит `docker image prune` и `docker builder prune` с фильтром `until=24h`, так что свежий/текущий деплой не трогает.</p>
                     </div>
                 </div>
 
