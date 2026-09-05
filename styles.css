@@ -6,9 +6,22 @@
        Хром при этом ПРИТЕМНЯЕТ подложку, а не поднимает её: панель должна
        читаться как рама, а не как ещё один лист контента. Отсюда и
        «потемнее» - рельс уходит назад, холст остаётся впереди. */
-    --bg-canvas: #0d0d0f;
+    --bg-canvas: #08080a;
     --rail-env: #050506;
     --material-chrome: rgba(0, 0, 0, 0.55);
+    /* Контентные слои, наоборот, ПОДНИМАЮТ подложку белым с малой альфой -
+       так карточка читается как лист над средой, а не как серый
+       прямоугольник. Непрозрачный вариант нужен там, где стекло поверх
+       стекла превратилось бы в кашу: перетаскиваемая карточка, выпадашки. */
+    --surface: rgba(255, 255, 255, 0.04);
+    --surface-raised: rgba(255, 255, 255, 0.065);
+    --surface-sunken: rgba(0, 0, 0, 0.28);
+    --surface-solid: #17171a;
+    --border-subtle: rgba(255, 255, 255, 0.055);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --danger-surface: rgba(255, 69, 58, 0.14);
+    --danger-border: rgba(255, 69, 58, 0.3);
+    --rose-300: #ff8f88;
     --control: rgba(255, 255, 255, 0.07);
     --control-hover: rgba(255, 255, 255, 0.12);
     --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
@@ -17,8 +30,8 @@
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
     --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
-    --bg-grouped: #1c1c1e;
-    --bg-grouped-active: #2c2c2e;
+    --bg-grouped: var(--surface);
+    --bg-grouped-active: var(--surface-raised);
     --text-primary: #ffffff;
     --text-secondary: #8e8e93;
     --accent-blue: #0a84ff;
@@ -27,6 +40,10 @@
     --accent-orange: #ff9f0a;
     --accent-red: #ff453a;
     --separator: rgba(84, 84, 88, 0.4);
+    /* Одна высота на все однострочные контролы. Без неё инпут, кнопка рядом
+       с ним и чип в том же ряду расходились на 3-6px - ряд выглядел
+       собранным из случайных деталей. */
+    --control-h: 40px;
     --sidebar-width: 260px;
     --tab-bar-height: 65px;
 }
@@ -35,11 +52,35 @@
 
 html, body {
     margin: 0; padding: 0;
-    background-color: var(--bg-base);
+    background-color: var(--bg-canvas);
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     height: 100%; overflow: hidden;
+}
+
+/* Фоновая среда: несколько очень бледных пятен под всем интерфейсом. Нужна
+   не ради красоты как таковой - без неё полупрозрачные карточки выглядят
+   просто светло-серыми прямоугольниками на плоской заливке. Сквозь среду те
+   же слои читаются как стекло разной плотности. Слой неподвижен
+   (position: fixed), поэтому не участвует в скролле и ничего не перерисовывает
+   при прокрутке длинных списков. */
+body:before {
+    content: ''; position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+    background:
+        radial-gradient(40rem 34rem at 46% 2%, rgba(255, 255, 255, 0.075), transparent 66%),
+        radial-gradient(34rem 30rem at 76% 52%, rgba(255, 255, 255, 0.05), transparent 64%),
+        radial-gradient(46rem 38rem at 22% 96%, rgba(255, 255, 255, 0.045), transparent 68%);
+    will-change: transform;
+}
+/* Пятна очень медленно дышат: период выбран так, чтобы движение нельзя было
+   заметить намеренно - только почувствовать. Анимируется только transform. */
+@keyframes ambient-drift {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to { transform: translate3d(2%, -1.5%, 0) scale(1.06); }
+}
+@media (prefers-reduced-motion: no-preference) {
+    body:before { animation: ambient-drift 72s var(--ease-in-out) infinite alternate; }
 }
 
 .app-container { width: 100%; height: 100vh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
@@ -93,7 +134,7 @@ html, body {
         -webkit-overflow-scrolling: touch;
     }
     .sidebar-scroll::-webkit-scrollbar { display: none; }
-    .view-container { position: absolute; top: 0; left: 0; right: 0; bottom: var(--tab-bar-height); background: var(--bg-canvas); }
+    .view-container { position: absolute; top: 0; left: 0; right: 0; bottom: var(--tab-bar-height); }
 }
 
 @media (min-width: 768px) {
@@ -127,7 +168,7 @@ html, body {
     }
     .sidebar-group-title:first-child { padding-top: 2px; }
 
-    .view-container { flex: 1; height: 100%; position: relative; background: var(--bg-canvas); }
+    .view-container { flex: 1; height: 100%; position: relative; }
 }
 
 .tab-item {
@@ -179,32 +220,40 @@ html, body {
 
 .view {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow-y: auto; overflow-x: hidden;
-    background-color: var(--bg-canvas); display: none; opacity: 0; transition: opacity 0.2s ease; padding-bottom: 40px;
+    background-color: transparent; display: none; opacity: 0; transition: opacity 0.2s ease; padding-bottom: 40px;
 }
 .view.active { display: block; opacity: 1; }
 
 .large-header {
-    padding: 28px 24px 16px 24px; position: sticky; top: 0; background: color-mix(in srgb, var(--bg-canvas) 88%, transparent);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 10; border-bottom: 0.5px solid var(--separator);
+    padding: 28px 24px 16px 24px; position: sticky; top: 0; background: rgba(8, 8, 10, 0.72);
+    backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); z-index: 10;
+    border-bottom: 1px solid var(--border-subtle);
 }
 .large-header p { margin: 0 0 2px 0; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
 .large-header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
 
 /* KANBAN BOARD */
 .kanban-board { display: flex; gap: 16px; padding: 24px; overflow-x: auto; height: calc(100vh - 120px); }
-.kanban-column { flex: 1; min-width: 250px; background: var(--bg-grouped); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.05); }
+.kanban-column { flex: 1; min-width: 250px; background: var(--surface-sunken); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; border: 1px solid var(--border-subtle); }
 .kanban-column-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 15px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 0.5px solid var(--separator); }
 .kanban-count { background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .kanban-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-.kanban-card { background: rgba(255,255,255,0.04); border-radius: 12px; padding: 12px; border: 1px solid rgba(255,255,255,0.08); cursor: grab; transition: transform 0.15s; }
-.kanban-card:active { cursor: grabbing; transform: scale(0.98); }
+.kanban-card {
+    background: var(--surface-raised); border-radius: 12px; padding: 12px;
+    border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top);
+    cursor: grab; transition: transform 140ms var(--ease-out), border-color 140ms var(--ease-out);
+}
+.kanban-card:hover { border-color: var(--border-strong); }
+/* Перетаскиваемая карточка становится непрозрачной: стекло, едущее над
+   стеклом, превращается в кашу. */
+.kanban-card:active { cursor: grabbing; transform: scale(0.98); background: var(--surface-solid); }
 
 /* DASHBOARD & ANALYTICS */
 .analytics-container { padding: 24px; max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-.analytics-card { background: var(--bg-grouped); border-radius: 16px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+.analytics-card { background: var(--surface); border-radius: 16px; padding: 20px; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); }
 .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
 .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
-.stat-box { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+.stat-box { background: var(--surface-sunken); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid var(--border-subtle); }
 
 /* BADGES & LIMITS */
 .funnel-badge { font-size: 10px; font-weight: 700; padding: 3px 6px; border-radius: 5px; text-transform: uppercase; margin-right: 4px; }
@@ -212,8 +261,9 @@ html, body {
 .warning-banner { background: rgba(255, 159, 10, 0.15); border: 1px solid var(--accent-orange); color: var(--accent-orange); padding: 12px; border-radius: 12px; font-size: 13px; margin-bottom: 16px; }
 
 .products-grid { padding: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-.product-card { background: var(--bg-grouped); border-radius: 16px; padding: 20px; cursor: pointer; transition: transform 0.15s ease, background 0.2s; border: 1px solid rgba(255, 255, 255, 0.06); display: flex; flex-direction: column; justify-content: space-between; }
-.product-card:hover { border-color: rgba(255, 255, 255, 0.2); background: var(--bg-grouped-active); transform: translateY(-2px); }
+.product-card { background: var(--surface); border-radius: 16px; padding: 20px; cursor: pointer; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); display: flex; flex-direction: column; justify-content: space-between; transition: transform 200ms var(--ease-out), border-color 200ms var(--ease-out), background-color 200ms var(--ease-out); }
+.product-card:hover { transform: translateY(-2px); border-color: var(--border-strong); background: var(--surface-raised); }
+.product-card:active { transform: translateY(0) scale(0.995); }
 
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .card-title { font-size: 20px; font-weight: 700; }
@@ -267,7 +317,7 @@ html, body {
 
 .modal-body { padding: 24px; flex: 1; }
 .p-section-title { font-size: 11px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; letter-spacing: 0.5px; margin: 24px 0 10px 4px; }
-.info-box { background: var(--bg-grouped); border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.5; border: 1px solid rgba(255,255,255,0.05); }
+.info-box { background: var(--surface); border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.5; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); }
 
 .roadmap-list { display: flex; flex-direction: column; gap: 10px; }
 .roadmap-step { background: var(--bg-grouped); border-radius: 12px; padding: 14px; border-left: 3px solid var(--accent-blue); }
@@ -278,7 +328,7 @@ html, body {
 .roadmap-status.in_progress { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
 .roadmap-status.done { background: rgba(48,209,88,0.15); color: var(--accent-green); }
 
-.idea-card { background: var(--bg-grouped); border-radius: 14px; padding: 16px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.05); position: relative; }
+.idea-card { background: var(--surface); border-radius: 14px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); position: relative; }
 .idea-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
 .idea-title { font-size: 15px; font-weight: 600; flex: 1; padding-right: 8px; }
 .format-tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600; background: rgba(255,255,255,0.08); color: var(--accent-orange); }
@@ -288,16 +338,79 @@ html, body {
 .meta-stats { font-size: 11px; color: var(--text-secondary); margin-bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
 
 .action-btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.schedule-btn { background: var(--accent-blue); color: white; border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
-.schedule-btn:disabled, .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.tg-btn { background: #229ED9; color: white; border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
-.edit-btn { background: rgba(255,255,255,0.1); color: var(--text-primary); border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
-.delete-btn { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* ЕДИНАЯ МЕХАНИКА КНОПОК
+   Раньше каждый класс задавал свои отступы и вес, а варианты различались
+   только цветом заливки: рядом стояли кнопки разной высоты, и ни одна не
+   реагировала на нажатие. Общая часть теперь одна, различаются только три
+   переменные - фон, текст, рамка. Отсюда одинаковая высота в любом ряду,
+   одинаковый отклик и предсказуемое disabled-состояние.
+   Второстепенные кнопки подсвечены волосяной линией по верхнему краю: так
+   читается толщина стеклянного слоя, и это дешевле честной рамки. */
+.schedule-btn, .tg-btn, .edit-btn, .delete-btn, .submit-btn,
+.cc-primary, .cc-secondary {
+    --btn-bg: transparent;
+    --btn-fg: var(--text-primary);
+    --btn-border: transparent;
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: var(--control-h); padding: 0 14px;
+    border: 1px solid var(--btn-border); border-radius: 11px;
+    background: var(--btn-bg); color: var(--btn-fg);
+    font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1;
+    white-space: nowrap; cursor: pointer;
+    transition: transform 140ms var(--ease-out), background-color 140ms var(--ease-out),
+                border-color 140ms var(--ease-out), color 140ms var(--ease-out), opacity 140ms var(--ease-out);
+}
+.schedule-btn:not(:disabled):active, .tg-btn:not(:disabled):active,
+.edit-btn:not(:disabled):active, .delete-btn:not(:disabled):active,
+.submit-btn:not(:disabled):active, .cc-primary:not(:disabled):active,
+.cc-secondary:not(:disabled):active { transform: scale(0.97); transition-duration: 100ms; }
+
+.schedule-btn:disabled, .tg-btn:disabled, .edit-btn:disabled, .delete-btn:disabled,
+.submit-btn:disabled, .cc-primary:disabled, .cc-secondary:disabled, .cc-link:disabled {
+    opacity: 0.35; cursor: not-allowed; transform: none;
+}
+.schedule-btn:focus-visible, .tg-btn:focus-visible, .edit-btn:focus-visible,
+.delete-btn:focus-visible, .submit-btn:focus-visible,
+.cc-primary:focus-visible, .cc-secondary:focus-visible {
+    outline: none; box-shadow: 0 0 0 2px var(--bg-canvas), 0 0 0 4px rgba(10, 132, 255, 0.7);
+}
+
+/* Главное действие - единственная сплошная плоскость в ряду. */
+.schedule-btn, .tg-btn, .submit-btn, .cc-primary {
+    --btn-bg: var(--accent-blue); --btn-fg: #fff; --btn-border: transparent;
+    box-shadow: 0 2px 10px rgba(10, 132, 255, 0.22);
+}
+.edit-btn, .cc-secondary {
+    --btn-bg: var(--control); --btn-fg: var(--text-primary); --btn-border: var(--border-subtle);
+    box-shadow: var(--hairline-top);
+}
+.delete-btn, .cc-danger {
+    --btn-bg: var(--danger-surface); --btn-fg: var(--rose-300); --btn-border: var(--danger-border);
+    box-shadow: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .schedule-btn:not(:disabled):hover, .tg-btn:not(:disabled):hover,
+    .submit-btn:not(:disabled):hover, .cc-primary:not(:disabled):hover { --btn-bg: #2b96ff; }
+    .edit-btn:not(:disabled):hover, .cc-secondary:not(:disabled):hover {
+        --btn-bg: var(--control-hover); --btn-border: var(--border-strong);
+    }
+    .delete-btn:not(:disabled):hover, .cc-danger:not(:disabled):hover {
+        --btn-bg: rgba(255, 69, 58, 0.22); --btn-border: var(--accent-red);
+    }
+}
 .ps-tab-btn.active { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); }
 
 .form-label { font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700; margin-top:12px; display:block; }
-.form-input, .form-textarea, .form-select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-family: inherit; font-size: 14px; line-height: 1.5; margin-top: 6px; margin-bottom: 12px; }
+.form-input, .form-textarea, .form-select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-subtle); background: var(--surface-sunken); color: var(--text-primary); font-family: inherit; font-size: 14px; line-height: 1.5; margin-top: 6px; margin-bottom: 12px; transition: border-color 140ms var(--ease-out), background-color 140ms var(--ease-out); }
+.form-input:hover, .form-textarea:hover, .form-select:hover { border-color: var(--border-strong); }
 .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(10,132,255,0.15); }
+/* Фиксированная высота, а не min-height: у однострочного поля высоту задаёт
+   line-height плюс вертикальные паддинги, и min-height её не подрезает -
+   поле оставалось на 3px выше стоящей рядом кнопки. */
+.form-input, .form-select { height: var(--control-h); padding-top: 0; padding-bottom: 0; }
 .form-textarea { min-height: 90px; resize: vertical; }
 /* Native <select> rendering (esp. Safari/WebKit) ignores the box-model padding
    above and falls back to the OS control's own shorter intrinsic height/font,
@@ -308,7 +421,7 @@ html, body {
 .form-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; font-family: inherit; line-height: 16px; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
 
 .date-picker-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-size: 16px; margin-top: 10px; color-scheme: dark; }
-.submit-btn { width: 100%; padding: 14px; background: var(--accent-blue); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; margin-top: 12px; cursor: pointer; }
+.submit-btn { width: 100%; min-height: 46px; padding: 0 18px; border-radius: 12px; font-size: 15px; margin-top: 12px; }
 
 .toast { position: fixed; bottom: 30px; right: 30px; background: var(--accent-green); color: white; padding: 12px 24px; border-radius: 14px; font-size: 14px; font-weight: 600; z-index: 300; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
 .toast.show { transform: translateY(0); opacity: 1; }
@@ -812,12 +925,12 @@ html, body {
 
 .cc-topic-row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
 .cc-topic-row .cc-input { flex: 1 1 260px; min-width: 0; }
-.cc-suggest { margin-top: 8px; white-space: nowrap; padding: 12px 14px; }
+.cc-suggest { margin-top: 8px; white-space: nowrap; }
 
 /* Чипы выбора форматов: раньше невыбранное состояние делалось opacity:0.5,
    из-за чего "не выбрано" читалось как "недоступно". */
 .cc-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.cc-chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 10px; border: 1px solid var(--separator); background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
+.cc-chip { display: inline-flex; align-items: center; gap: 8px; min-height: var(--control-h); padding: 0 13px; border-radius: 11px; border: 1px solid var(--separator); background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
 .cc-chip:hover { border-color: rgba(255,255,255,0.25); color: var(--text-primary); }
 .cc-chip-box { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--separator); font-size: 10px; color: #fff; }
 .cc-chip.on { border-color: var(--accent-blue); background: rgba(10,132,255,0.12); color: var(--text-primary); }
@@ -851,15 +964,16 @@ html, body {
 /* ДЕЙСТВИЯ */
 .cc-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
 .cc-actions-spacer { flex: 1 1 auto; }
-.cc-primary { width: 100%; padding: 13px 18px; border: none; border-radius: 12px; background: var(--accent-blue); color: #fff; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; margin-top: 20px; transition: filter 0.15s ease; }
-.cc-primary:hover:not(:disabled) { filter: brightness(1.1); }
-.cc-primary:disabled, .cc-secondary:disabled, .cc-link:disabled { opacity: 0.5; cursor: not-allowed; }
-.cc-primary-inline { width: auto; margin-top: 0; padding: 10px 16px; font-size: 13px; border-radius: 10px; }
-.cc-secondary { padding: 10px 14px; border: 1px solid var(--separator); border-radius: 10px; background: transparent; color: var(--text-primary); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
-.cc-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.07); }
-.cc-secondary.cc-danger { color: var(--accent-red); border-color: rgba(255,69,58,0.35); }
-.cc-secondary.cc-danger:hover { background: rgba(255,69,58,0.12); }
-.cc-link { border: none; background: none; color: var(--accent-blue); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; padding: 0; }
+/* Общая механика (высота, радиус, отклик, disabled) задана выше вместе с
+   остальными кнопками - здесь остаётся только то, чем .cc-primary
+   отличается: это кнопка на всю ширину блока. */
+.cc-primary { width: 100%; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 15px; margin-top: 20px; }
+.cc-primary-inline { width: auto; min-height: var(--control-h); margin-top: 0; padding: 0 16px; font-size: 13px; border-radius: 11px; }
+.cc-link {
+    border: none; background: none; color: var(--accent-blue); font-size: 12px; font-weight: 600;
+    font-family: inherit; cursor: pointer; padding: 0; transition: color 140ms var(--ease-out);
+}
+.cc-link:hover:not(:disabled) { color: #4aa8ff; }
 
 /* ПУСТЫЕ СОСТОЯНИЯ */
 .cc-placeholder { background: var(--bg-grouped); border: 1px dashed rgba(255,255,255,0.12); border-radius: 14px; padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
@@ -908,7 +1022,7 @@ html, body {
 .ie-panel { background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; }
 .ie-panel > .cc-label:first-child { margin-top: 0; }
 .ie-panel-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.ie-panel-actions .cc-secondary { padding: 8px 12px; font-size: 12px; }
+.ie-panel-actions .cc-secondary { padding: 0 12px; font-size: 12px; }
 .ie-asset-preview { margin-top: 8px; font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
 
 .ie-text-tools { display: flex; align-items: center; gap: 12px; }
@@ -1035,7 +1149,7 @@ html, body {
 .uc-field-grow { flex: 1 1 320px; }
 .uc-field .cc-label { margin-top: 0; }
 .uc-field .cc-hint { margin-top: 6px; }
-.uc-submit { flex: 0 0 auto; height: 44px; }
+.uc-submit { flex: 0 0 auto; }
 
 .uc-advanced { margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 14px; }
 .uc-advanced > summary {
@@ -1150,7 +1264,10 @@ select.crm-cell { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .crm-link:hover { color: var(--accent-blue); text-decoration: underline; }
 
 /* ДОСКА СДЕЛОК */
-.crm-board { align-items: flex-start; }
+/* Колонки тянутся на общую высоту: короткая пустая колонка плохо читается
+   как цель для перетаскивания. */
+.crm-board { align-items: stretch; }
+.crm-board .kanban-column { min-height: 340px; }
 .crm-stage-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
 .crm-column-sum { padding: 0 4px 8px; font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .crm-deal-card { cursor: pointer; }
