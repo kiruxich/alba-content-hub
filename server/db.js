@@ -506,6 +506,83 @@ CREATE TABLE IF NOT EXISTS scrape_niches (
     updated_at INTEGER DEFAULT (strftime('%s','now'))
 );
 
+-- CRM. Отдельные таблицы, а не расширение parser_niches/scrape_niches:
+-- те две - про СБОР (сырые выгрузки по нишам, перезаписываются при каждом
+-- перезапуске парсера), а здесь живёт РАБОТА с клиентом, которую перезапуск
+-- сбора не имеет права затирать. Импорт из сводной базы идёт в одну сторону
+-- и дедуплицируется по домену/телефону - см. server/routes/crm.js.
+CREATE TABLE IF NOT EXISTS crm_companies (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    domain TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    address TEXT DEFAULT '',
+    city TEXT DEFAULT '',
+    niche TEXT DEFAULT '',
+    telegram TEXT DEFAULT '',
+    vk TEXT DEFAULT '',
+    instagram TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    source TEXT DEFAULT 'manual',
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_crm_companies_domain ON crm_companies(domain);
+CREATE INDEX IF NOT EXISTS idx_crm_companies_niche ON crm_companies(niche);
+
+CREATE TABLE IF NOT EXISTS crm_contacts (
+    id TEXT PRIMARY KEY,
+    company_id TEXT,
+    name TEXT NOT NULL,
+    role TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    telegram TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_crm_contacts_company ON crm_contacts(company_id);
+
+-- stage - строка без CHECK-constraint, как ideas.status: набор стадий задан
+-- в CRM_STAGES (server/routes/crm.js) и может поменяться без миграции.
+CREATE TABLE IF NOT EXISTS crm_deals (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    company_id TEXT,
+    contact_id TEXT,
+    product_id TEXT,
+    stage TEXT DEFAULT 'new',
+    amount INTEGER DEFAULT 0,
+    close_date INTEGER,
+    lost_reason TEXT DEFAULT '',
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_crm_deals_stage ON crm_deals(stage);
+CREATE INDEX IF NOT EXISTS idx_crm_deals_company ON crm_deals(company_id);
+
+-- Одна таблица на заметки, задачи, звонки и автоматические записи о смене
+-- стадии: у Twenty это разные объекты, но здесь они различаются только полем
+-- kind и все нужны в одном месте - в общей ленте карточки. Разводить их по
+-- трём таблицам значило бы склеивать ленту тремя запросами и UNION'ом ради
+-- нулевой выгоды.
+CREATE TABLE IF NOT EXISTS crm_activities (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL DEFAULT 'note',
+    body TEXT DEFAULT '',
+    company_id TEXT,
+    contact_id TEXT,
+    deal_id TEXT,
+    due_at INTEGER,
+    done INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    updated_at INTEGER DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_crm_activities_company ON crm_activities(company_id);
+CREATE INDEX IF NOT EXISTS idx_crm_activities_deal ON crm_activities(deal_id);
+CREATE INDEX IF NOT EXISTS idx_crm_activities_due ON crm_activities(due_at);
+
 -- One row per Shorts-assembly request handed to video-worker (Phase 2) - the
 -- same "hub DB row tracks a remote worker's job_id" shape as parser_niches
 -- above, just without the persistent-card lifecycle (this is a one-shot job,
