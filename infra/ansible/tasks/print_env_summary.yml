@@ -1,0 +1,38 @@
+# Печатает в конце прогона, какие переменные окружения нужно вручную
+# прописать в Coolify-ресурсе хаба - плейбук готовит только саму VM
+# (nginx/ufw/Coolify-контроль-плейн), но не трогает Coolify API, поэтому
+# сами приложения и их env остаются ручным шагом (см. комментарий в начале
+# site.yml). Раньше это было только в комментариях наверху site.yml, которые
+# никто не читает после запуска - теперь то же самое видно прямо в выводе
+# ansible-playbook.
+- name: "Переменные окружения для hub — что и куда добавить"
+  debug:
+    msg:
+      - "=== Провижининг VM завершён. Дальше — вручную создать Coolify-ресурсы и прописать в hub: ==="
+      - ""
+      - "parser-worker (2ГИС, порт 8787):"
+      - "  PARSER_WORKER_URL=http://10.0.1.1:8787"
+      - "  PARSER_WORKER_TOKEN={{ parser_worker_token }}   (тот же токен передан этому прогону через -e)"
+      - ""
+      - "LibreTranslate (порт 5000):"
+      - "  LIBRETRANSLATE_URL=http://10.0.1.1:5000"
+      - ""
+      - "Piper TTS (порт 8789):"
+      - "  PIPER_WORKER_URL=http://10.0.1.1:8789   (+ тот же PIPER_WORKER_TOKEN, что задан контейнеру Piper)"
+      - ""
+      - "SeaweedFS / S3 (порт 8333):"
+      - "  S3_ENDPOINT=http://10.0.1.1:8333"
+      - "  S3_BUCKET / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY / S3_PUBLIC_URL_BASE — см. seaweedfs/entrypoint.sh"
+      - ""
+      - "video-worker (порт 8788):"
+      - "  VIDEO_WORKER_URL=http://10.0.1.1:8788"
+      - ""
+      - "noVNC basic-auth пароль (уже применён в /etc/nginx/.vnc_htpasswd этим прогоном):"
+      - "  {{ vnc_basic_auth_user }} / {{ vnc_basic_auth_password }}"
+      - ""
+      - "scrape-worker (ScrapeGraphAI, вторая база заказчиков) — этим плейбуком НЕ разворачивается вообще."
+      - "  Поднять отдельно (см. scrape-worker/README.md: docker compose up -d --build + ollama pull),"
+      - "  затем в hub: SCRAPE_WORKER_URL=http://<host>:8788, SCRAPE_WORKER_TOKEN=<тот же, что задан воркеру>."
+      - ""
+      - "ANTHROPIC_API_KEY, KIE_API_KEY, ELEVENLABS_API_KEY, ADMIN_EMAIL/ADMIN_PASSWORD_HASH/SESSION_SECRET,"
+      - "AGENT_API_TOKEN, LOCAL_CLAUDE_AGENT_URL/TOKEN — не про эту VM, задаются в hub независимо от провижининга."

@@ -84,6 +84,9 @@
     - name: Системные cron-задачи (Researcher, автоочистка Docker)
       include_tasks: tasks/setup_cron_jobs.yml
 
+    - name: Итоговая сводка — какие переменные и куда добавить в hub
+      include_tasks: tasks/print_env_summary.yml
+
   handlers:
     - name: reload systemd
       systemd:
