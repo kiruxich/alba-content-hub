@@ -2319,7 +2319,7 @@ async function toggleGroupForIdea(ideaId, groupId) {
 // выдвижная модалка: длинный текст поста должен быть виден целиком, а в
 // 540-пиксельном ящике это невозможно. Запоминаем, с какой вкладки пришли,
 // чтобы "Отмена" вернула туда же - редактор открывается из Хранилища,
-// Канбана, Календаря, Создания контента и карточки продукта.
+// CRM, Календаря, Создания контента и карточки продукта.
 let ideaEditorReturnViewId = 'view-bank';
 
 function openIdeaEditorPage(title) {
@@ -2348,7 +2348,7 @@ function closeIdeaEditorPage() {
 
 function ideaEditorViewLabel(viewId) {
     const labels = {
-        'view-bank': 'Хранилище постов', 'view-kanban': 'Канбан',
+        'view-bank': 'Хранилище постов', 'view-crm': 'CRM',
         'view-contentcreation': 'Создание контента', 'view-calendar': 'Календарь',
         'view-day-detail': 'Календарь', 'view-archive': 'Архив публикаций',
         'view-product-detail': 'Каталог продуктов', 'view-contentplan': 'Контент план',
