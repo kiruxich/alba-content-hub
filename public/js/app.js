@@ -129,14 +129,14 @@ function switchTab(tabName) {
         autoGrowAllTextareas(targetView); // высоту полей скрытой вкладки посчитать нельзя - только после показа
     }
 
-    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'kanban': 3, 'analytics': 4, 'calendar': 5, 'archive': 6, 'contentplan': 7, 'clients': 8, 'customers': 9, 'mediaassets': 10, 'urlchecker': 11, 'systeminfo': 12, 'agentcenter': 13 };
+    const tabMap = { 'products': 0, 'contentcreation': 1, 'bank': 2, 'crm': 3, 'analytics': 4, 'calendar': 5, 'archive': 6, 'contentplan': 7, 'clients': 8, 'customers': 9, 'mediaassets': 10, 'urlchecker': 11, 'systeminfo': 12, 'agentcenter': 13 };
     if (tabMap[tabName] !== undefined) {
         const tabs = document.querySelectorAll('.tab-item');
         if (tabs[tabMap[tabName]]) tabs[tabMap[tabName]].classList.add('active');
     }
 
     if (tabName === 'contentcreation') renderContentCreationView();
-    if (tabName === 'kanban') renderKanbanView();
+    if (tabName === 'crm') renderCrmView();
     if (tabName === 'analytics') renderAnalyticsView();
     if (tabName === 'calendar') {
         renderCalendar();
@@ -1015,6 +1015,698 @@ function renderContentCreationView() {
     renderAgentContentDrafts();
     autoGrowAllTextareas(list);
     saveContentDrafts();
+}
+
+// CRM
+// Объекты по образцу Twenty: компании, контакты, сделки, задачи - плюс
+// контентная доска, переехавшая сюда из отдельной вкладки «Канбан».
+// Все записи грузятся разом и фильтруются на клиенте: их сотни, не сотни
+// тысяч, а любая серверная фильтрация здесь означала бы round-trip на каждый
+// набранный символ в поиске.
+let crmMeta = { stages: [], counts: {}, pipelineValue: 0, wonValue: 0 };
+let crmCompanies = [];
+let crmContacts = [];
+let crmDeals = [];
+let crmTasks = [];
+let crmObject = 'overview';
+let crmDealsView = 'board';
+let crmSearch = '';
+let crmOpenRecord = null; // { type: 'company'|'contact'|'deal', id }
+
+const CRM_OBJECTS = ['overview', 'companies', 'contacts', 'deals', 'tasks', 'content'];
+const CRM_SOURCE_LABELS = { '2gis': '2ГИС', scrape: 'ScrapeGraph', both: '2ГИС + ScrapeGraph', manual: 'вручную' };
+const CRM_KIND_LABELS = { note: '📝 Заметка', call: '📞 Звонок', email: '✉️ Письмо', meeting: '🤝 Встреча', task: '☑️ Задача', stage_change: '🔀 Стадия' };
+
+function crmStage(id) {
+    return crmMeta.stages.find(s => s.id === id) || { id, title: id, color: '#8e8e93' };
+}
+
+function formatMoney(value) {
+    return `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
+}
+
+function formatCrmDate(ts) {
+    if (!ts) return '';
+    return new Date(ts * 1000).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function crmCompanyName(id) {
+    return crmCompanies.find(c => c.id === id)?.name || '';
+}
+
+async function loadCrmData() {
+    const [meta, companies, contacts, deals, tasks] = await Promise.all([
+        api('/api/crm/meta'), api('/api/crm/companies'), api('/api/crm/contacts'),
+        api('/api/crm/deals'), api('/api/crm/tasks'),
+    ]);
+    crmMeta = meta; crmCompanies = companies; crmContacts = contacts;
+    crmDeals = deals; crmTasks = tasks;
+}
+
+async function renderCrmView() {
+    try {
+        await loadCrmData();
+    } catch (e) {
+        const pane = document.getElementById('crm-pane-overview');
+        if (pane) pane.innerHTML = `<div class="cc-placeholder">Не удалось загрузить CRM: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    switchCrmObject(crmObject);
+}
+
+function switchCrmObject(obj) {
+    crmObject = CRM_OBJECTS.includes(obj) ? obj : 'overview';
+    document.querySelectorAll('#view-crm [data-crm-obj]').forEach(b => {
+        b.classList.toggle('on', b.dataset.crmObj === crmObject);
+    });
+    CRM_OBJECTS.forEach(o => {
+        const pane = document.getElementById(`crm-pane-${o}`);
+        if (pane) pane.style.display = o === crmObject ? '' : 'none';
+    });
+
+    const counts = crmMeta.counts || {};
+    const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n ? String(n) : ''; };
+    setCount('crm-count-companies', counts.companies);
+    setCount('crm-count-contacts', counts.contacts);
+    setCount('crm-count-deals', counts.deals);
+    setCount('crm-count-tasks', counts.openTasks);
+
+    renderCrmHeaderActions();
+    if (crmObject === 'overview') renderCrmOverview();
+    if (crmObject === 'companies') renderCrmCompanies();
+    if (crmObject === 'contacts') renderCrmContacts();
+    if (crmObject === 'deals') renderCrmDeals();
+    if (crmObject === 'tasks') renderCrmTasks();
+    if (crmObject === 'content') renderKanbanView();
+}
+
+// Кнопки в шапке зависят от объекта: «+ Компания» на вкладке контактов
+// бессмысленна и только сбивает.
+function renderCrmHeaderActions() {
+    const box = document.getElementById('crm-header-actions');
+    if (!box) return;
+    const actions = {
+        overview: `<button class="cc-secondary" onclick="importCrmFromMerged()">⬇ Импорт из сводной базы</button>`,
+        companies: `<button class="cc-secondary" onclick="importCrmFromMerged()">⬇ Импорт из сводной базы</button>
+                    <button class="cc-primary cc-primary-inline" onclick="createCrmRecord('company')">+ Компания</button>`,
+        contacts: `<button class="cc-primary cc-primary-inline" onclick="createCrmRecord('contact')">+ Контакт</button>`,
+        deals: `<div class="cc-segment">
+                    <button class="cc-seg-btn ${crmDealsView === 'board' ? 'on' : ''}" onclick="setCrmDealsView('board')">Доска</button>
+                    <button class="cc-seg-btn ${crmDealsView === 'table' ? 'on' : ''}" onclick="setCrmDealsView('table')">Таблица</button>
+                </div>
+                <button class="cc-primary cc-primary-inline" onclick="createCrmRecord('deal')">+ Сделка</button>`,
+        tasks: `<button class="cc-primary cc-primary-inline" onclick="createCrmTask()">+ Задача</button>`,
+        content: '',
+    };
+    box.innerHTML = actions[crmObject] || '';
+}
+
+function setCrmDealsView(view) {
+    crmDealsView = view;
+    renderCrmHeaderActions();
+    renderCrmDeals();
+}
+
+function setCrmSearch(value) {
+    crmSearch = value;
+    if (crmObject === 'companies') renderCrmCompanies();
+    if (crmObject === 'contacts') renderCrmContacts();
+    if (crmObject === 'deals') renderCrmDeals();
+}
+
+function crmMatches(record, fields) {
+    const q = crmSearch.trim().toLowerCase();
+    if (!q) return true;
+    return fields.some(f => String(record[f] || '').toLowerCase().includes(q));
+}
+
+// ---------- ОБЗОР ----------
+function renderCrmOverview() {
+    const pane = document.getElementById('crm-pane-overview');
+    if (!pane) return;
+    const c = crmMeta.counts || {};
+    const overdue = crmTasks.filter(t => !t.done && t.dueAt && t.dueAt * 1000 < Date.now());
+    const soon = crmTasks.filter(t => !t.done).slice(0, 6);
+
+    // Воронка: сколько сделок стоит на каждой стадии. Показывает, где
+    // затык, а не только итоговую сумму.
+    const byStage = crmMeta.stages.map(s => ({
+        ...s,
+        deals: crmDeals.filter(d => d.stage === s.id),
+    }));
+    const maxCount = Math.max(1, ...byStage.map(s => s.deals.length));
+
+    pane.innerHTML = `
+        <div class="merged-stats">
+            <div class="merged-stat"><b>${c.companies || 0}</b><span>компаний</span></div>
+            <div class="merged-stat"><b>${c.openDeals || 0}</b><span>сделок в работе</span></div>
+            <div class="merged-stat"><b>${formatMoney(crmMeta.pipelineValue)}</b><span>в пайплайне</span></div>
+            <div class="merged-stat"><b class="ok">${formatMoney(crmMeta.wonValue)}</b><span>выиграно</span></div>
+            <div class="merged-stat"><b class="${overdue.length ? 'bad' : ''}">${c.openTasks || 0}</b><span>задач${overdue.length ? ` · ${overdue.length} просрочено` : ''}</span></div>
+        </div>
+
+        ${crmCompanies.length === 0 ? `
+            <div class="cc-placeholder cc-placeholder-hero">
+                <div class="cc-placeholder-icon">🤝</div>
+                <b>CRM пока пуста</b>
+                <p>Компании, которые уже собраны в «Заказчиках», можно перенести сюда одной кнопкой — со всеми телефонами, email и соцсетями. Дубли между 2ГИС и ScrapeGraph склеятся сами.</p>
+                <button class="cc-primary cc-primary-inline" onclick="importCrmFromMerged()">⬇ Импортировать из сводной базы</button>
+            </div>
+        ` : `
+            <div class="crm-overview-grid">
+                <div class="crm-panel">
+                    <div class="crm-panel-head">Воронка</div>
+                    ${byStage.map(s => `
+                        <div class="crm-funnel-row" onclick="switchCrmObject('deals')">
+                            <span class="crm-funnel-name">${escapeHtml(s.title)}</span>
+                            <span class="crm-funnel-bar"><i style="width:${Math.round(s.deals.length / maxCount * 100)}%; background:${s.color};"></i></span>
+                            <span class="crm-funnel-num">${s.deals.length}</span>
+                            <span class="crm-funnel-sum">${formatMoney(s.deals.reduce((a, d) => a + (d.amount || 0), 0))}</span>
+                        </div>`).join('')}
+                </div>
+                <div class="crm-panel">
+                    <div class="crm-panel-head">Ближайшие задачи</div>
+                    ${soon.length ? soon.map(renderCrmTaskRow).join('') : `<div class="cc-empty" style="padding:8px 0;">Открытых задач нет.</div>`}
+                </div>
+            </div>
+        `}`;
+}
+
+// ---------- ТАБЛИЦЫ ----------
+// Одна функция на все табличные объекты: колонки описываются декларативно,
+// правка идёт по blur прямо в ячейке. Без этого три почти одинаковые
+// таблицы разъехались бы поведением при первой же правке.
+function crmTable(rows, columns, type, emptyText) {
+    if (!rows.length) return `<div class="cc-placeholder">${emptyText}</div>`;
+    return `
+    <div class="crm-table-wrap">
+        <table class="crm-table">
+            <thead><tr>${columns.map(c => `<th style="${c.width ? `width:${c.width}` : ''}">${c.title}</th>`).join('')}</tr></thead>
+            <tbody>
+                ${rows.map(r => `<tr>${columns.map(c => `<td>${c.render(r, type)}</td>`).join('')}</tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`;
+}
+
+function crmCell(record, type, field, placeholder = '') {
+    return `<input class="crm-cell" value="${escapeHtml(record[field] || '')}" placeholder="${escapeHtml(placeholder)}"
+        onblur="updateCrmField('${type}', '${record.id}', '${field}', this.value)">`;
+}
+
+function crmLinkCell(record, type, field) {
+    return `<button class="crm-link" onclick="openCrmRecord('${type}', '${record.id}')">${escapeHtml(record[field] || '—')}</button>`;
+}
+
+function crmSearchBar(placeholder) {
+    return `<div class="crm-toolbar">
+        <input type="text" class="form-input cc-input crm-search" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(crmSearch)}" oninput="setCrmSearch(this.value)">
+    </div>`;
+}
+
+function renderCrmCompanies() {
+    const pane = document.getElementById('crm-pane-companies');
+    if (!pane) return;
+    const rows = crmCompanies.filter(r => crmMatches(r, ['name', 'domain', 'phone', 'email', 'city', 'niche']));
+    pane.innerHTML = crmSearchBar('Поиск по названию, домену, телефону, городу…') + crmTable(rows, [
+        { title: 'Название', width: '22%', render: r => crmLinkCell(r, 'company', 'name') },
+        { title: 'Ниша', render: r => crmCell(r, 'company', 'niche') },
+        { title: 'Город', render: r => crmCell(r, 'company', 'city') },
+        { title: 'Телефон', render: r => crmCell(r, 'company', 'phone') },
+        { title: 'Email', render: r => crmCell(r, 'company', 'email') },
+        { title: 'Сайт', render: r => crmCell(r, 'company', 'domain') },
+        { title: 'Источник', width: '110px', render: r => `<span class="cc-pill">${CRM_SOURCE_LABELS[r.source] || r.source}</span>` },
+    ], 'company', crmSearch ? 'Ничего не найдено.' : 'Компаний пока нет — импортируйте из сводной базы или добавьте вручную.');
+}
+
+function renderCrmContacts() {
+    const pane = document.getElementById('crm-pane-contacts');
+    if (!pane) return;
+    const rows = crmContacts.filter(r => crmMatches(r, ['name', 'role', 'phone', 'email', 'telegram']));
+    pane.innerHTML = crmSearchBar('Поиск по имени, должности, контактам…') + crmTable(rows, [
+        { title: 'Имя', width: '22%', render: r => crmLinkCell(r, 'contact', 'name') },
+        { title: 'Должность', render: r => crmCell(r, 'contact', 'role') },
+        { title: 'Компания', render: r => crmCompanySelect(r, 'contact') },
+        { title: 'Телефон', render: r => crmCell(r, 'contact', 'phone') },
+        { title: 'Email', render: r => crmCell(r, 'contact', 'email') },
+        { title: 'Telegram', render: r => crmCell(r, 'contact', 'telegram') },
+    ], 'contact', crmSearch ? 'Ничего не найдено.' : 'Контактов пока нет.');
+}
+
+function crmCompanySelect(record, type) {
+    return `<select class="crm-cell" onchange="updateCrmField('${type}', '${record.id}', 'companyId', this.value)">
+        <option value="">— не выбрана —</option>
+        ${crmCompanies.map(c => `<option value="${c.id}" ${record.companyId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+    </select>`;
+}
+
+function renderCrmDeals() {
+    const pane = document.getElementById('crm-pane-deals');
+    if (!pane) return;
+    const rows = crmDeals.filter(r => crmMatches(r, ['title']) || crmMatches({ n: crmCompanyName(r.companyId) }, ['n']));
+
+    if (crmDealsView === 'table') {
+        pane.innerHTML = crmSearchBar('Поиск по названию сделки или компании…') + crmTable(rows, [
+            { title: 'Сделка', width: '24%', render: r => crmLinkCell(r, 'deal', 'title') },
+            { title: 'Компания', render: r => crmCompanySelect(r, 'deal') },
+            { title: 'Стадия', width: '160px', render: r => crmStageSelect(r) },
+            { title: 'Сумма', width: '140px', render: r => `<input class="crm-cell" type="number" value="${r.amount || 0}" onblur="updateCrmField('deal','${r.id}','amount',this.value)">` },
+        ], 'deal', crmSearch ? 'Ничего не найдено.' : 'Сделок пока нет.');
+        return;
+    }
+
+    pane.innerHTML = crmSearchBar('Поиск по названию сделки или компании…') + `
+        <div class="kanban-board crm-board">
+            ${crmMeta.stages.map(stage => {
+                const items = rows.filter(d => d.stage === stage.id);
+                const sum = items.reduce((a, d) => a + (d.amount || 0), 0);
+                return `
+                <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleCrmDealDrop(event, '${stage.id}')">
+                    <div class="kanban-column-header">
+                        <span><i class="crm-stage-dot" style="background:${stage.color};"></i>${escapeHtml(stage.title)}</span>
+                        <span class="kanban-count">${items.length}</span>
+                    </div>
+                    <div class="crm-column-sum">${formatMoney(sum)}</div>
+                    <div class="kanban-cards">
+                        ${items.map(d => `
+                            <div class="kanban-card crm-deal-card" draggable="true" ondragstart="handleCrmDealDragStart(event, '${d.id}')" onclick="openCrmRecord('deal','${d.id}')">
+                                <div class="crm-deal-title">${escapeHtml(d.title)}</div>
+                                ${d.companyId ? `<div class="crm-deal-company">${escapeHtml(crmCompanyName(d.companyId))}</div>` : ''}
+                                <div class="crm-deal-amount">${formatMoney(d.amount)}</div>
+                            </div>`).join('')}
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>`;
+}
+
+function crmStageSelect(record) {
+    return `<select class="crm-cell" onchange="moveCrmDeal('${record.id}', this.value)">
+        ${crmMeta.stages.map(s => `<option value="${s.id}" ${record.stage === s.id ? 'selected' : ''}>${escapeHtml(s.title)}</option>`).join('')}
+    </select>`;
+}
+
+// Перетаскивание сделок использует свой dataTransfer-ключ, а не общий с
+// контентной доской: обе доски теперь живут на одной вкладке, и общий ключ
+// позволил бы уронить карточку идеи в колонку сделок.
+function handleCrmDealDragStart(e, dealId) {
+    e.dataTransfer.setData('application/x-crm-deal', dealId);
+}
+
+async function handleCrmDealDrop(e, stage) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('application/x-crm-deal');
+    if (!id) return;
+    await moveCrmDeal(id, stage);
+}
+
+async function moveCrmDeal(id, stage) {
+    try {
+        const updated = await api(`/api/crm/deals/${id}/stage`, { method: 'POST', body: JSON.stringify({ stage }) });
+        crmDeals = crmDeals.map(d => (d.id === id ? updated : d));
+        crmMeta = await api('/api/crm/meta');
+        renderCrmDeals();
+        if (crmOpenRecord?.type === 'deal' && crmOpenRecord.id === id) renderCrmRecordPage();
+        showToast(`Стадия: ${crmStage(stage).title}`);
+    } catch (e) {
+        showToast('Не удалось сменить стадию: ' + e.message);
+    }
+}
+
+// ---------- ЗАДАЧИ ----------
+function renderCrmTaskRow(t) {
+    const overdue = !t.done && t.dueAt && t.dueAt * 1000 < Date.now();
+    const linked = t.dealId ? crmDeals.find(d => d.id === t.dealId)?.title
+        : t.companyId ? crmCompanyName(t.companyId) : '';
+    return `
+    <div class="crm-task ${t.done ? 'done' : ''}">
+        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleCrmTask('${t.id}', this.checked)">
+        <div class="crm-task-body">
+            <div class="crm-task-text">${escapeHtml(t.body || 'Без описания')}</div>
+            ${linked ? `<div class="crm-task-linked">${escapeHtml(linked)}</div>` : ''}
+        </div>
+        ${t.dueAt ? `<span class="crm-task-due ${overdue ? 'overdue' : ''}">${formatCrmDate(t.dueAt)}</span>` : ''}
+        <button class="crm-task-del" onclick="deleteCrmActivity('${t.id}')" title="Удалить">✕</button>
+    </div>`;
+}
+
+function renderCrmTasks() {
+    const pane = document.getElementById('crm-pane-tasks');
+    if (!pane) return;
+    const open = crmTasks.filter(t => !t.done);
+    const done = crmTasks.filter(t => t.done);
+    pane.innerHTML = `
+        <div class="crm-panel">
+            <div class="crm-panel-head">Открытые${open.length ? ` · ${open.length}` : ''}</div>
+            ${open.length ? open.map(renderCrmTaskRow).join('') : `<div class="cc-empty" style="padding:8px 0;">Всё сделано.</div>`}
+        </div>
+        ${done.length ? `
+        <div class="crm-panel" style="margin-top:14px;">
+            <div class="crm-panel-head">Выполненные · ${done.length}</div>
+            ${done.slice(0, 30).map(renderCrmTaskRow).join('')}
+        </div>` : ''}`;
+}
+
+async function toggleCrmTask(id, done) {
+    try {
+        await api(`/api/crm/activities/${id}`, { method: 'PUT', body: JSON.stringify({ done }) });
+        crmTasks = crmTasks.map(t => (t.id === id ? { ...t, done } : t));
+        crmMeta = await api('/api/crm/meta');
+        switchCrmObject(crmObject);
+    } catch (e) {
+        showToast('Не удалось обновить задачу: ' + e.message);
+    }
+}
+
+async function createCrmTask() {
+    const body = prompt('Что нужно сделать?');
+    if (!body || !body.trim()) return;
+    const dateStr = prompt('Срок в формате ДД.ММ.ГГГГ (можно оставить пустым)') || '';
+    await addCrmActivity({ kind: 'task', body: body.trim(), dueAt: parseRuDate(dateStr) });
+}
+
+// «12.09.2026» -> unix-секунды. Пустая/битая строка даёт null, а не NaN,
+// который ушёл бы в БД и сломал сортировку по сроку.
+function parseRuDate(str) {
+    const m = String(str || '').trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (!m) return null;
+    const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
+}
+
+// ---------- CRUD ----------
+async function updateCrmField(type, id, field, value) {
+    const map = { company: 'companies', contact: 'contacts', deal: 'deals' };
+    const lists = { company: () => crmCompanies, contact: () => crmContacts, deal: () => crmDeals };
+    const current = lists[type]().find(r => r.id === id);
+    if (current && String(current[field] ?? '') === String(value)) return;
+    try {
+        const updated = await api(`/api/crm/${map[type]}/${id}`, { method: 'PUT', body: JSON.stringify({ [field]: value }) });
+        if (type === 'company') crmCompanies = crmCompanies.map(r => (r.id === id ? updated : r));
+        if (type === 'contact') crmContacts = crmContacts.map(r => (r.id === id ? updated : r));
+        if (type === 'deal') { crmDeals = crmDeals.map(r => (r.id === id ? updated : r)); crmMeta = await api('/api/crm/meta'); }
+        if (crmOpenRecord?.id === id) renderCrmRecordPage();
+    } catch (e) {
+        showToast('Не удалось сохранить: ' + e.message);
+    }
+}
+
+async function createCrmRecord(type) {
+    const labels = { company: 'Название компании', contact: 'Имя контакта', deal: 'Название сделки' };
+    const value = prompt(labels[type]);
+    if (!value || !value.trim()) return;
+    const map = { company: 'companies', contact: 'contacts', deal: 'deals' };
+    const field = type === 'deal' ? 'title' : 'name';
+    try {
+        const created = await api(`/api/crm/${map[type]}`, { method: 'POST', body: JSON.stringify({ [field]: value.trim() }) });
+        await loadCrmData();
+        switchCrmObject(crmObject);
+        openCrmRecord(type, created.id);
+    } catch (e) {
+        showToast('Не удалось создать: ' + e.message);
+    }
+}
+
+async function importCrmFromMerged() {
+    showToast('Импортируем из сводной базы…');
+    try {
+        const r = await api('/api/crm/import', { method: 'POST', body: JSON.stringify({}) });
+        await loadCrmData();
+        switchCrmObject(crmCompanies.length ? 'companies' : crmObject);
+        showToast(`Импорт: новых ${r.imported}, дополнено ${r.updated}, без изменений ${r.skipped}`);
+    } catch (e) {
+        showToast('Не удалось импортировать: ' + e.message);
+    }
+}
+
+// ---------- СТРАНИЦА ЗАПИСИ ----------
+let crmRecordReturnViewId = 'view-crm';
+
+function openCrmRecord(type, id) {
+    const current = document.querySelector('.view.active');
+    if (current && current.id !== 'view-crm-record') crmRecordReturnViewId = current.id;
+    crmOpenRecord = { type, id };
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const view = document.getElementById('view-crm-record');
+    view.classList.add('active');
+    view.scrollTop = 0;
+    renderCrmRecordPage();
+    loadCrmTimeline();
+}
+
+function closeCrmRecord() {
+    crmOpenRecord = null;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    (document.getElementById(crmRecordReturnViewId) || document.getElementById('view-crm')).classList.add('active');
+}
+
+function crmRecordData() {
+    if (!crmOpenRecord) return null;
+    const { type, id } = crmOpenRecord;
+    if (type === 'company') return crmCompanies.find(r => r.id === id);
+    if (type === 'contact') return crmContacts.find(r => r.id === id);
+    if (type === 'deal') return crmDeals.find(r => r.id === id);
+    return null;
+}
+
+function crmField(type, id, field, label, value, opts = {}) {
+    if (opts.select) {
+        return `<div class="crm-field">
+            <label class="cc-label">${label}</label>
+            <select class="form-select cc-input" onchange="updateCrmField('${type}','${id}','${field}',this.value)">
+                ${opts.select.map(o => `<option value="${escapeHtml(o.value)}" ${String(value) === String(o.value) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
+            </select>
+        </div>`;
+    }
+    return `<div class="crm-field">
+        <label class="cc-label">${label}</label>
+        <input type="${opts.type || 'text'}" class="form-input cc-input" value="${escapeHtml(value ?? '')}" placeholder="${escapeHtml(opts.placeholder || '')}"
+            onblur="updateCrmField('${type}','${id}','${field}',this.value)">
+    </div>`;
+}
+
+function renderCrmRecordPage() {
+    const record = crmRecordData();
+    const main = document.getElementById('crm-record-main');
+    if (!record || !main) return;
+    const { type, id } = crmOpenRecord;
+    const crumbs = { company: 'CRM · Компании', contact: 'CRM · Контакты', deal: 'CRM · Сделки' };
+    document.getElementById('crm-record-crumb').innerText = crumbs[type];
+    document.getElementById('crm-record-title').innerText = record.name || record.title || 'Запись';
+
+    if (type === 'company') {
+        const contacts = crmContacts.filter(c => c.companyId === id);
+        const deals = crmDeals.filter(d => d.companyId === id);
+        // Скрипт холодного звонка подтягивается по нише из «Скриптов» - это
+        // ровно то, что нужно под рукой в момент звонка, и ради него не надо
+        // уходить на другую вкладку.
+        const script = niches.find(n => (n.name || '').toLowerCase() === (record.niche || '').toLowerCase());
+        main.innerHTML = `
+            <div class="crm-fields">
+                ${crmField(type, id, 'name', 'Название', record.name)}
+                ${crmField(type, id, 'niche', 'Ниша', record.niche, { placeholder: 'кальянные' })}
+                ${crmField(type, id, 'city', 'Город', record.city)}
+                ${crmField(type, id, 'phone', 'Телефон', record.phone)}
+                ${crmField(type, id, 'email', 'Email', record.email)}
+                ${crmField(type, id, 'domain', 'Сайт', record.domain)}
+                ${crmField(type, id, 'telegram', 'Telegram', record.telegram)}
+                ${crmField(type, id, 'vk', 'VK', record.vk)}
+                ${crmField(type, id, 'instagram', 'Instagram', record.instagram)}
+                ${crmField(type, id, 'address', 'Адрес', record.address)}
+            </div>
+
+            ${script?.coldCallPitch ? `
+                <details class="crm-script">
+                    <summary>📞 Скрипт звонка для ниши «${escapeHtml(script.name)}»</summary>
+                    <div class="crm-script-body">${escapeHtml(script.coldCallPitch)}</div>
+                    <button class="cc-secondary" onclick="copyCrmScript(this)">📋 Скопировать</button>
+                </details>` : ''}
+
+            <div class="crm-related">
+                <div class="crm-panel-head">Контакты · ${contacts.length}
+                    <button class="cc-link" onclick="addCrmRelated('contact','${id}')">+ Добавить</button>
+                </div>
+                ${contacts.length ? contacts.map(c => `
+                    <div class="crm-related-row" onclick="openCrmRecord('contact','${c.id}')">
+                        <b>${escapeHtml(c.name)}</b>
+                        <span>${escapeHtml(c.role || '')}</span>
+                        <span>${escapeHtml(c.phone || '')}</span>
+                    </div>`).join('') : `<div class="cc-empty" style="padding:6px 0;">Контактов нет.</div>`}
+            </div>
+
+            <div class="crm-related">
+                <div class="crm-panel-head">Сделки · ${deals.length}
+                    <button class="cc-link" onclick="addCrmRelated('deal','${id}')">+ Добавить</button>
+                </div>
+                ${deals.length ? deals.map(d => `
+                    <div class="crm-related-row" onclick="openCrmRecord('deal','${d.id}')">
+                        <b>${escapeHtml(d.title)}</b>
+                        <span class="cc-pill" style="background:${crmStage(d.stage).color}22; color:${crmStage(d.stage).color};">${escapeHtml(crmStage(d.stage).title)}</span>
+                        <span>${formatMoney(d.amount)}</span>
+                    </div>`).join('') : `<div class="cc-empty" style="padding:6px 0;">Сделок нет.</div>`}
+            </div>`;
+    }
+
+    if (type === 'contact') {
+        main.innerHTML = `
+            <div class="crm-fields">
+                ${crmField(type, id, 'name', 'Имя', record.name)}
+                ${crmField(type, id, 'role', 'Должность', record.role)}
+                ${crmField(type, id, 'companyId', 'Компания', record.companyId || '', {
+                    select: [{ value: '', label: '— не выбрана —' }, ...crmCompanies.map(c => ({ value: c.id, label: c.name }))],
+                })}
+                ${crmField(type, id, 'phone', 'Телефон', record.phone)}
+                ${crmField(type, id, 'email', 'Email', record.email)}
+                ${crmField(type, id, 'telegram', 'Telegram', record.telegram)}
+            </div>`;
+    }
+
+    if (type === 'deal') {
+        main.innerHTML = `
+            <div class="crm-fields">
+                ${crmField(type, id, 'title', 'Название', record.title)}
+                ${crmField(type, id, 'stage', 'Стадия', record.stage, {
+                    select: crmMeta.stages.map(s => ({ value: s.id, label: s.title })),
+                })}
+                ${crmField(type, id, 'amount', 'Сумма, ₽', record.amount, { type: 'number' })}
+                ${crmField(type, id, 'companyId', 'Компания', record.companyId || '', {
+                    select: [{ value: '', label: '— не выбрана —' }, ...crmCompanies.map(c => ({ value: c.id, label: c.name }))],
+                })}
+                ${crmField(type, id, 'contactId', 'Контакт', record.contactId || '', {
+                    select: [{ value: '', label: '— не выбран —' }, ...crmContacts.map(c => ({ value: c.id, label: c.name }))],
+                })}
+                ${crmField(type, id, 'productId', 'Продукт', record.productId || '', {
+                    select: [{ value: '', label: '— без привязки —' }, ...productsData.map(p => ({ value: p.id, label: p.title }))],
+                })}
+                ${record.stage === 'lost' ? crmField(type, id, 'lostReason', 'Причина отказа', record.lostReason) : ''}
+            </div>`;
+    }
+}
+
+function copyCrmScript(btn) {
+    const text = btn.parentElement.querySelector('.crm-script-body')?.innerText || '';
+    navigator.clipboard.writeText(text).then(() => showToast('Скрипт скопирован'));
+}
+
+async function addCrmRelated(type, companyId) {
+    const label = type === 'contact' ? 'Имя контакта' : 'Название сделки';
+    const value = prompt(label);
+    if (!value || !value.trim()) return;
+    const path = type === 'contact' ? 'contacts' : 'deals';
+    const field = type === 'contact' ? 'name' : 'title';
+    try {
+        await api(`/api/crm/${path}`, { method: 'POST', body: JSON.stringify({ [field]: value.trim(), companyId }) });
+        await loadCrmData();
+        renderCrmRecordPage();
+    } catch (e) {
+        showToast('Не удалось создать: ' + e.message);
+    }
+}
+
+async function deleteCrmRecordFromPage() {
+    if (!crmOpenRecord) return;
+    const { type, id } = crmOpenRecord;
+    const names = { company: 'компанию вместе с её сделками и лентой', contact: 'контакт', deal: 'сделку' };
+    if (!confirm(`Удалить ${names[type]}?`)) return;
+    const map = { company: 'companies', contact: 'contacts', deal: 'deals' };
+    try {
+        await api(`/api/crm/${map[type]}/${id}`, { method: 'DELETE' });
+        closeCrmRecord();
+        await loadCrmData();
+        switchCrmObject(crmObject);
+        showToast('Удалено');
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
+}
+
+// ---------- ЛЕНТА ----------
+async function loadCrmTimeline() {
+    const side = document.getElementById('crm-record-side');
+    if (!side || !crmOpenRecord) return;
+    const { type, id } = crmOpenRecord;
+    const key = { company: 'companyId', contact: 'contactId', deal: 'dealId' }[type];
+    side.innerHTML = `<div class="cc-placeholder">Загружаем ленту…</div>`;
+    let items = [];
+    try {
+        items = await api(`/api/crm/timeline?${key}=${encodeURIComponent(id)}`);
+    } catch (e) {
+        side.innerHTML = `<div class="cc-placeholder">Не удалось загрузить ленту: ${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    side.innerHTML = `
+        <div class="crm-panel">
+            <div class="crm-panel-head">Добавить в ленту</div>
+            <select class="form-select cc-input" id="crm-activity-kind">
+                <option value="note">📝 Заметка</option>
+                <option value="call">📞 Звонок</option>
+                <option value="email">✉️ Письмо</option>
+                <option value="meeting">🤝 Встреча</option>
+                <option value="task">☑️ Задача</option>
+            </select>
+            <textarea class="form-textarea cc-input" id="crm-activity-body" placeholder="Что произошло или что нужно сделать…"></textarea>
+            <input type="text" class="form-input cc-input" id="crm-activity-due" placeholder="Срок для задачи: ДД.ММ.ГГГГ">
+            <button class="cc-primary" onclick="submitCrmActivity()">Добавить</button>
+        </div>
+
+        <div class="crm-timeline">
+            ${items.length ? items.map(a => `
+                <div class="crm-tl-item">
+                    <div class="crm-tl-head">
+                        <span class="crm-tl-kind">${CRM_KIND_LABELS[a.kind] || a.kind}</span>
+                        <span class="crm-tl-date">${formatCrmDate(a.createdAt)}</span>
+                        ${a.kind !== 'stage_change' ? `<button class="crm-task-del" onclick="deleteCrmActivity('${a.id}')" title="Удалить">✕</button>` : ''}
+                    </div>
+                    <div class="crm-tl-body">${escapeHtml(a.body)}</div>
+                    ${a.dueAt ? `<div class="crm-tl-due">Срок: ${formatCrmDate(a.dueAt)}${a.done ? ' · выполнено' : ''}</div>` : ''}
+                </div>`).join('') : `<div class="cc-empty" style="padding:10px 0;">Пока ничего не происходило.</div>`}
+        </div>`;
+    autoGrowAllTextareas(side);
+}
+
+async function submitCrmActivity() {
+    const kind = document.getElementById('crm-activity-kind')?.value || 'note';
+    const body = document.getElementById('crm-activity-body')?.value.trim() || '';
+    const due = document.getElementById('crm-activity-due')?.value || '';
+    if (!body) return showToast('Напишите, что добавить');
+    await addCrmActivity({ kind, body, dueAt: parseRuDate(due) });
+}
+
+async function addCrmActivity(payload) {
+    const link = {};
+    if (crmOpenRecord) {
+        const { type, id } = crmOpenRecord;
+        if (type === 'company') link.companyId = id;
+        if (type === 'contact') link.contactId = id;
+        if (type === 'deal') {
+            link.dealId = id;
+            // Заметка по сделке должна быть видна и в карточке компании -
+            // проставляем связь сразу, а не выводим её джойном на чтении.
+            link.companyId = crmDeals.find(d => d.id === id)?.companyId || null;
+        }
+    }
+    try {
+        await api('/api/crm/activities', { method: 'POST', body: JSON.stringify({ ...payload, ...link }) });
+        crmTasks = await api('/api/crm/tasks');
+        crmMeta = await api('/api/crm/meta');
+        if (crmOpenRecord) await loadCrmTimeline();
+        else switchCrmObject(crmObject);
+        showToast('Добавлено');
+    } catch (e) {
+        showToast('Не удалось добавить: ' + e.message);
+    }
+}
+
+async function deleteCrmActivity(id) {
+    try {
+        await api(`/api/crm/activities/${id}`, { method: 'DELETE' });
+        crmTasks = await api('/api/crm/tasks');
+        crmMeta = await api('/api/crm/meta');
+        if (crmOpenRecord) await loadCrmTimeline();
+        if (crmObject === 'tasks' || crmObject === 'overview') switchCrmObject(crmObject);
+    } catch (e) {
+        showToast('Не удалось удалить: ' + e.message);
+    }
 }
 
 // КАНБАН-ДОСКА (DRAG AND DROP)
