@@ -1,0 +1,24 @@
+<task-notification>
+<task-id>ac33b831f2b61057c</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/ac33b831f2b61057c.output</output-file>
+<status>completed</status>
+<summary>Agent "Parser niche completion notifications" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Report
+
+**File touched:** `/Users/kiruxa/Desktop/alba-content-hub/server/routes/parserNiches.js`
+
+**Status transitions that now notify** (both inside `GET /:id/status`, per-request row): looking at the DB schema comment (`server/db.js:240`) and `public/js/app.js`'s `statusLabels`, terminal states are `done` (success) and `error` (failure). Notification fires when `row.status !== job.status` (i.e. this specific poll changed it) **and** `job.status` is `done` or `error`. Once the DB row itself reads `done`/`error`, the next poll's `row.status === job.status`, so it's a no-op — verified this against a running mock worker (see below), including a poll immediately after completion producing zero duplicate sends.
+
+**Message format** (`parse_mode: 'Markdown'`, matching `agentResearcher.js`'s `notifyTelegram`, bold title + emoji prefix consistent with the existing captcha alert):
+- Success: `✅ *Парсер 2ГИС завершил нишу «&lt;category&gt;»*\n\nНайдено записей: &lt;N&gt;\nПодробности — в приложении.` (the "Найдено записей" line is omitted if no numeric count field is found in `stats`)
+- Failure: `❌ *Парсер 2ГИС завершился с ошибкой на нише «&lt;category&gt;»*\n\nПоследняя строка лога: &lt;last log line&gt;\nПодробности — в приложении.`
+
+Since the Python parser-worker (which produces `job.stats`) isn't part of this repo and has no documented shape, `extractResultCount()` defensively checks several plausible field names (`total`, `count`, `results`, `found`, `companies`, `rows`, `total_found`, `unique_count`, `raw_count`) and falls back to omitting the count line if none match — safer than guessing wrong and breaking on a real payload.
+
+**Refactor:** Extracted the fetch-to-Telegram boilerplate (previously only in `captcha-alert`) into a shared `notifyTelegram(text)` helper at the top of the file, now used by all three send sites in this file (captcha alert, done, error). Kept it local to this file per your scope note — not shared with `agentResearcher.js`, since that's a separate, still-inline pattern and three call sites didn't justify a cross-file abstraction.
+
+**How I tested:** No live parser-worker was reachable from here, so I stood up a tiny local HTTP mock in the scratchpad that serves canned `GET /jobs/:id` responses, pointed the real app (`server/index.js`) at it via `PARSER_WORKER_URL=http://localhost:8899`, and ran everything against the actual local dev DB (file-based libSQL fallback — no `TURSO_*` env vars were set in this shell). Set a fake token/chat via `PUT /api/settings/telegram`, created a test niche, then drove it through `running → running` (no notify), `running → done` (notify, with `stats.total: 42` correctly picked up), `done → done` (no dup), `running → error` (notify, with last log line captured), `error → error` (no dup). Temporarily added one debug `console.log` of the Telegram response status to positively confirm the outbound call was made — got a real `401` back from `api.telegram.org` (expected, fake token), then removed the debug line before finishing. Ran `node --check` on the final file — passes. All test data (the niche row, the fake Telegram token/chat_id) was deleted/cleared from the local dev DB afterward, and both background test processes were killed.</result>
+<usage><subagent_tokens>126727</subagent_tokens><tool_uses>65</tool_uses><duration_ms>410051</duration_ms></usage>
+</task-notification>
