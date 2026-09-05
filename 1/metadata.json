@@ -1,0 +1,84 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "01M1R6C85R26M3QJJ7T6DN2AW2",
+  "session_id": "ce2c234a-a392-4523-81ee-12b7539fd8ba",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-05T07:08:57.668846Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "vite.config.js"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "64cbd57910c9",
+  "checkpoint_transcript_start": 534,
+  "transcript_lines_at_start": 534,
+  "compact_transcript_start": 94,
+  "token_usage": {
+    "input_tokens": 84,
+    "cache_creation_tokens": 28484,
+    "cache_read_tokens": 8262284,
+    "output_tokens": 16292,
+    "api_call_count": 42
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01S8hSQqt9H2m3nUpWghCcib",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "graphify"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "64cbd57910c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 277,
+        "end": 278,
+        "entry_ids": [
+          "9734e564-6a52-499f-86f1-24f597590ded"
+        ],
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: graphify",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-05T07:08:57.598626Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
+    "human_added": 2,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 3,
+    "total_lines_changed": 5,
+    "agent_percentage": 40,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
