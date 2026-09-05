@@ -493,7 +493,11 @@ router.post('/:id/auto-generate', async (req, res) => {
     let reelsScript = null;
     if (isReels && isLocalClaudeAgentConfigured()) {
         try {
-            reelsScript = await generateReelsScript(idea.title, idea.desc || '');
+            // Тон голоса тот же, что у всей остальной генерации: сценарий
+            // Reels озвучивается от лица бренда, и звучать он должен так же,
+            // как посты, а не нейтральным дикторским текстом.
+            const voiceRow = (await db.execute('SELECT tone_of_voice FROM agent_settings WHERE id = 1')).rows[0];
+            reelsScript = await generateReelsScript(idea.title, idea.desc || '', voiceRow?.tone_of_voice || '');
         } catch (e) {
             console.error('ideas/auto-generate: reels script generation failed, falling back to post text:', e.message);
         }

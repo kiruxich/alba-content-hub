@@ -57,8 +57,10 @@ export function resolveCity(cityName) {
     return callTask('resolve-city', { cityName }, { timeoutMs: 90 * 1000 });
 }
 
-export function generateColdCallPitch({ category, prompt, toneOfVoice }) {
-    return callTask('cold-call-pitch', { category, prompt, toneOfVoice }, { timeoutMs: 3 * 60 * 1000 });
+// productsContext - каталог продуктов студии (см. systemContext.js): без него
+// модель писала питч, не зная, что именно Alba продаёт.
+export function generateColdCallPitch({ category, prompt, toneOfVoice, productsContext }) {
+    return callTask('cold-call-pitch', { category, prompt, toneOfVoice, productsContext }, { timeoutMs: 3 * 60 * 1000 });
 }
 
 // Подбор сайтов компаний для второй базы заказчиков (scrape-worker,
@@ -77,24 +79,29 @@ export function generateNicheDescription(category) {
 // new milestones grounded in that product's own project-info fields
 // (about/target audience/value proposition/differentiators), same
 // preview-then-confirm shape as discoverRssSources/discoverKeywords.
-export function generateRoadmap({ productName, about, targetAudience, valueProposition, keyDifferentiators, existingTitles }) {
-    return callTask('roadmap', { productName, about, targetAudience, valueProposition, keyDifferentiators, existingTitles }, { timeoutMs: 3 * 60 * 1000 });
+// systemContext - общий срез системы (стратегия из контент-плана, выводы
+// Insights, реальные метрики публикаций, состояние CRM), см.
+// server/lib/systemContext.js. Собирается на стороне хаба и приходит сюда
+// готовым текстом: агент по-прежнему получает узкие именованные параметры,
+// а не произвольный промпт.
+export function generateRoadmap({ productName, about, targetAudience, valueProposition, keyDifferentiators, existingTitles, systemContext }) {
+    return callTask('roadmap', { productName, about, targetAudience, valueProposition, keyDifferentiators, existingTitles, systemContext }, { timeoutMs: 3 * 60 * 1000 });
 }
 
-export function generateReelsScript(title, postText) {
-    return callTask('reels-script', { title, postText });
+export function generateReelsScript(title, postText, toneOfVoice) {
+    return callTask('reels-script', { title, postText, toneOfVoice });
 }
 
-export function generateScriptSection({ heading, prompt, nicheName, nicheSubtitle, toneOfVoice }) {
-    return callTask('script-section', { heading, prompt, nicheName, nicheSubtitle, toneOfVoice });
+export function generateScriptSection({ heading, prompt, nicheName, nicheSubtitle, toneOfVoice, productsContext }) {
+    return callTask('script-section', { heading, prompt, nicheName, nicheSubtitle, toneOfVoice, productsContext });
 }
 
 // Runs on Sonnet server-side (see local-claude-agent/server.js), longer
 // timeout than the other tasks - it can write up to 4 full pieces of copy in
 // one call. `formats` (subset of tgPost/reelsScript/threads/pinterest)
 // defaults to all 4 server-side when omitted/empty.
-export function generateContentDraft({ topic, productContext, toneOfVoice, postFormula, formats }) {
-    return callTask('content-draft', { topic, productContext, toneOfVoice, postFormula, formats }, { timeoutMs: 4 * 60 * 1000 });
+export function generateContentDraft({ topic, productContext, toneOfVoice, postFormula, formats, systemContext }) {
+    return callTask('content-draft', { topic, productContext, toneOfVoice, postFormula, formats, systemContext }, { timeoutMs: 4 * 60 * 1000 });
 }
 
 // Also Sonnet (see local-claude-agent/server.js) - a real topic pitch that

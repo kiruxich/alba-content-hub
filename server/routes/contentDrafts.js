@@ -3,17 +3,11 @@ import { db } from '../db.js';
 import { translateToEnglish } from '../lib/translateToEnglish.js';
 import { isLocalClaudeAgentConfigured, generateContentDraft, suggestContentTopic } from '../lib/localClaudeAgent.js';
 import { buildContentPlanContext } from './contentPlan.js';
+import { buildProductContext, buildInsightsContext, buildPerformanceContext, joinContext } from '../lib/systemContext.js';
 
 const router = Router();
 
 const FORMAT_KEYS = ['tgPost', 'reelsScript', 'threads', 'pinterest'];
-
-async function buildProductContext(productId) {
-    if (!productId) return '';
-    const info = (await db.execute({ sql: 'SELECT * FROM project_info WHERE product_id = ?', args: [productId] })).rows[0];
-    if (!info) return '';
-    return [info.about, info.target_audience, info.value_proposition].filter(Boolean).join(' ');
-}
 
 // POST /generate { topic, productId?, formats?: string[] } - writes the
 // requested formats (default: all 4, for back-compat) from a topic, on
@@ -33,7 +27,15 @@ router.post('/generate', async (req, res) => {
         : [];
     const formats = requestedFormats.length ? requestedFormats : FORMAT_KEYS;
 
-    const productContext = await buildProductContext(productId);
+    // «Подобрать тему» рядом уже получала стратегию, а сама генерация текста -
+    // нет: тему выбирали с оглядкой на цель квартала, а писали пост в отрыве
+    // от неё. Плюс подмешиваем то, что реально сработало в опубликованном.
+    const [productContext, strategyContext, insightsContext, performanceContext] = await Promise.all([
+        buildProductContext(productId),
+        buildContentPlanContext(),
+        buildInsightsContext(),
+        buildPerformanceContext({ days: 30 }),
+    ]);
     const settings = (await db.execute('SELECT tone_of_voice, post_formula FROM agent_settings WHERE id = 1')).rows[0];
 
     try {
@@ -43,6 +45,7 @@ router.post('/generate', async (req, res) => {
             toneOfVoice: settings?.tone_of_voice || '',
             postFormula: settings?.post_formula || '',
             formats,
+            systemContext: joinContext(strategyContext, insightsContext, performanceContext),
         });
         for (const key of formats) {
             if (typeof result?.[key]?.title !== 'string') throw new Error(`generation missing "${key}"`);
@@ -70,8 +73,15 @@ router.post('/suggest-topic', async (req, res) => {
         ? req.body.excludeTopics.filter(t => typeof t === 'string' && t.trim())
         : [];
 
-    const productContext = await buildProductContext(productId);
-    const strategyContext = await buildContentPlanContext();
+    const [productContext, planContext, insightsContext] = await Promise.all([
+        buildProductContext(productId),
+        buildContentPlanContext(),
+        buildInsightsContext(),
+    ]);
+    // Insights знает, что реально зашло аудитории - без него «актуальная
+    // тема» опирается только на свежесть новости, но не на то, читают ли
+    // такое вообще.
+    const strategyContext = joinContext(planContext, insightsContext);
     const recentTitles = (await db.execute('SELECT title FROM ideas ORDER BY created_at DESC LIMIT 20')).rows
         .map(r => r.title).filter(Boolean);
     const usedTopics = [...new Set([...excludeTopics, ...recentTitles])];

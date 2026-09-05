@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { isLocalClaudeAgentConfigured, generateRoadmap } from '../lib/localClaudeAgent.js';
+import { buildInsightsContext, buildPerformanceContext, buildSalesContext, joinContext } from '../lib/systemContext.js';
+import { buildContentPlanContext } from './contentPlan.js';
 
 const router = Router();
 
@@ -78,10 +80,16 @@ router.put('/:productId/roadmap', async (req, res) => {
 });
 
 // "✨ Сгенерировать через ИИ" next to "+ Добавить этап" - proposes new
-// milestones grounded in this product's own О ПРОЕКТЕ fields above the
-// roadmap on the same page. Preview-only like discoverRssSources/
-// discoverKeywords in agentSettings.js: nothing is saved here, the client
-// shows a checklist and the user confirms via the existing PUT .../roadmap.
+// milestones. Preview-only like discoverRssSources/discoverKeywords in
+// agentSettings.js: nothing is saved here, the client shows a checklist and
+// the user confirms via the existing PUT .../roadmap.
+//
+// Контекст собирается со всей системы, а не только из «О проекте» этого
+// продукта: этап продвижения зависит от того, куда компания идёт
+// (бизнес-цель и фокус квартала из контент-плана), что уже реально
+// сработало в контенте (выводы Insights плюс сырые метрики публикаций) и
+// на какой стадии продажи (CRM). Роадмап, написанный в отрыве от этого,
+// предлагает «запустить блог» там, где блог уже год как идёт.
 router.post('/:productId/roadmap/generate', async (req, res) => {
     if (!isLocalClaudeAgentConfigured()) {
         return res.status(503).json({ error: 'local-claude-agent не настроен (LOCAL_CLAUDE_AGENT_URL/LOCAL_CLAUDE_AGENT_TOKEN)' });
@@ -95,6 +103,15 @@ router.post('/:productId/roadmap/generate', async (req, res) => {
     })).rows[0];
     const existingTitles = row ? JSON.parse(row.roadmap_json || '[]').map(r => r.title).filter(Boolean) : [];
 
+    // Собираем параллельно: каждый сборщик сам глотает свои ошибки и отдаёт
+    // пустую строку, так что ни один из них не может уронить генерацию.
+    const [strategy, insights, performance, sales] = await Promise.all([
+        buildContentPlanContext(),
+        buildInsightsContext(),
+        buildPerformanceContext({ days: 30 }),
+        buildSalesContext(),
+    ]);
+
     try {
         const result = await generateRoadmap({
             productName,
@@ -103,6 +120,7 @@ router.post('/:productId/roadmap/generate', async (req, res) => {
             valueProposition: row?.value_proposition || '',
             keyDifferentiators: row?.key_differentiators || '',
             existingTitles,
+            systemContext: joinContext(strategy, insights, performance, sales),
         });
         const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
         res.json({

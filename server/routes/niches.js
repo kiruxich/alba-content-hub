@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { isLocalClaudeAgentConfigured, generateScriptSection, generateColdCallPitch } from '../lib/localClaudeAgent.js';
+import { buildProductsCatalogContext } from '../lib/systemContext.js';
 
 const router = Router();
 
@@ -70,6 +71,10 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
     if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
     const settingsRow = (await db.execute('SELECT tone_of_voice FROM agent_settings WHERE id = 1')).rows[0];
+    // Скрипт звонка - это продажа конкретных продуктов студии, а модель о них
+    // ничего не знала: получался разговор «про сайты вообще» без единого
+    // упоминания того, что Alba реально может предложить собеседнику.
+    const productsContext = await buildProductsCatalogContext();
 
     try {
         const result = await generateScriptSection({
@@ -78,6 +83,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
             nicheName: row.name,
             nicheSubtitle: row.subtitle || '',
             toneOfVoice: settingsRow?.tone_of_voice || '',
+            productsContext,
         });
         res.json({ text: result.text });
     } catch (e) {
@@ -99,9 +105,14 @@ router.post('/:id/generate-pitch', async (req, res) => {
 
     const prompt = (req.body?.prompt || '').trim();
     const settingsRow = (await db.execute('SELECT tone_of_voice FROM agent_settings WHERE id = 1')).rows[0];
+    const productsContext = await buildProductsCatalogContext();
 
     try {
-        const result = await generateColdCallPitch({ category: row.name, prompt, toneOfVoice: settingsRow?.tone_of_voice || '' });
+        const result = await generateColdCallPitch({
+            category: row.name, prompt,
+            toneOfVoice: settingsRow?.tone_of_voice || '',
+            productsContext,
+        });
         res.json({ text: result.text });
     } catch (e) {
         res.status(502).json({ error: e.message });

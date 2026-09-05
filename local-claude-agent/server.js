@@ -302,12 +302,16 @@ app.post('/run/roadmap', requireToken, async (req, res) => {
     const valueProposition = (req.body?.valueProposition || '').trim();
     const keyDifferentiators = (req.body?.keyDifferentiators || '').trim();
     const existingTitles = Array.isArray(req.body?.existingTitles) ? req.body.existingTitles.filter(Boolean) : [];
+    // Срез всей системы, собранный хабом (см. server/lib/systemContext.js):
+    // бизнес-цель и фокус квартала, выводы Insights, реальные метрики
+    // публикаций, состояние CRM.
+    const systemContext = (req.body?.systemContext || '').trim();
 
     const prompt = `You are helping plan a product promotion roadmap for "${productName}".
 
 ${about ? `About the product: ${about}\n` : ''}${targetAudience ? `Target audience: ${targetAudience}\n` : ''}${valueProposition ? `Value proposition: ${valueProposition}\n` : ''}${keyDifferentiators ? `Key differentiators: ${keyDifferentiators}\n` : ''}
-${existingTitles.length ? `Roadmap steps already planned (do NOT repeat these or close variants):\n${existingTitles.map(t => `- ${t}`).join('\n')}\n` : ''}
-Suggest 3-6 NEW, concrete, sequential roadmap milestones for promoting this product (e.g. "MVP", "Первые 10 клиентов", "Запуск партнёрской программы") - each a short title plus a 1-2 sentence description of what it actually involves. Order them roughly by when they'd happen. Write in Russian.
+${systemContext ? `Current state of the wider business (strategy, what already worked in content, sales pipeline). Ground your milestones in this - do NOT propose a step the company has clearly already done or that contradicts the stated focus:\n${systemContext}\n\n` : ''}${existingTitles.length ? `Roadmap steps already planned (do NOT repeat these or close variants):\n${existingTitles.map(t => `- ${t}`).join('\n')}\n` : ''}
+Suggest 3-6 NEW, concrete, sequential roadmap milestones for promoting this product (e.g. "MVP", "Первые 10 клиентов", "Запуск партнёрской программы") - each a short title plus a 1-2 sentence description of what it actually involves. Order them roughly by when they'd happen. Where the context above gives you something specific to lean on (a working format, the current quarter's focus, the state of the pipeline), say so in the description instead of writing a generic step. Write in Russian.
 
 Respond with a JSON array of objects: [{ "title": "...", "description": "..." }, ...]`;
 
@@ -363,6 +367,10 @@ app.post('/run/cold-call-pitch', requireToken, async (req, res) => {
     const category = (req.body?.category || '').trim();
     const prompt = (req.body?.prompt || '').trim();
     const toneOfVoice = (req.body?.toneOfVoice || '').trim();
+    // Каталог продуктов студии от хаба (см. server/lib/systemContext.js):
+    // без него питч писался «про сайты вообще», не зная, что Alba реально
+    // может предложить собеседнику.
+    const productsContext = (req.body?.productsContext || '').trim();
     if (!category) return res.status(400).json({ error: 'category is required' });
 
     const fullPrompt = `Write a cold-outreach pitch message in Russian, from Alba Creation (a web/software studio), for a business in the "${category}" niche. This gets sent over Telegram to a lead who's still deciding whether to work with the studio - it needs to read as a real, personal message, not a mass-market ad.
@@ -402,7 +410,7 @@ Telegram: @KirillSklemin
 Ссылка на наш сайт: alba-creation.ru
 ---
 
-${toneOfVoice ? `Tone of voice to follow: ${toneOfVoice}\n` : ''}${prompt ? `Specific instructions for this niche/pitch: ${prompt}` : 'No specific instructions given - use your best judgment for what pain points and service angle fit this niche.'}
+${productsContext ? `What the studio actually sells - offer what genuinely fits this niche, and name it, instead of pitching generic "a website":\n${productsContext}\n\n` : ''}${toneOfVoice ? `Tone of voice to follow: ${toneOfVoice}\n` : ''}${prompt ? `Specific instructions for this niche/pitch: ${prompt}` : 'No specific instructions given - use your best judgment for what pain points and service angle fit this niche.'}
 
 If the demo-bot line ("Заодно пришлю демо-бота Blisski") doesn't make sense for this niche, adapt or drop it - only keep it if there's a genuinely relevant portfolio case to reference (mention it generically as "готовый пример из портфолио" if you don't have a specific product name to use).
 
@@ -431,11 +439,13 @@ app.post('/run/script-section', requireToken, async (req, res) => {
     const nicheName = (req.body?.nicheName || '').trim();
     const nicheSubtitle = (req.body?.nicheSubtitle || '').trim();
     const toneOfVoice = (req.body?.toneOfVoice || '').trim();
+    // Каталог продуктов студии от хаба (см. server/lib/systemContext.js).
+    const productsContext = (req.body?.productsContext || '').trim();
     if (!prompt) return res.status(400).json({ error: 'prompt is required' });
     if (!nicheName) return res.status(400).json({ error: 'nicheName is required' });
 
     const fullPrompt = `You are writing one section ("${heading || 'без названия'}") of a Russian-language live cold-call sales script, for a salesperson calling businesses in the "${nicheName}" niche${nicheSubtitle ? ` (${nicheSubtitle})` : ''}.
-${toneOfVoice ? `\nOverall tone/style to follow for this whole script: ${toneOfVoice}\n` : ''}
+${productsContext ? `\nWhat the studio actually sells - lean on whichever of these fits this niche instead of speaking about services in the abstract:\n${productsContext}\n` : ''}${toneOfVoice ? `\nOverall tone/style to follow for this whole script: ${toneOfVoice}\n` : ''}
 Instruction for this specific section: ${prompt}
 
 Write ONLY the section's script text itself - natural spoken Russian the salesperson would actually say, or a numbered list of prepared questions/talking points if that fits the section better. No markdown formatting, no headers, no meta-commentary about the script.
@@ -458,9 +468,12 @@ Respond with a JSON object: { "text": "..." }`;
 app.post('/run/reels-script', requireToken, async (req, res) => {
     const title = (req.body?.title || '').trim();
     const postText = (req.body?.postText || '').trim();
+    // Тот же тон голоса, что у остальной генерации: закадровый текст звучит
+    // от лица бренда, а не нейтральным диктором.
+    const toneOfVoice = (req.body?.toneOfVoice || '').trim();
     if (!postText) return res.status(400).json({ error: 'postText is required' });
 
-    const prompt = `Turn this already-written social post into a short vertical video (Reels/Shorts, 20-40 seconds) script in Russian. Post title: "${title}". Post text:\n\n${postText}\n\nWrite: a short scene-by-scene shot list (what's shown), and a separate voiceover script (what's said, natural spoken Russian, timed to roughly fit 20-40 seconds when read aloud).
+    const prompt = `Turn this already-written social post into a short vertical video (Reels/Shorts, 20-40 seconds) script in Russian. Post title: "${title}". Post text:\n\n${postText}\n${toneOfVoice ? `\nTone of voice for the voiceover: ${toneOfVoice}\n` : ''}\nWrite: a short scene-by-scene shot list (what's shown), and a separate voiceover script (what's said, natural spoken Russian, timed to roughly fit 20-40 seconds when read aloud).
 
 Respond with a JSON object: { "shotList": ["scene 1 description", "scene 2 description", ...], "voiceoverText": "..." }`;
 
@@ -541,6 +554,11 @@ app.post('/run/content-draft', requireToken, async (req, res) => {
     const productContext = (req.body?.productContext || '').trim();
     const toneOfVoice = (req.body?.toneOfVoice || '').trim();
     const postFormula = (req.body?.postFormula || '').trim();
+    // Срез системы от хаба (см. server/lib/systemContext.js): бизнес-цель и
+    // фокус квартала, выводы Insights, реальные метрики публикаций. Раньше
+    // это видела только задача suggest-topic, и текст писался в отрыве от
+    // стратегии, под которую тему и подбирали.
+    const systemContext = (req.body?.systemContext || '').trim();
     if (!topic) return res.status(400).json({ error: 'topic is required' });
 
     const requestedFormats = Array.isArray(req.body?.formats) ? req.body.formats.filter(k => CONTENT_FORMAT_KEYS.includes(k)) : [];
@@ -552,7 +570,7 @@ app.post('/run/content-draft', requireToken, async (req, res) => {
     const prompt = `You are writing content for Alba Creation's content-marketing hub, in ${formats.length} different format${formats.length > 1 ? 's' : ''} for the same topic, all in Russian. Each format is a separate, complete, ready-to-publish piece - not variations of the same text, each adapted to how that platform is actually used.
 
 Topic: "${topic}"
-${productContext ? `Product/service context: ${productContext}\n` : ''}${toneOfVoice ? `Tone of voice to follow: ${toneOfVoice}\n` : ''}${postFormula ? `Post structure guideline ("золотая середина"): ${postFormula}\n` : ''}
+${productContext ? `Product/service context: ${productContext}\n` : ''}${toneOfVoice ? `Tone of voice to follow: ${toneOfVoice}\n` : ''}${postFormula ? `Post structure guideline ("золотая середина"): ${postFormula}\n` : ''}${systemContext ? `\nWider context - the current business goal, this quarter's focus, and what has actually performed well in past publications. Let it shape the angle and the CTA; do not quote these numbers in the post itself:\n${systemContext}\n` : ''}
 Write ${formats.length > 1 ? 'all of the following' : 'the following'}:
 ${formatList}
 
