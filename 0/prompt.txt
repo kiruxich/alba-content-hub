@@ -1,0 +1,9 @@
+<task-notification>
+<task-id>a49f1f6baf7a13171</task-id>
+<tool-use-id>toolu_01TLhkbrUJbkN3rLXuQk78Be</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a49f1f6baf7a13171.output</output-file>
+<status>killed</status>
+<summary>Agent "Генерация медиа переезжает в Создание контента" was stopped by Claude</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Now let's check where `mediaAssetFilterType`, `mediaAssetFilterProduct`, `mediaAssets` variables are declared, and where `mediaAssetProductLabel` is defined.</result>
+</task-notification>
