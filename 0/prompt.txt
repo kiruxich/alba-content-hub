@@ -1,0 +1,260 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+
+This is a single continuous session that evolved through many phases on the `alba-content-hub` project (a content marketing admin SPA for "Alba Creation" studio, hosted on Vercel with a Turso/libSQL backend):
+
+   a) Initial: Build a knowledge graph of the codebase (graphify), review functionality, fix bugs found.
+   b) Migrate data storage from localStorage to a real backend with SQLite, ultimately Turso/libSQL, deployable on Vercel.
+   c) Add new admin tabs: "Контент план" (Content Plan - quarterly roadmap), "Заказчики" (Clients - sales call scripts).
+   d) Convert all modal-based UI (Products, Calendar days, Niches) to full-page navigation instead of drawer overlays.
+   e) Add "О проекте" (About project) section per product with maximum real detail, especially for Alba Creation itself (fetched from alba-creation.ru).
+   f) Visual redesign of Content Plan: user explicitly rejected the first "sticky note grid" ("выглядит убого" - looks ugly) then rejected a horizontal-scrolling timeline ("я не хочу скроллов горизонтальных, поменяй компоновку как нибудь" - I don't want horizontal scrolls, change the layout somehow) - final accepted design is a vertical roadmap with numbered circular markers.
+   g) Fix default dev ports to 8000 (web) / 8001 (api) so parallel Claude sessions don't collide, while keeping VITE_PORT/API_PORT overrides.
+   h) MAJOR PIVOT: Build an autonomous multi-agent AI content pipeline ("контент завод" - content factory), based on review/critique of a Gemini-authored spec, then user's own refined ideas (rubrics, derivatives, quality gate, forward planning, content lifecycle, UTM/ROI closing loop, batch moderation, asset library). Explicit instruction: "добавь все что придумал в общий план и будем реализовывать" (add everything into the plan and we'll implement) then "начинай" (start) with DB schema as agreed first step.
+   i) User explicitly chose "Researcher" as first agent to build (of Researcher vs. Auth options), then explicitly chose to use a LOCAL embedding model (Xenova/multilingual-e5-small) DESPITE being shown the real risk: model+library = 174MB, close to Vercel's ~250MB serverless bundle limit ("Всё равно локальная модель" said twice, including after seeing exact byte counts).
+   j) Mid-turn interruption: requested two Telegram bots (auto-reply + enhanced notification bot with URL legit/load-check → PDF). After clarifying questions, user redirected: skip the auto-reply bot entirely (use Telegram Business Away Message instead, or just don't build it - user chose "не нужно бота" = no bot needed); for the legit-check, explicitly said to use their own real published tool https://github.com/kiruxich/legitAgent "по максимуму" (to the max); for load test, confirmed "только свои/клиентские проекты" (only own/client projects - safety boundary). Also explicitly requested this become an ADMIN TAB (URL input, results/charts below, "Generate PDF" + "Download" buttons) rather than a bot-driven flow.
+   k) Explicit instruction on communication style (CRITICAL, must persist): "для экономии токенов не расписывай мне так подробно свои шаги, только реально важное - какие то чекпоинты (сделал то, получилось это, нашел баг и тд), добавь это в правила проекта" (for token economy don't describe steps in such detail, only real checkpoints, add this to project rules). This was saved to CLAUDE.md and to memory - **must be followed for all future responses in this session: terse, checkpoint-style only, no verbose step narration.**
+   l) Most recent request: add a specific weekly content schedule (7 days, each with a product/topic focus) as "a beautiful table" in the Content Plan tab, positioned just below the roadmap/timeline section, plus a reminder of the "Золотая середина" (Golden Middle) post-writing formula (3-step structure: business problem → technical solution → business result), so "у меня вся система по нему работала" (my whole system works by it) - i.e., this should govern actual system behavior, not just be decorative text. User explicitly invited suggestions: "если есть что предложить на изменение - предложи" (if you have suggestions to change, propose them).
+
+2. Key Technical Concepts:
+   - Vite + vanilla JS SPA frontend (public/js/app.js, index.html, styles.css), Express backend (server/), Turso/libSQL database (@libsql/client), deployed on Vercel (serverless functions via api/index.js -> server/app.js)
+   - Vercel serverless constraints: function bundle size (~250MB uncompressed ceiling), maxDuration, Vercel Cron Jobs (GET requests to configured paths), functions.includeFiles for explicit static asset bundling
+   - PRAGMA-checked idempotent schema migrations via a custom `ensureColumn(table, column, definition)` helper (checks PRAGMA table_info before ALTER TABLE, safe to run on every server startup)
+   - libSQL client patterns: `db.execute({sql, args})`, `db.executeMultiple()`, `db.transaction('write')`, no native prepared-statement objects
+   - @xenova/transformers (transformers.js) for local ONNX-based embeddings, model Xenova/multilingual-e5-small, quantized, with "query: " prefix convention, L2-normalized vectors (cosine similarity = dot product)
+   - Build-time model prefetching pattern (download at build, not runtime, to avoid cold-start network calls on serverless) via a custom script + vercel.json buildCommand
+   - rss-parser for RSS/Atom feed ingestion
+   - @legit-agent/core (published npm package, MIT-ish/real tool by the user) for 152-ФЗ/38-ФЗ/ЗоЗПП Russian legal compliance checks on raw HTML via `scanSources(files, catalog)`, no browser dependency (uses parse5)
+   - @legit-agent/live (NOT used, deferred) requires full `playwright` (Chromium), incompatible with current Vercel bundle
+   - pdfkit for PDF generation - critical gotcha: built-in fonts (Helvetica etc) have NO Cyrillic glyphs, must register external TTF fonts via `doc.registerFont(name, path)` + `doc.font(name)`
+   - Google Fonts / @fontsource npm packages ship per-script subset WOFF2 files (e.g. roboto-cyrillic-400-normal.woff2, roboto-latin-400-normal.woff2) - NOT combined; must merge subsets for full character coverage (digits are in "latin" not "cyrillic")
+   - Python fonttools (`fontTools.ttLib.TTFont`, `f.flavor = None` to force WOFF2→plain-TTF conversion; `python3 -m fontTools.merge` to merge multiple TTFs into one with combined glyph coverage)
+   - Cosine similarity / vector embeddings for content-relevance filtering (Researcher agent matching news articles to products)
+   - Bounded/rate-limited load testing pattern (worker-pool concurrent fetch loop with time-boxed duration)
+   - Turso CLI (`turso db shell`) used repeatedly to directly verify data in the live production database
+   - Project CLAUDE.md for persistent project-level instructions to Claude (created this session)
+   - Memory system (`/Users/kiruxa/.claude/projects/-Users-kiruxa-Desktop-alba-content-hub/memory/`) - feedback-type memory saved
+
+3. Files and Code Sections:
+
+   - **server/db.js** — Central schema file, uses top-level await, `ensureColumn()` helper for idempotent migrations. Most recently edited to add:
+     ```js
+     await ensureColumn('agent_settings', 'weekly_schedule', "TEXT DEFAULT '[]'");
+     await ensureColumn('agent_settings', 'post_formula', "TEXT DEFAULT ''");
+     ```
+     and (appended near end of file, after niches seed):
+     ```js
+     const defaultWeeklySchedule = [
+         { day: 'mon', label: 'Понедельник', product: 'hranitel', focus: 'Хранитель (Enterprise, документооборот, OCR)' },
+         { day: 'tue', label: 'Вторник', product: 'duet', focus: 'ДУЭТ (Event SaaS, генерация сайтов и приглашений)' },
+         { day: 'wed', label: 'Среда', product: 'alba-creation', focus: 'Alba Creation (кастомная разработка под ключ, нагрузочные тесты)' },
+         { day: 'thu', label: 'Четверг', product: 'insights', focus: 'InSights (AI-аналитика, скоринг блогеров, парсинг)' },
+         { day: 'fri', label: 'Пятница', product: null, focus: 'Ретро-кейсы из портфолио студии (Murla, Merfy, Архивариус и др.)' },
+         { day: 'sat', label: 'Суббота', product: null, focus: 'Gamedev и Open-Source (Crista, Фантазия, legitAgent)' },
+         { day: 'sun', label: 'Воскресенье', product: null, focus: 'Мемы, дедлайны, забавные правки клиентов, вайб фаундера' },
+     ];
+     const defaultPostFormula = 'Золотая середина — обязательная структура для экспертных постов Пн–Сб:\n1. Бизнес-проблема: какую боль, потерю времени или денег мы решаем.\n2. Техническое решение: как именно мы это закодили (наш стек), простыми бытовыми аналогиями.\n3. Бизнес-результат: измеримая метрика (ускорили в X раз, сэкономили Y бюджета, выдержали Z запросов).';
+     await db.execute({
+         sql: `UPDATE agent_settings SET weekly_schedule = ?, post_formula = ?
+               WHERE id = 1 AND weekly_schedule = '[]'`,
+         args: [JSON.stringify(defaultWeeklySchedule), defaultPostFormula],
+     });
+     ```
+     This edit was already applied and saved successfully. The file also contains (from earlier in session): tables ideas, scheduled_events, plan_settings, telegram_settings, content_plan, niches, project_info, agent_expenses, agent_settings, agent_runs, product_embeddings, platform_connections, content_rubrics, media_assets, admin_sessions; plus ensureColumn calls for ideas (source, agent_meta, draft_text, content_type, expires_at, rubric_id, quality_flags, cover_asset_id) and scheduled_events (platform, external_post_id, metrics_views/saves/clicks/synced_at, utm_code).
+
+   - **server/routes/agentSettings.js** — Currently mid-edit (NOT yet modified with the new fields). Last read content in full:
+     ```js
+     import { Router } from 'express';
+     import { db } from '../db.js';
+
+     const router = Router();
+
+     function serialize(row) {
+         return {
+             sources: JSON.parse(row.sources || '[]'),
+             keywords: JSON.parse(row.keywords || '[]'),
+             toneOfVoice: row.tone_of_voice || '',
+             budgetDailyCapUsd: row.budget_daily_cap_usd,
+             videoGenerationEnabled: Boolean(row.video_generation_enabled),
+             platformAutoPublish: JSON.parse(row.platform_auto_publish || '{}'),
+             productOfWeekOverride: row.product_of_week_override || null,
+         };
+     }
+
+     router.get('/', async (req, res) => {
+         const result = await db.execute('SELECT * FROM agent_settings WHERE id = 1');
+         res.json(serialize(result.rows[0]));
+     });
+
+     router.put('/', async (req, res) => {
+         const b = req.body || {};
+         const current = (await db.execute('SELECT * FROM agent_settings WHERE id = 1')).rows[0];
+
+         const sources = b.sources !== undefined ? JSON.stringify(b.sources) : current.sources;
+         const keywords = b.keywords !== undefined ? JSON.stringify(b.keywords) : current.keywords;
+         const tone_of_voice = b.toneOfVoice !== undefined ? b.toneOfVoice : current.tone_of_voice;
+         const budget_daily_cap_usd = b.budgetDailyCapUsd !== undefined ? b.budgetDailyCapUsd : current.budget_daily_cap_usd;
+         const video_generation_enabled = b.videoGenerationEnabled !== undefined
+             ? (b.videoGenerationEnabled ? 1 : 0) : current.video_generation_enabled;
+         const platform_auto_publish = b.platformAutoPublish !== undefined
+             ? JSON.stringify(b.platformAutoPublish) : current.platform_auto_publish;
+         const product_of_week_override = b.productOfWeekOverride !== undefined
+             ? b.productOfWeekOverride : current.product_of_week_override;
+
+         await db.execute({
+             sql: `UPDATE agent_settings SET sources = ?, keywords = ?, tone_of_voice = ?, budget_daily_cap_usd = ?,
+                   video_generation_enabled = ?, platform_auto_publish = ?, product_of_week_override = ? WHERE id = 1`,
+             args: [sources, keywords, tone_of_voice, budget_daily_cap_usd, video_generation_enabled, platform_auto_publish, product_of_week_override],
+         });
+         const result = await db.execute('SELECT * FROM agent_settings WHERE id = 1');
+         res.json(serialize(result.rows[0]));
+     });
+
+     export default router;
+     ```
+     **NEEDS**: Add `weeklySchedule: JSON.parse(row.weekly_schedule || '[]')` and `postFormula: row.post_formula || ''` to serialize(); add corresponding fields to the PUT handler's current/b merging logic and the UPDATE SQL statement/args.
+
+   - **server/routes/urlChecker.js** — New file (committed), implements POST /scan and POST /pdf. Uses `@legit-agent/core`'s `scanSources`/`defaultCatalog`/`dedupeFindings`, `pdfkit`, custom `runLoadTest` from `../lib/loadTest.js`. Registers Cyrillic fonts:
+     ```js
+     const __dirname = path.dirname(fileURLToPath(import.meta.url));
+     const FONT_REGULAR = path.join(__dirname, '..', 'fonts', 'Roboto-Regular.ttf');
+     const FONT_BOLD = path.join(__dirname, '..', 'fonts', 'Roboto-Bold.ttf');
+     ...
+     const doc = new PDFDocument({ margin: 50 });
+     doc.registerFont('Regular', FONT_REGULAR);
+     doc.registerFont('Bold', FONT_BOLD);
+     doc.font('Regular');
+     ```
+     `normalizeUrl()` helper prepends https:// if missing and validates via `new URL()`.
+
+   - **server/lib/loadTest.js** — New file, `runLoadTest(url, {concurrency, durationMs})`, hard caps `MAX_CONCURRENCY = 20`, `MAX_DURATION_MS = 15000`, worker-pool pattern, returns totalRequests/errors/errorRate/requestsPerSecond/avgMs/minMs/maxMs/p50Ms/p95Ms/statusCounts.
+
+   - **server/lib/embeddings.js** — New file, exports `embed(text)` and `cosineSimilarity(a,b)`. Sets `env.cacheDir` to `server/models/` (gitignored) to avoid node_modules default cache and enable build-time prefetch bundling.
+
+   - **server/lib/products.js** — New file, server-side mirror of frontend productsData ids/titles (7 products: insights, hranitel, duet, crista, fantaziya, legitagent, alba-creation).
+
+   - **server/routes/agentResearcher.js** — New file, GET/POST `/run`. Fetches RSS sources from agent_settings, strips HTML via regex, truncates to 400 chars, computes/caches product embeddings in product_embeddings table (hash-based cache invalidation via simpleHash of about-text), scores candidates by cosine similarity, dedupes by exact-title match against recent agent-sourced ideas, logs to agent_runs, returns top-3 brief. Optional CRON_SECRET Bearer-token check (only enforced if env var set).
+
+   - **scripts/prefetch-embedding-model.mjs** — New file, calls `embed('warm up')` to force model download at build time.
+
+   - **vercel.json** — Current full content:
+     ```json
+     {
+       "buildCommand": "node scripts/prefetch-embedding-model.mjs && vite build",
+       "outputDirectory": "dist",
+       "rewrites": [
+         { "source": "/api/:path*", "destination": "/api" }
+       ],
+       "functions": {
+         "api/index.js": {
+           "includeFiles": "server/{models,fonts}/**",
+           "maxDuration": 60
+         }
+       },
+       "crons": [
+         { "path": "/api/agent-researcher/run", "schedule": "30 5 * * *" }
+       ]
+     }
+     ```
+
+   - **server/app.js** — All routers mounted; current full mount list: ideasRouter, eventsRouter, settingsRouter, telegramRouter, contentPlanRouter, nichesRouter, projectInfoRouter, agentSettingsRouter, agentExpensesRouter, agentRunsRouter, agentResearcherRouter, urlCheckerRouter (paths: /api/ideas, /api/events, /api/settings, /api/telegram, /api/content-plan, /api/niches, /api/project-info, /api/agent-settings, /api/agent-expenses, /api/agent-runs, /api/agent-researcher, /api/url-checker).
+
+   - **server/routes/ideas.js** — Extended serialize/upsertSql/upsertArgs to include source, agentMeta, draftText, contentType, expiresAt, rubricId, qualityFlags, coverAssetId. DELETE route bug fixed: now runs `DELETE FROM scheduled_events WHERE idea_id = ?` BEFORE `DELETE FROM ideas WHERE id = ?` (was reversed, causing FK's ON DELETE SET NULL to orphan events before the explicit cleanup query could match them).
+
+   - **server/routes/events.js** — Extended serialize to include platform, externalPostId, metrics{views,saves,clicks}, metricsSyncedAt, utmCode. POST now auto-generates `utmCode = \`${b.ideaId ? \`idea${b.ideaId}\` : \`pub${id}\`}_${platform}\``. Added PUT /:id for future metrics-sync writes.
+
+   - **server/fonts/Roboto-Regular.ttf, Roboto-Bold.ttf** — New binary files (60KB each), merged latin+cyrillic subsets, committed to git (small enough, unlike the embedding model).
+
+   - **server/models/** — Gitignored directory holding the 129MB embedding model, NOT committed. Populated via `node scripts/prefetch-embedding-model.mjs`.
+
+   - **.gitignore** — Has `server/models` added (embedding model excluded from git).
+
+   - **CLAUDE.md** (new, project root) — Contains the terseness rule:
+     ```markdown
+     # Working style for this project
+
+     - Keep step-by-step narration minimal. Don't describe each tool call or intermediate action in prose.
+     - Only report real checkpoints: what was done, what the result was, and any bugs/blockers found. E.g. "Fixed X — tested, works" or "Found bug: Y, fixing now."
+     - Skip restating plans already agreed on before executing them.
+     ```
+
+   - **package.json** — Dependencies added this session (via pnpm add): @xenova/transformers, rss-parser, @legit-agent/core, pdfkit, @fontsource/roboto (transient, used only for font extraction, still in package.json).
+
+4. Errors and fixes:
+   - **better-sqlite3 native module segfault** (earlier session phase): Homebrew Node build crashed on any node-gyp-compiled N-API addon. Fixed by switching to sql.js (WASM), then to @libsql/client (pure HTTP, no native binding) for Turso compatibility.
+   - **sql.js missing FTS5**: npm sql.js build has FTS5 compiled out. Fixed by using indexed LIKE search instead.
+   - **Vite build silently dropping js/app.js**: `<script src="js/app.js">` without `type="module"` caused Vite to warn and NOT copy the file to dist/. Fixed by moving the file to `public/js/app.js` (Vite copies public/ verbatim).
+   - **Git author email mismatch blocking Vercel deploy**: local git config had a placeholder email not matching the user's GitHub account. Fixed via `git config user.email` + `git commit --amend --reset-author`.
+   - **Stray reverted js/app.js from Cursor autosave**: User worried real file was overwritten. Investigated via `git status --short` (showed `js/` as untracked `??`) and confirmed `public/js/app.js` (tracked, current) was untouched - the stray file was harmless old content Cursor recreated at the old (pre-migration) path. Deleted the stray `js/` directory; confirmed clean `git status` afterward.
+   - **Cascade-delete bug** (found via testing, not user-reported): `DELETE FROM ideas` ran before `DELETE FROM scheduled_events WHERE idea_id=?`, but the FK's `ON DELETE SET NULL` fired synchronously as part of the first statement, nulling idea_id before the second statement could match rows by it - silently orphaning events. Fixed by reordering (delete events first, then the idea). Verified via create-then-delete round trip test.
+   - **Vercel embedding-model bundle size risk**: Model + @xenova/transformers = 174MB, close to Vercel's ~250MB limit. Flagged clearly to user with exact numbers via AskUserQuestion; user chose to proceed anyway ("Всё равно пробуем деплой локальной модели"). Mitigated by: build-time prefetch into server/models/ (gitignored, not in git, but present at Vercel build time so it gets bundled), vercel.json functions.includeFiles explicit glob, maxDuration bump to 60s. NOT YET VERIFIED that an actual Vercel deploy succeeds within size limits - this is a real open risk the user accepted knowingly.
+   - **legitAgent Chromium dependency**: @legit-agent/live needs full playwright (won't fit Vercel bundle). Discovered @legit-agent/core has zero browser dependency and can run scanSources() directly on fetched HTML text. User confirmed: lightweight (no-browser) version now, full browser-based live scan deferred to post-VPS phase.
+   - **PDF Cyrillic mojibake**: pdfkit's built-in Helvetica font has no Cyrillic glyphs. Multi-step fix:
+     1. Tried GitHub raw URLs for Roboto TTF (github.com/.../raw/... path) - got HTML error pages, not binaries (wrong URL format).
+     2. Tried raw.githubusercontent.com path - got 14-byte "404: Not Found" responses (wrong file path in that repo).
+     3. Tried copying macOS system font Arial Unicode.ttf - technically worked but 22MB and Apple-licensed (not legally redistributable/shippable) - abandoned.
+     4. Installed `@fontsource/roboto` via npm (properly OFL-licensed) - only had WOFF/WOFF2, not TTF.
+     5. Converted WOFF2→TTF via Python fonttools (`TTFont(src); f.flavor = None; f.save(dst)`) - first attempt didn't clear flavor, still saved as WOFF2-flavored (file command still showed "Web Open Font Format"); fixed by explicitly setting `f.flavor = None` before save.
+     6. First successful TTF conversion used the WRONG subset (`roboto-cyrillic-ext-400-normal.woff2` - "cyrillic-ext" is for extended Cyrillic languages, not standard Russian) - text still rendered as tofu boxes (□). Fixed by switching to the plain `roboto-cyrillic-400-normal.woff2` subset.
+     7. After fixing the subset, Cyrillic text rendered correctly BUT digits/Latin punctuation rendered as tofu boxes (Google Fonts subsets exclude Latin/digits from the "cyrillic" subset). Fixed by merging the `latin` and `cyrillic` subset TTFs into one combined font using `python3 -m fontTools.merge --output-file=... part0.ttf part1.ttf`.
+     8. Final verification: PDF correctly shows Cyrillic text AND digits AND punctuation. Confirmed via reading the generated PDF directly.
+     9. Registered fonts in urlChecker.js via `doc.registerFont()` + `doc.font()` calls at each heading (Bold) vs body text (Regular) transition throughout the PDF-generation code.
+
+5. Problem Solving:
+   - Systematically diagnosed and worked around a native-module segfault (better-sqlite3) by switching database drivers twice (sql.js → @libsql/client) until finding one compatible with both this machine's Homebrew Node AND Vercel serverless (Turso/libSQL won on both counts since it's pure HTTP).
+   - Solved the "how to run a local ML model on serverless" problem via build-time prefetching + explicit file bundling rather than runtime download, after user insisted on local embeddings despite size risk.
+   - Solved Cyrillic PDF rendering (multi-step font sourcing/conversion/merging problem) through systematic trial: URL guessing → npm package → format conversion → subset debugging → subset merging.
+   - Ongoing/accepted risk (not "solved", explicitly accepted by user): Vercel function bundle size with the 129MB embedding model - real risk that the next Vercel deploy could fail; not yet confirmed successful in production.
+   - Ongoing/deferred (explicitly agreed, not a bug): full browser-based legitAgent scan-url (cookie-consent dynamic check, SPA hydration) - deferred to post-VPS phase per user's own choice.
+   - No authentication exists on the API yet - explicitly flagged multiple times as a real security gap, user chose to prioritize building Researcher first over Auth; this remains outstanding.
+
+6. All user messages (verbatim/near-verbatim, non-tool-result turns only):
+   - "создай граф проекта при помощи graphiny, так же посморетри на функционал, нужнно сделать что все работало как должно + предложи какие то свои варинаты если знаешь как лучше"
+   - "не нужно, оставь все как есть но я сейчас pnpm run dev прописываю и у меня почему то на 3000 порту читсо фронт открывается, сделай чтоб дефолтно юзались 8000 и 8001 без доп прописывания после команды"
+   - "останови сам а запущу уже я"
+   - "календарь и контент план тоже должны не модалку а целые страницы по нажатию на карточки открывать и в контент плане вообще должен быть совсем другой вид, как лучше всего сделать в виде canvas может быть?"
+   - (mid-turn) "в продуктах по нажатию тоже новая страница и там должен быть отдельный пункт внутри каждого проекта с информаций про сам проект (можешь с alba-creation взять"
+   - "выглядит убого, сделай красивый визуал и в о проекте нужно МАКСИМУМ ИНФЫ, возьми из alba все что есть"
+   - (mid-turn) "уже лучше да, но я не хочу скроллов горизонтальных, поменяй компоновку как нибудь"
+   - "теперь мы будем перестраивать всю систему" [followed by the full Gemini spec pasted verbatim] "вот что мне выдал gemini просмотри все и скажи что хорошо что плохо, что поменять или улучшить" "выдай кратко что тебе нужно сделать как ты понял задачу" "и еще, переезд на кулифай сервер и тд будет сильно позже пока что нужно реализовать все что можно на текущей инфре, напиши еще что можно без переезда а что нельзя сделать"
+   - "ты расписал то что плохо, распиши на что и как заменить, так же что можно улучишть и для чего можно n8n использовать, т к я хочу"
+   - "давай подумаем как должна выглядеть вся система в конечном итоге, какой функционал добавить и как"
+   - "а интеграции с соц сетями (инста треадс ютуб шортс) ? мне нужно заливать туда все из админки а так же собирать метрики т е добавляется еще один агент анализа? придумай улучшения"
+   - "сразу пересобираем общий план и посмотри теперь на всю мою получающуюся систему учитывая кан бан и тд и попробуй выдать финальные улучшения, после чего перейдем к реализации"
+   - "начинай"
+   - "1" (choosing Researcher over Auth)
+   - "тогда не нужно бота, просто сделай скрипт внутри системы отдельной вкладкой пусть на ней будет сверху инпут для url и после анализа под инпутом все графики и отчеты будут а так же кнопка сформировать pdf по нажатию на которую делается pdf и рядом кнопка скачать" (part of AskUserQuestion answer)
+   - "легит проверка выполняется по моему сделанному скилу https://github.com/kiruxich/legitAgent пусть делает по максимуму" (part of AskUserQuestion answer)
+   - "Только свои/клиентские проекты (рекомендую)" (AskUserQuestion answer selection)
+   - "Облёгчённая версия сейчас, полная после VPS (рекомендую)" (AskUserQuestion answer selection, re: Chromium)
+   - "продолжи, я правда в курсоре случайно нажал сохранить возможно у тебя другие файлы"
+   - "для экономии токенов не расписывай мне так подробно свои шаги, только реально важное - какие то чекпоинты (сделал то, получилось это, нашел баг и тд), добавь это в правила проекат" [CRITICAL - style instruction, verbatim preserved]
+   - Most recent (with attached schedule/formula): "Расписание по дням (Фокус дня): [full schedule text as quoted in analysis]... Формула написания экспертных постов (Пн-Сб): Ты обязан использовать структуру «Золотая середина»: [3-step formula]... вот я сделал вот такое расписание и правилло добавь расписание в виде красивой таблице в контент план (просто под роадмапом и так же добавь там же как напоминание про золотое правило (чтоб у меня вся система по нему работала, если есть что предложить на изменение - предложи)"
+
+   Also several `AskUserQuestion` selections made by the user across the session (embeddings provider "Всё равно локальная модель" x2, dev port defaults, Chromium approach, bot approach, legit-check scope, load-test scope) - captured above where directly quoted.
+
+7. Pending Tasks:
+   - **Immediate**: Finish adding `weeklySchedule` and `postFormula` fields to server/routes/agentSettings.js (serialize function + PUT handler + UPDATE SQL).
+   - Build the frontend: render the weekly schedule as a table and the golden-rule formula as a reminder callout in the Content Plan tab, positioned just below the roadmap/timeline section (per explicit user instruction: "просто под роадмапом").
+   - Fetch agent-settings data into frontend state (app.js) since Content Plan currently doesn't load it.
+   - Propose the suggested improvements/observations the user explicitly invited ("если есть что предложить на изменение - предложи"), e.g.: reconcile the fixed weekly day→product rotation against the quarterly Content Plan focus (they currently operate independently - is that intentional?); note that Friday/Saturday map to multiple products, not one (ambiguous for future automation); suggest the future Researcher/Generator read this exact schedule to auto-pick target_product per day once built.
+   - Build the URL Checker admin tab frontend (new nav tab, view, URL input, results display with charts/reports, PDF generate + download buttons) — backend is complete and tested, frontend not yet started.
+   - (Longer-term, previously outlined, not yet started): Generator agent (turns Researcher briefs into actual `ideas` rows with drafted text + cover images), Auth/session mechanism (admin_sessions table exists but unused), AI Agent Center admin tab, Cost Tracker admin tab, Agent Settings admin tab (beyond what's needed for the schedule table), platform_connections OAuth flows, media_assets library UI, content_rubrics management, VK publishing integration, metrics-sync job, Phase 2 (video/FFmpeg, n8n) and Phase 3 (social platforms) work — all previously scoped in planning discussions but explicitly deferred/not yet started.
+
+8. Current Work:
+   Implementing the user's most recent request: add the weekly content schedule and "Золотая середина" post formula to the system, storing it in `agent_settings` (architectural decision made to keep this machine-readable for the future Generator agent, not just decorative Content Plan text) rather than only as inline text.
+
+   Completed so far in this sub-task:
+   - Added two new columns to `agent_settings` via `ensureColumn()` in server/db.js: `weekly_schedule` (TEXT DEFAULT '[]') and `post_formula` (TEXT DEFAULT '').
+   - Added seed data at the end of server/db.js (`defaultWeeklySchedule` array matching the user's exact schedule, `defaultPostFormula` string matching the user's exact golden-middle formula text), guarded by `UPDATE agent_settings SET weekly_schedule = ?, post_formula = ? WHERE id = 1 AND weekly_schedule = '[]'` so it only seeds once and never overwrites later edits.
+   - Just re-read the full current content of `server/routes/agentSettings.js` (shown verbatim in section 3 above) to prepare for editing it.
+
+   **Not yet done**: The actual edit to `server/routes/agentSettings.js` to add `weeklySchedule` and `postFormula` to both the `serialize()` function and the PUT handler (reading `b.weeklySchedule`/`b.postFormula`, falling back to `current.weekly_schedule`/`current.post_formula`, and adding them to the UPDATE SQL statement and args array) has NOT yet been made — this was the exact next action when the conversation was cut off for compaction.
+
+9. Optional Next Step:
+   Directly continue the in-progress edit to `server/routes/agentSettings.js`: add `weeklySchedule: JSON.parse(row.weekly_schedule || '[]')` and `postFormula: row.post_formula || ''` to the `serialize()` function, and extend the PUT handler to accept/merge `b.weeklySchedule`/`b.postFormula` (JSON-stringifying weeklySchedule) into the UPDATE SQL and args array — mirroring the exact pattern already used for `sources`/`keywords`/etc. in that same file. This directly continues the task in progress per the user's most recent message: "добавь расписание в виде красивой таблице в контент план (просто под роадмапом и так же добавь там же как напоминание про золотое правило (чтоб у меня вся система по нему работала, если есть что предложить на изменение - предложи)". After the route is updated, the next steps (per the same request) are: test the endpoint against the live Turso DB, then build the frontend rendering (table + rule callout) in the Content Plan view under the roadmap, then surface the suggested observations/improvements to the user as invited — all while strictly honoring the terseness instruction (checkpoint-style updates only, no verbose step-by-step narration).
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/kiruxa/.claude/projects/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
