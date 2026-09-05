@@ -1,0 +1,84 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "01M1RP355591BRVXD1GTD741QS",
+  "session_id": "ce2c234a-a392-4523-81ee-12b7539fd8ba",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-05T11:43:36.698781Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [
+    "index.html",
+    "public/js/app.js",
+    "styles.css"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "13a9fa2a9d16",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 504,
+    "cache_creation_tokens": 1334927,
+    "cache_read_tokens": 54901550,
+    "output_tokens": 138961,
+    "api_call_count": 254
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01S8hSQqt9H2m3nUpWghCcib",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "graphify"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "feaf50c0d655",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 277,
+        "end": 278,
+        "entry_ids": [
+          "9734e564-6a52-499f-86f1-24f597590ded"
+        ],
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: graphify",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-05T11:43:36.567097Z",
+    "agent_lines": 531,
+    "agent_removed": 532,
+    "human_added": 2,
+    "human_modified": 42,
+    "human_removed": 0,
+    "total_committed": 575,
+    "total_lines_changed": 1107,
+    "agent_percentage": 96.0252935862692,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
