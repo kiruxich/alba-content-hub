@@ -1,0 +1,301 @@
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+
+This is a single very long continuous session on the `alba-content-hub` project (a content marketing admin SPA for "Alba Creation" studio, hosted on Vercel initially, now fully migrated to a self-managed VPS via Coolify, using Turso/libSQL backend). The session evolved through many phases:
+
+a) Finished a weekly-schedule + "Золотая середина" formula feature in the Content Plan tab (from prior session context).
+b) User revealed a local 2GIS scraper project (`~/Projects/parser_clients/`) and wanted it integrated as a "Заказчики" admin tab with per-niche cards, renaming the existing sales-scripts "Заказчики" tab to "Скрипты". Constraint: 2GIS requires a headed (non-headless) browser.
+c) User revealed they already have a VPS (running alba-creation.ru via pm2) and wanted to migrate the whole admin hub there via Coolify (self-hosted PaaS), explicitly choosing Coolify over continuing with raw pm2 or n8n.
+d) Explicit instruction (saved to CLAUDE.md and memory) mid-session: "делай оба" for migrating both LibreTranslate and parser-worker into proper Coolify-managed Docker resources for a "microservices architecture", after discovering these were initially set up via manual SSH/systemd/docker-run instead of through Coolify's UI.
+e) After discovering Anthropic API credit balance was insufficient (user provided a real API key that turned out unusable) and after weighing local-Claude-CLI vs paid-API vs free-alternative options at length, user explicitly rejected any Claude/paid-API dependency for parser-query-generation and translation, saying "зачем вообще клауд для перевода на русский? можешь просто скрипт сделать?" — resulting in a pivot to pure heuristics (parser queries) and self-hosted LibreTranslate (translation).
+f) Requested I add project rule (now in CLAUDE.md and memory): always split independent remaining work across parallel Sonnet-5 subagents, but ask permission first before dispatching.
+g) After reviewing a shared video about a content-creation "content factory" workflow (Instagram Reels from a third party), asked me to identify which roles/agents to adopt into their own system (currently has Researcher + wants Generator), and to propose a full Telegram integration (two-way, not just outbound notifications).
+h) Explicitly asked: how to validate the "Золотая середина" post structure WITHOUT an AI agent — I proposed and built a structured-output + pure-code validation approach.
+i) Requested a new "Настройки агентов" (Agent Settings) admin tab showing/editing the sources, tone of voice, and prompts currently used by agents.
+j) Requested (mid-turn) a new "О системе" (System Info) tab with a detailed diagram of how the whole system works.
+k) Requested launching parallel subagents to speed up remaining roadmap work ("можешь для ускорения процесса запустить субагентов на разные задачи"), then explicitly told me to ALSO delegate the task I was planning to do myself (Researcher cron + Generator routine setup) to a third subagent, and to find and delegate a fourth independent task myself ("свою задачу скорми третьему субагенту а сам найди еще задачи по 4ого субагента").
+
+2. Key Technical Concepts:
+   - Coolify (self-hosted PaaS/Docker orchestration UI) — resources deployed via git-push (Railpack/Nixpacks or Dockerfile build packs) or prebuilt Docker Image; **critical finding: Coolify container names change on every redeploy, no stable network alias exists** — services must be reached via the Docker bridge gateway IP (10.0.1.1) + explicitly published host port, never by container-name DNS.
+   - Coolify automation via Laravel `artisan tinker` executed through `docker exec coolify php artisan tinker --execute="..."` — used to set env vars (`$app->environment_variables()->updateOrCreate(...)`) and trigger deployments (`queue_application_deployment(...)`) programmatically, since no API token could be safely created (root-scoped Sanctum token creation was blocked by the safety classifier).
+   - libSQL/Turso client `noKeepAliveFetch` workaround in server/db.js — VPS-specific bug where kept-alive HTTP connections to Turso silently hang after ~5-8 requests; fixed by forcing `Connection: close` via a custom fetch that must clone the `Request` object's headers (not `init.headers`, which libsql client leaves empty) to preserve the Authorization header.
+   - Docker-in-Docker Xvfb pattern for parser-worker — headed Chromium + Xvfb + x11vnc + noVNC all bundled in one Docker image (matching official Selenium images), entrypoint.sh starts Xvfb/x11vnc/websockify in background then execs uvicorn in foreground.
+   - ufw firewall rules scoping internal service ports (8787 for parser-worker, 5000 for LibreTranslate) to the Coolify docker subnet (10.0.1.0/24) only, not the public internet — defense in depth alongside app-level tokens.
+   - Ansible playbook (infra/ansible/) for VM-level disaster-recovery provisioning — repeatedly revised as more app-level pieces moved into Coolify-managed resources (playbook's job shrank to: Docker+Coolify install, nginx+SSL per domain via certbot, ufw rules, htpasswd for noVNC basic-auth — no longer installs Node/pm2/Xvfb/etc at the VM level since those live in Coolify containers now).
+   - `community.general` Ansible collection (ufw, htpasswd modules) — required, added `requirements.yml`.
+   - LibreTranslate — self-hosted Docker image (`libretranslate/libretranslate:latest`), env vars `LT_LOAD_ONLY=en,ru`, `LT_DISABLE_WEB_UI=true`, `LT_UPDATE_MODELS=false`, REST API `POST /translate {q, source, target, format}` → `{translatedText}`.
+   - Claude Code headless CLI (`claude -p "..." --output-format json`) — uses subscription auth (not `ANTHROPIC_API_KEY`, confirmed via testing `--bare` mode which requires an API key and failed with "Not logged in"), but has significant per-call overhead (~50k tokens for cold-start context/tool-definition loading) that consumes subscription rate-limit budget, not direct dollar cost — ultimately NOT used for the parser/translation features (user rejected this path), but IS being used for the Generator agent via a Claude Code **routine** (see below).
+   - Claude Code "routines" (cloud scheduled agents, via `schedule` skill / `RemoteTrigger` tool) — fully isolated cloud sessions, **cannot access local files/services/env vars**, minimum cron interval is 1 hour, can use Bash/curl to hit external HTTP APIs. Used for the Generator agent (runs daily, not time-critical, fits the 1-hour-granularity constraint).
+   - Editor / quality-gate validation without AI — the core design insight: Generator must output structured fields (businessProblem/technicalSolution/businessResult/cta) rather than free-flowing prose, so validation becomes pure code (field presence, length, regex for a measurable metric) instead of a semantic-understanding task.
+   - Subagent parallelization with `isolation: "worktree"` — used for subagents touching shared frontend files (index.html, public/js/app.js) to avoid concurrent-edit conflicts; subagents not touching repo files (pure SSH/routine work) don't need isolation.
+   - Project rule now in CLAUDE.md: "Если ты понимаешь что можно выполнять работу несколькими субагентами то всегда делай это но предварительно явно спроси разрешение и используй всегда sonnet 5 medium для субагентов" — always split independent work across parallel Sonnet-5 subagents when recognized, but ask permission first.
+
+3. Files and Code Sections:
+
+   - **server/db.js** — Central schema/migration file. Key additions this session:
+     - `noKeepAliveFetch(input, init)` function (near top, before `makeClient()`):
+       ```js
+       function noKeepAliveFetch(input, init) {
+           if (input instanceof Request) {
+               const headers = new Headers(input.headers);
+               headers.set('Connection', 'close');
+               return fetch(new Request(input, { headers }));
+           }
+           const headers = new Headers((init && init.headers) || {});
+           headers.set('Connection', 'close');
+           return fetch(input, { ...init, headers });
+       }
+       ```
+       Passed as `fetch: noKeepAliveFetch` to `createClient({ url, authToken, fetch: noKeepAliveFetch })` for the Turso branch of `makeClient()`.
+     - `ensureColumn()` wrapped in try/catch to swallow "duplicate column name" errors (race-condition defense):
+       ```js
+       async function ensureColumn(table, column, definition) {
+           const info = await db.execute(`PRAGMA table_info(${table})`);
+           const exists = info.rows.some(r => r.name === column);
+           if (!exists) {
+               try {
+                   await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+               } catch (e) {
+                   if (!/duplicate column name/i.test(e.message)) throw e;
+               }
+           }
+       }
+       ```
+     - Added `parser_niches` table (id, category, description, status, queries_json, log, stats_json, raw_file, dedup_file, archive_file, job_id, created_at, updated_at).
+     - Added to `ideas`: `title_en`, `desc_en`, `cta_en` TEXT columns (English translation mirror).
+     - Added to `agent_settings`: `generator_prompt` TEXT DEFAULT '' with seeded default:
+       ```
+       Ты — копирайтер студии Alba Creation. Пишешь пост для соцсетей на основе темы, которую нашёл агент-исследователь.
+       Продукт дня: {{product}}
+       Тема: {{topic}}
+       Источник: {{snippet}}
+       Тон голоса: {{tone_of_voice}}
+       Формат: {{format}}
+       Обязательно следуй структуре "Золотая середина":
+       {{post_formula}}
+       Ответь СТРОГО валидным JSON без пояснений:
+       {"title": "...", "businessProblem": "...", "technicalSolution": "...", "businessResult": "...", "cta": "..."}
+       ```
+       Seeded via a SEPARATE guarded UPDATE (`WHERE id = 1 AND generator_prompt = ''`) because the existing `weekly_schedule`-guarded UPDATE no longer fires (weekly_schedule already populated from earlier in session).
+     - Added to `agent_runs`: `brief_json` TEXT column (stores the full structured Researcher brief).
+
+   - **server/lib/editorValidation.js** — NEW file, pure-code quality gate:
+     ```js
+     const FORMAT_LIMITS = {
+         'TG Пост': 4096, 'Reels / Shorts': 1000, 'Тред X/Threads': 280, 'Лонгрид Habr/VC': Infinity,
+     };
+     const RESULT_METRIC_RE = /\d+\s*%|\bв\s*\d+\s*раз|\d+x\b|\d+\s*(руб|₽|\$|usd)/i;
+     export function validateDraft({ businessProblem, technicalSolution, businessResult, cta, format }) {
+         const flags = [];
+         if (!businessProblem || businessProblem.trim().length < 20) flags.push('missing_business_problem');
+         if (!technicalSolution || technicalSolution.trim().length < 20) flags.push('missing_technical_solution');
+         if (!businessResult || businessResult.trim().length < 10) flags.push('missing_business_result');
+         else if (!RESULT_METRIC_RE.test(businessResult)) flags.push('result_missing_metric');
+         if (!cta || !cta.trim()) flags.push('missing_cta');
+         const assembled = [businessProblem, technicalSolution, businessResult].filter(Boolean).join('\n\n');
+         const limit = FORMAT_LIMITS[format] ?? FORMAT_LIMITS['TG Пост'];
+         if (assembled.length > limit) flags.push('over_char_limit');
+         return { flags, assembledText: assembled };
+     }
+     ```
+
+   - **server/routes/ideas.js** — POST handler now imports `validateDraft` and auto-runs it for agent-sourced drafts:
+     ```js
+     let desc = b.desc || '';
+     let qualityFlags = b.qualityFlags || [];
+     if (b.source === 'agent' && b.draftText) {
+         const { flags, assembledText } = validateDraft({ ...b.draftText, format: b.format });
+         qualityFlags = flags;
+         desc = assembledText;
+     }
+     ```
+     Also extended earlier this session with `title_en`/`desc_en`/`cta_en` (upsertSql/upsertArgs/serialize) and a `POST /:id/translate` route calling `translateToEnglish()`.
+
+   - **server/lib/translateToEnglish.js** — REWRITTEN mid-session (originally called Anthropic API, now calls self-hosted LibreTranslate):
+     ```js
+     const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || 'http://libretranslate:5000';
+     async function translateOne(text) {
+         if (!text || !text.trim()) return '';
+         const res = await fetch(`${LIBRETRANSLATE_URL}/translate`, {
+             method: 'POST', headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ q: text, source: 'ru', target: 'en', format: 'text' }),
+         });
+         if (!res.ok) throw new Error(`LibreTranslate ${res.status}`);
+         const data = await res.json();
+         return data.translatedText || '';
+     }
+     export async function translateToEnglish({ title, desc, cta }) {
+         const [titleEn, descEn, ctaEn] = await Promise.all([translateOne(title), translateOne(desc), translateOne(cta)]);
+         return { titleEn, descEn, ctaEn };
+     }
+     ```
+     NOTE: `LIBRETRANSLATE_URL` in production Coolify env vars is set to `http://10.0.1.1:5000` (gateway+port, NOT container name) — confirmed working after fixing both the port-mapping config and a missing ufw rule.
+
+   - **server/lib/generateParserQueries.js** — SIMPLIFIED mid-session (originally called Claude API with heuristic fallback, now pure heuristic only):
+     ```js
+     export async function generateParserQueries(category, description) {
+         const words = `${category} ${description || ''}`.toLowerCase().split(/[\s,;.!?]+/).map(w => w.trim()).filter(w => w.length > 2);
+         const keywords = Array.from(new Set(words)).slice(0, 8);
+         return [{ query: category.trim(), keywords }];
+     }
+     ```
+
+   - **server/routes/agentResearcher.js** — Extended with Telegram notification and brief persistence:
+     ```js
+     async function logRun(runDate, status, log, trendsFound, costUsd, briefJson) {
+         await db.execute({
+             sql: `INSERT INTO agent_runs (run_date, agent_name, status, log, cost_usd, trends_found, brief_json) VALUES (?, 'researcher', ?, ?, ?, ?, ?)`,
+             args: [runDate, status, log, costUsd, trendsFound, briefJson ? JSON.stringify(briefJson) : null],
+         });
+     }
+     async function notifyTelegram(brief) {
+         const settingsRes = await db.execute('SELECT token, chat_id FROM telegram_settings WHERE id = 1');
+         const settings = settingsRes.rows[0];
+         if (!settings?.token || !settings?.chat_id) return;
+         const lines = brief.trends.map((t, i) => `${i + 1}. *${t.topic}*\n   Продукт: ${t.target_product} · релевантность ${t.relevance_score}\n   ${t.source_url}`);
+         const text = `🔎 *Сводка Researcher за ${brief.date}*\n\n${lines.join('\n\n') || 'Актуальных тем не найдено сегодня.'}`;
+         try {
+             await fetch(`https://api.telegram.org/bot${settings.token}/sendMessage`, {
+                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ chat_id: settings.chat_id, text, parse_mode: 'Markdown' }),
+             });
+         } catch (e) { console.error('Researcher: failed to notify Telegram:', e.message); }
+     }
+     ```
+     `runResearcher` now calls `await notifyTelegram(brief);` after successful logRun. New endpoint:
+     ```js
+     router.get('/latest-brief', async (req, res) => {
+         const result = await db.execute("SELECT run_date, brief_json FROM agent_runs WHERE agent_name = 'researcher' AND status = 'success' AND brief_json IS NOT NULL ORDER BY id DESC LIMIT 1");
+         const row = result.rows[0];
+         if (!row) return res.status(404).json({ error: 'no successful researcher run yet' });
+         res.json(JSON.parse(row.brief_json));
+     });
+     ```
+     **This route was NOT yet scheduled** — the Vercel Cron that used to trigger it is dead since migrating off Vercel; Subagent C was tasked with setting up a replacement via `/etc/cron.d/alba-researcher`.
+
+   - **server/routes/agentSettings.js** — Fully rewritten to add `generatorPrompt` to both `serialize()` and the PUT handler (same merge-with-current pattern as other fields).
+
+   - **server/routes/parserNiches.js** — Full CRUD + job orchestration for 2GIS scraper niches. Key routes: GET/POST/PUT/DELETE /, POST /:id/run (generates queries via generateParserQueries, calls createParserJob), GET /:id/status (polls worker, updates DB), POST /:id/cancel, POST /:id/dedupe (gated: `ACTIVE_STATUSES.includes(row.status)` → 409), POST /:id/archive (same gate), GET /:id/download/:kind, POST /:id/captcha-alert (worker→hub callback, now requires `!WORKER_TOKEN || header !== WORKER_TOKEN` → 401, i.e. unconditional rejection if token unset — fixed from a bypass bug). DELETE now cancels the job first: `if (row?.job_id) { try { await cancelParserJob(row.job_id); } catch (_) {} }` before deleting the row.
+
+   - **server/lib/parserWorkerClient.js** — fetch wrapper for parser-worker's HTTP API (`PARSER_WORKER_URL` env, default `http://10.0.1.1:8787`), functions: createParserJob, getParserJob, cancelParserJob, dedupeParserJob, archiveParserJob, fetchParserFile.
+
+   - **parser-worker/main.py** — FastAPI app. Key structures: global `require_worker_token` middleware (rejects all requests except `/health` if token mismatch), in-memory `jobs: dict[str, Job]` + `asyncio.Queue`, `worker_loop()` processes jobs sequentially and now checks `if job.cancelled: continue` right after dequeue (handles cancel-while-queued case). `cancel_job` endpoint handles both actively-running (`job.task.cancel()`) and still-queued (`job.cancelled = True; job.status = "cancelled"`) cases. `dedupe_job`/`archive_job` now check `if job.status in ACTIVE_STATUSES: raise HTTPException(409, ...)` and run their (blocking, openpyxl-based) work via `await asyncio.to_thread(...)` instead of inline on the event loop.
+
+   - **parser-worker/parser_core.py** — Adapted 2GIS scraper (from user's original `parser.py`), plus `dedupe_franchises()` (from `clear_db.py`). `Job` class has `self.task = None` and `self.cancelled = False` fields. CAPTCHA detection enhanced: `CAPTCHA_STATUS_CODES = {403, 429}`, checked via `nav_response.status in CAPTCHA_STATUS_CODES` alongside the existing text-marker heuristic (`CAPTCHA_MARKERS` list expanded with English markers like "just a moment", "access denied", etc.).
+
+   - **parser-worker/Dockerfile** (NEW):
+     ```dockerfile
+     FROM python:3.11-slim
+     RUN apt-get update && apt-get install -y --no-install-recommends \
+         xvfb x11vnc novnc websockify && rm -rf /var/lib/apt/lists/*
+     WORKDIR /app
+     COPY requirements.txt .
+     RUN pip install --no-cache-dir -r requirements.txt
+     RUN playwright install --with-deps chromium
+     COPY . .
+     ENV DISPLAY=:99
+     ENV PARSER_DATA_DIR=/app/data
+     RUN chmod +x /app/entrypoint.sh
+     EXPOSE 8787 6080
+     ENTRYPOINT ["/app/entrypoint.sh"]
+     ```
+   - **parser-worker/entrypoint.sh** (NEW): starts Xvfb :99, x11vnc (`-localhost` restricted, port 5900), websockify (port 6080 → localhost:5900), then `exec uvicorn main:app --host 0.0.0.0 --port 8787`.
+     Both were built AND tested locally on the server via `docker build` + `docker run --network coolify` before committing — confirmed API health, noVNC page, and a real Chromium scrape job all worked inside the container.
+
+   - **infra/ansible/** — Heavily revised multiple times:
+     - `site.yml`: now has an `assert` pre-task rejecting `CHANGE_ME` placeholder secrets; Node.js/pm2 provisioning REMOVED (alba-creation.ru no longer uses pm2); calls `tasks/setup_parser_worker.yml` (now just htpasswd+ufw, renamed conceptually to "VM-уровень для parser-worker/LibreTranslate") BEFORE the per-site nginx loop (ordering fix: hub's nginx config references `.vnc_htpasswd` which must exist first).
+     - `tasks/setup_site.yml`: REWRITTEN so cert-check happens FIRST and the temporary HTTP-only bootstrap config is only written `when: not cert_stat.stat.exists` (fixes a bug where every playbook re-run would briefly replace a working HTTPS config with a redirect-only stub for all sites, causing an outage).
+     - `tasks/setup_parser_worker.yml`: REWRITTEN to remove all Xvfb/x11vnc/novnc/websockify/venv/systemd provisioning (obsolete — now Coolify-managed); keeps only `community.general.htpasswd` (idempotent noVNC basic-auth) and two `community.general.ufw` rules (port 8787 for parser-worker, port 5000 for LibreTranslate, both scoped to `10.0.1.0/24`).
+     - `vars/main.yml`: `node_version` var removed (unused); `parser_worker_token`/`vnc_basic_auth_password` default to literal `CHANGE_ME` (now enforced via the assert); `hub` site entry has `extra_locations` with the `/vnc/` nginx proxy block.
+     - `requirements.yml` (NEW): declares `community.general` collection dependency.
+     - `templates/nginx-app.conf.j2`: extended with `{% for loc in site.extra_locations | default([]) %}` rendering block.
+
+   - **index.html** — Multiple new tabs/views added this session:
+     - Nav buttons for: Скрипты (renamed from Заказчики), Заказчики (new, parser niches), Проверка сайта (URL checker), Настройки агентов, О системе — full nav button list now spans indices 0–11.
+     - `<div id="view-customers">` — parser niche cards grid.
+     - `<div id="view-urlchecker">` — URL checker input + results.
+     - `<div id="view-agentsettings">` — sources/keywords/tone/formula/generator-prompt form with Save button.
+     - `<div id="view-systeminfo">` — large inline SVG architecture diagram (viewBox 0 0 1160 760, boxes for Браузер/Telegram-бот/nginx/hub/Turso/parser-worker/LibreTranslate/2ГИС/Researcher/Generator with directional arrows and labels) plus 4 explanation cards below.
+     - `edit-idea-overlay` extended with an `#edit-idea-en-section` (English translation fields + "Перевести на английский" button).
+
+   - **public/js/app.js** — Extensive additions: `tabMap` now `{ 'products': 0, 'bank': 1, 'kanban': 2, 'analytics': 3, 'graph': 4, 'calendar': 5, 'contentplan': 6, 'clients': 7, 'customers': 8, 'urlchecker': 9, 'agentsettings': 10, 'systeminfo': 11 }`. Key new functions: `renderParserNiches`/`drawParserNiches` (with an `activeElement`-guard fix to avoid wiping unsaved input during 4s polling), `saveParserNicheField` (with rollback-on-failure fix), `runParserNiche` (with double-click guard via `event.target.disabled`), `cancelParserNiche`, `dedupeParserNiche`, `archiveParserNiche`, `downloadParserFile`, `removeParserNiche`; `runUrlCheck`/`renderUrlCheckReport`/`generateUrlCheckPdf`; `translateIdeaToEnglish` (uses global `event.target`, flagged by review as fragile but not fixed); `renderAgentSettingsForm`/`saveAgentSettingsForm`.
+
+   - **infra/ansible/vars/main.yml, tasks/setup_parser_worker.yml, site.yml comments** — all updated to document the new addressing scheme: "контейнеры Coolify меняют имя на каждом деплое, поэтому адресация только через docker bridge gateway + опубликованный порт."
+
+   - **CLAUDE.md** (project root) — appended:
+     ```
+     - If a set of remaining tasks is genuinely independent (separate files/areas, no shared in-flight edits), always split it across parallel subagents to execute concurrently — but ask explicit permission first before dispatching them. Use model "sonnet" (Sonnet 5) for these subagents. Don't do this when the tasks touch the same files you're currently editing yourself (real conflict risk) or when a task is small enough that spinning up an agent costs more time than just doing it directly.
+     ```
+
+   - **Memory file** `/Users/kiruxa/.claude/projects/-Users-kiruxa-Desktop-alba-content-hub/memory/feedback_parallel_subagents.md` (NEW) + MEMORY.md index entry — records the parallel-subagent preference.
+
+4. Errors and fixes:
+   - **better-sqlite3/sql.js issues** (from prior session, not this one — already resolved via @libsql/client).
+   - **Turso connection hang on VPS**: extensively diagnosed (curl-per-request always worked, persistent-connection reuse hung at request #5-8 consistently, reproduced identically with both `libsql://` and `https://` URL schemes, reproduced on both bare host and inside Docker container). Fixed via custom `noKeepAliveFetch` forcing `Connection: close`; first fix attempt (rebuilding headers from `init.headers`) caused a 401 because the libsql client actually passes a pre-built `Request` object as the first fetch argument with `init` empty — had to clone `input.headers` instead via `new Request(input, {headers})`. Verified by running the FULL db.js migration (all ~50 ensureColumn calls) successfully after the fix.
+   - **Coolify GitHub App manifest flow failing in Safari**: "We didn't find an App Manifest for your request" — root cause was Safari-specific (blocked cross-origin auto-submit form), fixed by switching to Chrome.
+   - **Coolify container "docker-image-..." wrong port** — "Exposed ports" field defaulted to 80 instead of the app's real port (5000 for LibreTranslate); user fixed via UI after I diagnosed it.
+   - **parser-worker Coolify resource built via Railpack instead of Dockerfile** — despite selecting Dockerfile build pack (or it reverted), Coolify auto-detected Python and used its own buildpack (created `.venv`, defaulted port to 3000). Diagnosed via `docker exec ... ps`/`cat /proc/1/cmdline` showing `--port 3000` and a `.venv` path inconsistent with the Dockerfile. Fixed by user explicitly re-confirming Build pack=Dockerfile and Base directory=/parser-worker in Coolify UI, then redeploying.
+   - **LibreTranslate unreachable from hub despite correct port mapping**: root cause was a missing ufw rule for port 5000 (only 8787 had been allowed from the docker subnet earlier) — confirmed via `ufw status numbered` showing no 5000 rule, fixed with `ufw allow from 10.0.1.0/24 to any port 5000 proto tcp`.
+   - **Stale `LIBRETRANSLATE_URL` env var**: after moving LibreTranslate to Coolify with port-mapping, forgot to update hub's env var from the old container-name-based `http://libretranslate:5000` to `http://10.0.1.1:5000` — caught via `{"error":"fetch failed"}` on the translate endpoint, fixed via tinker + redeploy.
+   - **SSH connection flakiness throughout the session**: repeated "Connection closed by 80.78.244.31 port 22" errors on rapid-fire SSH commands, resolved by adding short `sleep` delays between connections and/or using `ControlMaster=auto -o ControlPersist=180s` for connection reuse; occasionally the server appeared to rate-limit/reject connections entirely for ~15-90 seconds (possibly fail2ban), resolved by waiting longer.
+   - **Video file cannot be read directly**: `Read` tool errored "This tool cannot read binary files" for the .mp4 — worked around using local `ffmpeg` to extract frames as JPGs, which the Read tool CAN process as images (audio content remains inaccessible).
+   - **AskUserQuestion answer misread as approval**: at one point a stale/delayed `ScheduleWakeup` prompt fired and was initially almost treated as fresh — caught and explicitly flagged to the user as "устаревшее напоминание" (outdated reminder) rather than acted upon, twice.
+   - **Root-token creation blocked by safety classifier**: attempted to create a Sanctum personal-access-token via tinker for Coolify's REST API automation — blocked by Claude Code's auto-mode classifier as a sensitive credential-creation action; pivoted to guiding the user through the Coolify UI manually for new-resource creation instead (env-var updates and deploy-triggering via tinker on EXISTING resources remained fine and were used throughout).
+
+5. Problem Solving:
+   - Systematically diagnosed and fixed a genuinely obscure, VPS-network-specific libSQL/Turso connection-hang bug through careful progressive isolation (raw fetch → libsql client → varying scheme → host vs container → curl-per-request vs persistent-connection) rather than guessing.
+   - Solved the "how do I address a service whose container name changes every deploy" problem by discovering and consistently applying the docker-bridge-gateway-IP + published-host-port pattern across three different services (hub↔parser-worker, hub↔LibreTranslate), each time via the SAME diagnostic method (docker inspect Aliases, confirming instability).
+   - Solved the "validate a structured content formula without an LLM" design problem by shifting the burden to generation-time structure (forcing the Generator to output separate fields) rather than post-hoc text analysis.
+   - Solved the "no internet-facing product for local Claude Code as a backend" architecture question through direct empirical testing (`claude -p --bare` auth-mode test) rather than assumption, concluding routines (not local execution) are the correct mechanism for the Generator agent given the 1-hour-cron-granularity and Researcher-timing constraints — while local/API paths were correctly abandoned for translation/parser-query-gen after the user's explicit "no Claude for this" directive.
+   - Ongoing: the four dispatched subagents' work (Telegram webhook, Agent Center tab, Researcher-cron+Generator-routine, media_assets library) is NOT YET REVIEWED OR MERGED — this is the immediate open thread.
+
+6. All user messages (verbatim/near-verbatim, non-tool-result turns only, from where this compacted-summary picks up — i.e., starting from the parser-project reveal onward, since earlier messages were already captured in the prior summary that seeded this session):
+
+   - "@\"/Users/kiruxa/Projects/parser_clients/\"\nсо мной только на русском\n\nкстати у меня идея страничку заказчики текущую переименуй в скрипты и сделай новую страницу заказчиков..." [full detailed parser-integration request, verbatim as shown in the transcript]
+   - AskUserQuestion answers: "он должен сам запускаться по нажатию кнопки в админке" (re: local agent launch mechanism) — later superseded.
+   - "давай для ускорения процесса можешь разделить задачи какие можно делать параллельно и выполнять их субагентами (для субагентов используй sonnet 5 medium)"
+   - "но мне не нужно было тремя агентами ревьюить мне нужно чтоб 3 агента выполняли текущие задачи паралелльно"
+   - "окей а еще добавь в правила проекта что если ты понимаешь что можно выполнять работу несколькоими субагентами то всегда делай это но предварительно явно спроси разрешение и используй всегда sonnet 5 medium для субагентов"
+   - "REDACTED" (real Anthropic API key)
+   - "а у меня план куплен, но я так понимаю это не то, можно как то без пополнения баланса апи?"
+   - "а зачем мне их апи вообще?"
+   - "нет, как раз таки я сам это вручную делаю, можно по нажатиям этих кнопок просто открывать локально claude тут выполнять все в новом окне (а на сайт добавить небольшое окошко с выводом туда чата?"
+   - "объясни подробнее технически"
+   - "погнали дальше"
+   - AskUserQuestion answer: "он должен сам запускаться по нажатию кнопки в админке"
+   - "с видео я понял, остановись\n\nа можно как то сделать чтоб у меня микросервисна архитектура была т е чтоб ты все через кулифай проводил?" [with attached video @"/Users/kiruxa/Desktop/IMG_2862.MP4" earlier in same turn, plus questions about how such "agents" are built in general, and whether I can watch/listen to video]
+   - "делай оба"
+   - Several Coolify UI screenshots/statuses shared with brief clarifying questions ("контейнеры поднял... правда один уже задеплоил и я про портмаппинг не понял...", "так тут один портмаппинг можно указать", "готово все сделал первый контейнер уже запущен второй как ты и гооврил не деплоил", "порт поменял, парсер залдеплоить?", "готово" [multiple times, confirming UI actions taken])
+   - "насчет двустороннего воркфлоу так и сделаем мы вроде это обсуждали где то раньше и преврати в полнценный шаг редактора (только как на золотую середину без агента проверять?\n\nи можешь сделать отдельную вкладу настроек агентов с выводом туда промптов и источников которыми сейчас пользуется агент + возможность редактирования"
+   - "погнали дальше"
+   - "и сделай еще вкладку информации по системе добавь туда диаграмму подробную как работает система" (sent mid-turn while I was working)
+   - "можешь для ускорения процесса запустить субагентов на разные задачи (по роадмапу же полюбому можно одноврменно что то делать)" (sent mid-turn)
+   - AskUserQuestion answer: "свою задачу скорми третьему субагенту а сам найди еще задачи по 4ого субагента"
+   - "ты вроде только 2 запустил?" (sent mid-turn, after I'd launched subagents A and B)
+
+7. Pending Tasks:
+   - **Immediate**: wait for completion notifications from all 4 dispatched subagents (Telegram webhook — agentId a8394f603dacd7862; Agent Center tab — agentId aedde7b8ee541f288; Researcher cron + Generator routine — agentId a05613a9b1d25f163; media_assets library — agentId adb13f443051dc064). Do NOT poll or fabricate results — wait for actual task-notification events.
+   - Once each completes: review its actual work (trust-but-verify — read the real diffs/files, don't just accept the agent's self-report), merge worktree branches for the three that used `isolation: "worktree"` (A, B, D) back into main, resolve any conflicts (B and D both touch index.html/public/js/app.js and could conflict with each other on tabMap indices or shared CSS additions), test the merged result end-to-end, commit, push, verify Coolify auto-deploy.
+   - After merging: register the Telegram webhook (Subagent A was told to write a registration script, not run it — a human/I need to actually run it once against the real bot token).
+   - Verify the Generator routine's first real scheduled run (or the smoke-test run Subagent C may have triggered) actually produces a sensible draft idea end-to-end through to Editor validation.
+   - Longer-term/deferred (not actively pending, mentioned across the session but not scoped for immediate work): content_rubrics management UI/backend (explicitly deferred — "нет даже бэкенда, нужно сначала решить дизайн"), Designer/image-generation and Video-editor/FFmpeg roles from the video-inspired role analysis (explicitly scoped out as out-of-scope for now), full regenerate-loop logic where a "regenerate_requested" Telegram reply actually triggers a new Generator pass (Subagent A was told only to capture the request, not implement regeneration itself).
+
+8. Current Work:
+   Immediately before this summary was requested, I had just finished dispatching the fourth and final parallel subagent ("Build media assets library", agentId adb13f443051dc064, `isolation: "worktree"`, model "sonnet") per the user's explicit instruction "свою задачу скорми третьему субагенту а сам найди еще задачи по 4ого субагента". This followed:
+   - Subagent A (Telegram webhook) launched with worktree isolation.
+   - Subagent B (Agent Center tab) launched with worktree isolation.
+   - User interjection "ты вроде только 2 запустил?" — I confirmed correct and continued.
+   - Subagent C (Researcher cron + Generator routine, my own originally-planned task, now delegated per user's request) launched WITHOUT worktree isolation (pure infra/routine work, no repo file edits expected).
+   - Subagent D (media_assets library) launched WITH worktree isolation.
+
+   All four are now running in the background. The very last tool result received was the "Async agent launched successfully" confirmation for Subagent D, including its output_file path and explicit instructions not to read that file directly (would overflow context) and to wait for the automatic task-notification instead.
+
+   No subagent has reported back yet. I have not yet sent any user-facing text response after dispatching Subagent D — the conversation was cut off for compaction immediately after that tool call.
+
+9. Optional Next Step:
+   The only appropriate next step is to WAIT for the background task-notifications from the four dispatched subagents (per tool guidance: "You will be notified automatically when it completes... do not report, assume, or predict them; continue other work or respond to the user in the meantime"). Since there is no other in-flight foreground work, the correct immediate action once this conversation resumes is either (a) if a task-notification has already arrived, review that specific subagent's actual output files/diffs and report a terse checkpoint per the user's established communication-style preference ("для экономии токенов не расписывай мне так подробно свои шаги, только реально важное - какие то чекпоинты"), or (b) if no notification has arrived yet, briefly acknowledge to the user that all 4 subagents are now running and I'm waiting for their results, without polling. Do not start unrelated work, and do not fabricate or predict any subagent's results before its actual completion notification arrives — this was explicitly reinforced by the tool system reminders throughout this session ("Never race... never fabricate or predict them").
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/kiruxa/.claude/projects/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
