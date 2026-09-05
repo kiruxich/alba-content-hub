@@ -1,0 +1,154 @@
+2026-Aug-30 20:46:25 Docker 29.7.2 with BuildKit and Buildx detected on deployment server (localhost).
+2026-Aug-30 20:46:25 Starting deployment of kiruxich/alba-content-hub:main to localhost.
+2026-Aug-30 20:46:25 Preparing container with helper image: docker.io/coollabsio/coolify-helper:1.0.16
+2026-Aug-30 20:46:28 Image not found (xoegttvi12olrfxmwkx6vzkd:2e5938b10be383ce7b5b75122c110195cb3b9422). Building new image.
+2026-Aug-30 20:46:28 ----------------------------------------
+2026-Aug-30 20:46:29 Importing kiruxich/alba-content-hub:main (commit sha 2e5938b10be383ce7b5b75122c110195cb3b9422) to /artifacts/rfqcfqkgjdygvvyvsnhomcko.
+2026-Aug-30 20:46:32 Generating Railpack build plan.
+2026-Aug-30 20:46:33 Building docker image with Railpack.
+2026-Aug-30 20:46:33 To check the current progress, click on Show Debug Logs.
+2026-Aug-30 20:46:52 ========================================
+2026-Aug-30 20:46:52 Deployment failed: Command execution failed (exit code 102): docker exec rfqcfqkgjdygvvyvsnhomcko bash -c 'bash /artifacts/build.sh'
+2026-Aug-30 20:46:52 Error: #0 building with "coolify-railpack" instance using docker-container driver
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #1 resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0
+2026-Aug-30 20:46:52 #1 DONE 0.7s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #2 docker-image://ghcr.io/railwayapp/railpack-frontend:v0.23.0@sha256:ba4c430961d9ee3215c64807727a4b11e2198daac31250e9db9eaf9cee4624d6
+2026-Aug-30 20:46:52 #2 resolve ghcr.io/railwayapp/railpack-frontend:v0.23.0@sha256:ba4c430961d9ee3215c64807727a4b11e2198daac31250e9db9eaf9cee4624d6 done
+2026-Aug-30 20:46:52 #2 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #3 load build definition from railpack-plan.json
+2026-Aug-30 20:46:52 #3 transferring dockerfile: 4.97kB done
+2026-Aug-30 20:46:52 #3 DONE 0.0s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #4 loading .
+2026-Aug-30 20:46:52 #4 DONE 0.0s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #5 [railpack] secrets hash
+2026-Aug-30 20:46:52 #5 DONE 0.0s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #6 docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.3.17
+2026-Aug-30 20:46:52 #6 resolve ghcr.io/railwayapp/railpack-builder:mise-2026.3.17
+2026-Aug-30 20:46:52 #6 resolve ghcr.io/railwayapp/railpack-builder:mise-2026.3.17 0.5s done
+2026-Aug-30 20:46:52 #6 DONE 0.5s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #7 docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.17
+2026-Aug-30 20:46:52 #7 resolve ghcr.io/railwayapp/railpack-runtime:mise-2026.3.17 0.5s done
+2026-Aug-30 20:46:52 #7 DONE 0.5s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #4 loading .
+2026-Aug-30 20:46:52 #4 transferring context: 844.48kB 0.0s done
+2026-Aug-30 20:46:52 #4 DONE 0.0s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #5 [railpack] secrets hash
+2026-Aug-30 20:46:52 #5 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #8 mkdir /etc/mise
+2026-Aug-30 20:46:52 #8 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #9 create mise config
+2026-Aug-30 20:46:52 #9 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #10 install mise packages: node, pnpm
+2026-Aug-30 20:46:52 #10 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #11 copy .
+2026-Aug-30 20:46:52 #11 DONE 0.0s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #12 pnpm install
+2026-Aug-30 20:46:52 #12 0.381 Lockfile is up to date, resolution step is skipped
+2026-Aug-30 20:46:52 #12 0.447 Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-Aug-30 20:46:52 #12 0.494 Packages: +289
+2026-Aug-30 20:46:52 #12 0.494 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-Aug-30 20:46:52 #12 1.461 Progress: resolved 289, reused 0, downloaded 88, added 82
+2026-Aug-30 20:46:52 #12 2.473 Progress: resolved 289, reused 0, downloaded 224, added 212
+2026-Aug-30 20:46:52 #12 3.475 Progress: resolved 289, reused 0, downloaded 288, added 288
+2026-Aug-30 20:46:52 #12 3.895 Progress: resolved 289, reused 0, downloaded 289, added 289, done
+2026-Aug-30 20:46:52 #12 3.981 .../sharp@0.32.6/node_modules/sharp install$ (node install/libvips && node install/dll-copy && prebuild-install) || (node install/can-compile && node-gyp rebuild && node install/dll-copy)
+2026-Aug-30 20:46:52 #12 3.982 .../node_modules/protobufjs postinstall$ node scripts/postinstall
+2026-Aug-30 20:46:52 #12 3.983 .../esbuild@0.21.5/node_modules/esbuild postinstall$ node install.js
+2026-Aug-30 20:46:52 #12 4.084 .../node_modules/protobufjs postinstall: Done
+2026-Aug-30 20:46:52 #12 4.137 .../esbuild@0.21.5/node_modules/esbuild postinstall: Done
+2026-Aug-30 20:46:52 #12 4.179 .../sharp@0.32.6/node_modules/sharp install: sharp: Downloading https://github.com/lovell/sharp-libvips/releases/download/v8.14.5/libvips-8.14.5-linux-x64.tar.br
+2026-Aug-30 20:46:52 #12 5.028 .../sharp@0.32.6/node_modules/sharp install:<REDACTED>@0.32.6/node_modules/sharp install: Done
+2026-Aug-30 20:46:52 #12 5.666
+2026-Aug-30 20:46:52 #12 5.666 dependencies:
+2026-Aug-30 20:46:52 #12 5.666 + @aws-sdk/client-s3 3.1121.0
+2026-Aug-30 20:46:52 #12 5.666 + @fontsource/roboto 5.3.0
+2026-Aug-30 20:46:52 #12 5.666 + @legit-agent/core 0.7.1
+2026-Aug-30 20:46:52 #12 5.666 + @libsql/client 0.17.4
+2026-Aug-30 20:46:52 #12 5.666 + @xenova/transformers 2.17.2
+2026-Aug-30 20:46:52 #12 5.666 + bcryptjs 3.0.3
+2026-Aug-30 20:46:52 #12 5.666 + cors 2.8.6
+2026-Aug-30 20:46:52 #12 5.666 + express 5.2.1
+2026-Aug-30 20:46:52 #12 5.666 + multer 2.3.0
+2026-Aug-30 20:46:52 #12 5.666 + pdfkit 0.20.1
+2026-Aug-30 20:46:52 #12 5.666 + rss-parser 3.13.0
+2026-Aug-30 20:46:52 #12 5.666 + xlsx 0.18.5
+2026-Aug-30 20:46:52 #12 5.666
+2026-Aug-30 20:46:52 #12 5.666 devDependencies:
+2026-Aug-30 20:46:52 #12 5.666 + concurrently 10.0.5
+2026-Aug-30 20:46:52 #12 5.666 + vite 5.4.21
+2026-Aug-30 20:46:52 #12 5.666
+2026-Aug-30 20:46:52 #12 5.692 Done in 5.4s using pnpm v9.15.9
+2026-Aug-30 20:46:52 #12 DONE 5.9s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #13 copy / /app
+2026-Aug-30 20:46:52 #13 DONE 0.3s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #14 copy .
+2026-Aug-30 20:46:52 #14 DONE 0.1s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #15 pnpm run build
+2026-Aug-30 20:46:52 #15 0.350
+2026-Aug-30 20:46:52 #15 0.350 > alba-content-hub@2.0.0 build /app
+2026-Aug-30 20:46:52 #15 0.350 > vite build
+2026-Aug-30 20:46:52 #15 0.350
+2026-Aug-30 20:46:52 #15 0.580 vite v5.4.21 building for production...
+2026-Aug-30 20:46:52 #15 0.679 <script src="js/app.js"> in "/index.html" can't be bundled without type="module" attribute
+2026-Aug-30 20:46:52 #15 0.681 transforming...
+2026-Aug-30 20:46:52 #15 0.696 ✓ 2 modules transformed.
+2026-Aug-30 20:46:52 #15 0.722 rendering chunks...
+2026-Aug-30 20:46:52 #15 0.729 computing gzip size...
+2026-Aug-30 20:46:52 #15 0.735 dist/index.html 78.41 kB │ gzip: 18.32 kB
+2026-Aug-30 20:46:52 #15 0.736 dist/assets/index-CLhQ3CBo.css 29.38 kB │ gzip: 5.85 kB
+2026-Aug-30 20:46:52 #15 0.736 ✓ built in 129ms
+2026-Aug-30 20:46:52 #15 DONE 0.8s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #16 copy /mise/installs
+2026-Aug-30 20:46:52 #16 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #17 copy /usr/local/bin/mise
+2026-Aug-30 20:46:52 #17 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #18 copy /etc/mise/config.toml
+2026-Aug-30 20:46:52 #18 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #19 install apt packages: curl wget
+2026-Aug-30 20:46:52 #19 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #20 copy /mise/shims
+2026-Aug-30 20:46:52 #20 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #21 copy /root/.local/state/mise
+2026-Aug-30 20:46:52 #21 CACHED
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #22 copy /app/node_modules
+2026-Aug-30 20:46:52 #22 DONE 3.0s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #23 copy /root/.cache
+2026-Aug-30 20:46:52 #23 DONE 0.2s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #24 copy /app
+2026-Aug-30 20:46:52 #24 DONE 0.0s
+2026-Aug-30 20:46:52
+2026-Aug-30 20:46:52 #25 copy /app
+2026-Aug-30 20:46:52 #25 ERROR: failed to copy files: copy file range failed: no space left on device
+2026-Aug-30 20:46:52 ------
+2026-Aug-30 20:46:52 > copy /app:
+2026-Aug-30 20:46:52 ------
+2026-Aug-30 20:46:52 ERROR: failed to build: failed to solve: ResourceExhausted: failed to copy files: copy file range failed: no space left on device
+2026-Aug-30 20:46:52 ========================================
+2026-Aug-30 20:46:52 Deployment failed. Removing the new version of your application.
+2026-Aug-30 20:46:52 Gracefully shutting down build container: rfqcfqkgjdygvvyvsnhomcko
