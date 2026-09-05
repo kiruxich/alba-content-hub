@@ -29,7 +29,7 @@
 4. Строки уходят в хаб в теле статуса job'а и складываются в
    `scrape_niches.results_json`, плюс доступны XLSX-выгрузкой.
 
-## Запуск
+## Запуск (локально/на своём сервере через docker compose)
 
 ```bash
 cd scrape-worker
@@ -39,15 +39,36 @@ docker compose exec ollama ollama pull qwen2.5:7b
 docker compose exec ollama ollama pull nomic-embed-text
 ```
 
+## Запуск через Coolify
+
+Это compose из двух сервисов (ollama + сам воркер) — **Build pack: Docker
+Compose**, не Dockerfile (тот поднимет только один контейнер без ollama
+вообще, и SmartScraperGraph будет не с кем говорить).
+
+1. New Resource → Git Repository → этот репозиторий.
+2. Base directory: `/scrape-worker`.
+3. Build pack: **Docker Compose** (не Dockerfile).
+4. Environment variable: `SCRAPE_WORKER_TOKEN` = `openssl rand -hex 24`.
+5. После первого деплоя — `ollama pull` (см. выше) нужно выполнить внутри
+   контейнера `ollama` этого стека: `docker compose exec ollama ollama pull
+   qwen2.5:7b` и `... nomic-embed-text` (SSH на сервер, найти папку деплоя
+   этого Coolify-ресурса, там и лежит тот же `docker-compose.yml`).
+6. Открыть порт 8790 из docker-подсети Coolify (см.
+   `infra/ansible/tasks/setup_selfhosted_ufw.yml`), как у остальных
+   self-hosted сервисов — иначе хаб до воркера не достучится.
+
 Без `ollama pull` первый job упадёт с `model not found` — это не баг воркера,
 модель качается один раз в volume `ollama-models`.
 
 Затем в `.env` хаба:
 
 ```
-SCRAPE_WORKER_URL=http://<хост>:8788
+SCRAPE_WORKER_URL=http://<хост>:8790
 SCRAPE_WORKER_TOKEN=<тот же токен>
 ```
+
+Порт хоста — 8790, не 8788: тот уже занят video-worker, если оба воркера
+живут на одном сервере (см. docker-compose.yml).
 
 Проверить связку можно прямо из интерфейса: «Заказчики» → ScrapeGraph, вверху
 панели видно, на связи ли воркер и какая модель поднята.
