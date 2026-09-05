@@ -1,0 +1,6 @@
+<task-notification>
+<task-id>a94ff777c5d5fc9ef</task-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a94ff777c5d5fc9ef.output</output-file>
+<status>stopped</status>
+<summary>No completion record was found for background agent "FFmpeg video-assembly worker service" from the previous session. It may have been stopped, or it may have been running when the previous Claude Code process exited — either way its transcript is saved, so its progress is not lost. Resume it by sending it a message with SendMessage, or check its worktree/output for partial work before assuming the task landed.</summary>
+</task-notification>
