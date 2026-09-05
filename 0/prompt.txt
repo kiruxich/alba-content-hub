@@ -1,0 +1,31 @@
+на русском со мной
+
+---
+
+<task-notification>
+<task-id>b19fx4nwf</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/5f1e6a8d-d78e-49d1-95b1-99f10d537035/tasks/b19fx4nwf.output</output-file>
+<status>failed</status>
+<summary>Background command "Запустить тестовый экземпляр API-сервера на порту 8091 в фоне" failed with exit code 144</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b2tpfi1hd</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/5f1e6a8d-d78e-49d1-95b1-99f10d537035/tasks/b2tpfi1hd.output</output-file>
+<status>failed</status>
+<summary>Background command "Запустить тестовый экземпляр Vite dev-сервера на порту 8090" failed with exit code 144</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b8eyre84i</task-id>
+<tool-use-id>toolu_01KMFLKTtD8KPEysRcPBQKM7</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/5f1e6a8d-d78e-49d1-95b1-99f10d537035/tasks/b8eyre84i.output</output-file>
+<status>failed</status>
+<summary>Background command "Перезапустить тестовый API-сервер на порту 8091" failed with exit code 143</summary>
+</task-notification>
