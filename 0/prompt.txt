@@ -1,0 +1,26 @@
+<task-notification>
+<task-id>a0bffbd741056560a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a0bffbd741056560a.output</output-file>
+<status>completed</status>
+<summary>Agent "Резюме: версионирование файлов парсера на S3" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Committed inside the worktree only (branch `worktree-agent-a15403b5f22f111b4`), not pushed, and `/Users/kiruxa/Desktop/alba-content-hub` proper was never touched.
+
+**What was built** (all work was already present from the interrupted run — I reviewed, verified, and committed it):
+
+- `server/db.js`: new `parser_niche_file_versions` table (id, niche_id, kind, s3_key, original_filename, created_at) + index on niche_id.
+- `server/routes/parserNiches.js`: `archiveExistingNicheFiles()`/`archiveWorkerFile()`/`archiveNewlyAvailableFiles()` helpers persist raw/dedup/archive bytes to S3 via `uploadBuffer` and record a version row before any UPDATE that would wipe them — hooked into `POST /:id/run` (before the nulling UPDATE), `POST /:id/upload` (before overwrite, plus the fresh upload itself), and `GET /:id/status` (when a worker job's file just became available). All best-effort and silently no-op when `isObjectStorageConfigured()` is false.
+- New endpoints: `GET /api/parser-niches/:id/versions` (list, newest first) and `GET /api/parser-niches/:id/versions/:versionId/download` (streams from S3).
+- `server/lib/objectStorage.js`: exported `publicUrlForKey` for the download route to use.
+- `public/js/app.js` / `styles.css`: expandable "История версий" section per niche card in `drawParserNiches()`, lazily fetched on first expand, styled consistent with `.parser-niche-card`/`.parser-file-badge`.
+
+**Verified locally** (sqlite fallback, no Turso creds in this worktree's `.env`, confirmed absent): server boots clean; `node --check` passes on all 4 JS files; `GET /versions` returns rows correctly; `GET /versions/:id/download` returns 503 (not a crash) when S3 unconfigured, and 404 for an unknown version id; `POST /upload` completes successfully end-to-end with the archival call no-op'ing silently (no new version row created, confirming graceful degradation matches "today's behavior" requirement). `git status`/`git check-ignore` confirmed only the 5 intended files are staged — the local test sqlite db is gitignored.
+
+**Not exercised** (needs live verification after deploy with `S3_*` env vars set): the actual `uploadBuffer` PUT against a real bucket, and the versions-download route's GET against real S3 content. `POST /:id/run`'s archival path specifically wasn't exercised either since `createParserJob` fails first on `fetch failed` (parser-worker isn't reachable in this sandbox) — same failure point main would hit here, unrelated to this change.
+
+Also confirmed: this branch's `parserNiches.js` doesn't yet have `POST /:id/generate-description` (branch is behind main as expected), so there's no structural conflict — the new routes/helpers added here are additive and don't touch that area.
+
+result: Built and committed (commit `6ffa68d` on branch `worktree-agent-a15403b5f22f111b4`) a durable S3-backed version-history system for parser-niche files — new `parser_niche_file_versions` table, archival hooks in `parserNiches.js`'s run/upload/status routes, two new API endpoints, and a frontend "История версий" panel — verified locally against sqlite with graceful no-op confirmed when S3 is unconfigured; live S3 behavior still needs a post-deploy check.</result>
+<usage><subagent_tokens>75454</subagent_tokens><tool_uses>20</tool_uses><duration_ms>120618</duration_ms></usage>
+</task-notification>
