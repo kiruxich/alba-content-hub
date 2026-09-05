@@ -1,0 +1,29 @@
+<task-notification>
+<task-id>a1cf4e4a52def775a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a1cf4e4a52def775a.output</output-file>
+<status>completed</status>
+<summary>Agent "Generator regenerate-loop backend" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Server confirmed stopped, DB confirmed clean, and `node --check` passes.
+
+## Summary
+
+**Files changed:**
+- `/Users/kiruxa/Desktop/alba-content-hub/server/routes/ideas.js` — new route + PUT changes
+- `/Users/kiruxa/Desktop/alba-content-hub/docs/generator-regeneration.md` — new doc (self-contained, ready to paste into the Generator's cloud-routine prompt)
+
+**1. `GET /api/ideas/needs-regeneration`**
+Returns `{ items: Idea[] }` — ideas with `status: 'idea'` and a non-empty `agentMeta.regenerateNotes`. Each item is the normal serialized idea (id, title, desc, format, funnel, targetGroups, draftText, agentMeta, qualityFlags, etc.) plus a convenience top-level `regenerateNotes` mirror. Implementation: a cheap SQL `LIKE '%regenerateNotes%'` pre-filter (matching the existing search-endpoint convention, since nothing else in this codebase uses `json_extract`), then an exact JS check on the parsed array.
+
+**2. `PUT /api/ideas/:id` extended**
+- When the request includes `draftText` and the idea is agent-sourced, the server now recomputes `desc` and `qualityFlags` via the same `validateDraft()` used on `POST /api/ideas` — previously PUT stored `draft_text` but never re-derived `desc`/`qualityFlags`, which would have left the assembled post text frozen on the stale draft. Fixed this as part of the task since it's required for the regeneration flow to actually produce a usable revision.
+- When `draftText` is present and the resolved `agentMeta` (from the request or existing row) has a non-empty `regenerateNotes`, it's reset to `[]`; every other `agentMeta` key (e.g. `sourceUrl`) is preserved. This only triggers when `draftText` is actually sent, so ordinary edits (title/status/metrics-only PUTs) are unaffected — verified nothing in the frontend currently sends `draftText` via PUT, so this is a net-new code path, not a behavior change for existing callers.
+
+**3. Testing** — local file-based dev DB only (`data/alba-content-hub.db`), server started via `node server/index.js` directly (not `pnpm run server`, which loads `.env` pointing at the real Turso instance) with `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` explicitly unset. Flow: created a fake `source: 'agent'` idea via `POST /api/ideas`, directly wrote `agent_meta.regenerateNotes` to mirror exactly what `telegramWebhook.js`'s `appendRegenerateNote` does, confirmed it appeared in `GET /api/ideas/needs-regeneration`, `PUT` a revised `draftText`, confirmed `desc`/`qualityFlags` recomputed and `agentMeta.regenerateNotes` cleared while `sourceUrl` survived, confirmed the idea dropped off the list. Cleaned up test rows (one stray row from a failed local `curl` retry was also found and removed) — local DB now empty, server process killed.
+
+**4. `node --check server/routes/ideas.js`** — passes.
+
+One judgment call worth flagging: the task asked me to verify whether PUT wires `validateDraft` the same as POST — it didn't, so I fixed it (documented above) rather than just noting the gap, since without it the regeneration loop would silently not update the visible post text.</result>
+<usage><subagent_tokens>96089</subagent_tokens><tool_uses>35</tool_uses><duration_ms>249745</duration_ms></usage>
+</task-notification>
