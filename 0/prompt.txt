@@ -1,0 +1,2 @@
+kiruxa@MacBook-Air-Sklemin ~ % cd local-claude-agent && docker compose up -d --build
+cd: no such file or directory: local-claude-agent
