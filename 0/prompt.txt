@@ -1,0 +1,34 @@
+kiruxa@MacBook-Air-Sklemin alba-content-hub % turso auth signup
+zsh: command not found: turso
+kiruxa@MacBook-Air-Sklemin alba-content-hub % turso auth signup
+Opening your browser at:
+https://api.turso.tech/signup?port=58676&redirect=true&REDACTED&type=cli
+Waiting for authentication...
+✔  Success! Logged in as kiruxich
+
+✏️  We are so happy you are here!
+Now that you are authenticated, it is time to create a database:
+        turso db create
+kiruxa@MacBook-Air-Sklemin alba-content-hub % turso db create alba-content-hub
+Created group default at aws-eu-west-1 in 702ms.
+Created database alba-content-hub at group default in 1.102s.
+
+Start an interactive SQL shell with:
+
+   turso db shell alba-content-hub
+
+To see information about the database, including a connection URL, run:
+
+   turso db show alba-content-hub
+
+To get an authentication token for the database, run:
+
+   turso db tokens create alba-content-hub
+
+kiruxa@MacBook-Air-Sklemin alba-content-hub % turso db show alba-content-hub --url
+libsql://alba-content-hub-kiruxich.aws-eu-west-1.turso.io
+kiruxa@MacBook-Air-Sklemin alba-content-hub % turso db tokens create alba-content-hub
+REDACTED
+kiruxa@MacBook-Air-Sklemin alba-content-hub % 
+
+готово, что дальше?
