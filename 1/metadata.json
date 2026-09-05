@@ -1,0 +1,75 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "01M1R91BRT4E0N01NCKDSNAV46",
+  "session_id": "ce2c234a-a392-4523-81ee-12b7539fd8ba",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-05T07:55:27.702911Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "index.html",
+    "public/js/app.js"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "0df407d82127",
+  "checkpoint_transcript_start": 1212,
+  "transcript_lines_at_start": 1212,
+  "compact_transcript_start": 221,
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 26508,
+    "cache_read_tokens": 5003683,
+    "output_tokens": 9664,
+    "api_call_count": 15
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01S8hSQqt9H2m3nUpWghCcib",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "graphify"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "64cbd57910c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 277,
+        "end": 278,
+        "entry_ids": [
+          "9734e564-6a52-499f-86f1-24f597590ded"
+        ],
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: graphify",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-05T07:55:27.581971Z",
+    "agent_lines": 27,
+    "agent_removed": 3,
+    "human_added": 4,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 32,
+    "total_lines_changed": 35,
+    "agent_percentage": 85.71428571428571,
+    "metric_version": 2
+  }
+}
