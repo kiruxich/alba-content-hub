@@ -1,0 +1,35 @@
+<task-notification>
+<task-id>a282cf754b707e2d1</task-id>
+<tool-use-id>toolu_018e58uWCxZaeEpHXqmdeQC7</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a282cf754b707e2d1.output</output-file>
+<status>completed</status>
+<summary>Agent "Budget cap enforcement for agent spend" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Report
+
+**Phase 1 — Investigation findings**
+
+- `grep -rn "INSERT INTO agent_expenses" server/` turned up exactly **one** call site: `server/routes/agentExpenses.js:42`, the generic `POST /api/agent-expenses` endpoint itself. Nothing in `server/routes/` or `server/lib/` calls it internally — the table is only ever populated by whoever POSTs to that endpoint directly (manual/historical data, or in principle the cloud Generator/Researcher agents, which live outside this repo).
+- `agentResearcher.js`'s `logRun(runDate, status, log, trendsFound, costUsd, briefJson)` is called 4 times, and `costUsd` is hardcoded to `0` at every call site (lines ~137, 147, 192, 199) — confirmed by the code comment "Local embeddings only, no LLM call in this step - genuinely free."
+- Despite that, `agent_expenses` in the dev DB already has real rows (monthUsd was `0.02` before my test), so *some* external process (likely manual entries or a cloud routine) is writing to it — but nothing in this repo generates that spend today.
+- `agent_settings.budget_daily_cap_usd` schema default is `1.0` (not null) and the dev row had `0.75` set via the UI — so the cap has been configured by a human, it just was never read anywhere. **Enforcement is currently forward-looking**: this repo's own agents (Researcher) don't spend money yet, so the guard has nothing to stop today, but it's now the correct choke point for whenever Researcher, the cloud Generator, or anything else starts reporting real `agent_expenses` costs.
+
+**Phase 2 — Implementation**
+
+- `server/lib/checkBudgetCap.js` (new): `checkBudgetCap()` reads `agent_settings.budget_daily_cap_usd`, computes today's spend using the identical SQL from `agent-expenses/summary`'s `today` query, and returns `{ capUsd, spentTodayUsd, exceeded }`. Cap of `0`, `null`, or unset → `capUsd: null`, `exceeded: false` (never blocks by default).
+- `server/routes/agentResearcher.js`: `runResearcher` now calls `checkBudgetCap()` first; if exceeded it calls `logRun(runDate, 'skipped', ..., 0, 0)` with a `budget_exceeded`-style message and returns `{ status: 'skipped', reason: 'budget_exceeded' }`, mirroring the existing `no_sources`/`no_candidates` pattern.
+- `server/routes/agentExpenses.js`: added `GET /budget-status` → `{capUsd, spentTodayUsd, exceeded}`, documented with a comment in the same style as the `latest-brief` "Consumed by the Generator agent" note, since it's meant for external cloud-routine self-checks.
+- `node --check` passed on all three touched files.
+
+**Testing performed against the dev Turso DB** (via the actual running server on :8001, not mocked):
+1. Set `budgetDailyCapUsd: 0.01` via `PUT /api/agent-settings`.
+2. Inserted a fake `agent_expenses` row (`total_usd: 5.00`) via `POST /api/agent-expenses`.
+3. `GET /api/agent-expenses/budget-status` → `{"capUsd":0.01,"spentTodayUsd":5,"exceeded":true}`.
+4. `POST /api/agent-researcher/run` → `{"status":"skipped","reason":"budget_exceeded"}`; verified the corresponding `agent_runs` row: `status: skipped, log: "Daily budget cap of $0.01 reached (spent $5 today)."`.
+5. Reset cap to `null` → `budget-status` returned `exceeded:false`; re-ran researcher → skipped for the pre-existing `no_sources` reason (not budget), confirming normal operation resumed.
+6. Cleaned up: deleted the fake `agent_expenses` row and the test `agent_runs` log row directly via `db.execute`, restored `budgetDailyCapUsd` to its original `0.75`. Final state matches pre-test state (`monthUsd` back to `0.02`).
+7. Stopped the local server; confirmed port 8001 no longer listening.
+
+Note: `git status` shows `server/routes/ideas.js`, `server/routes/parserNiches.js`, and an untracked `docs/` directory as modified/new — these predate this session and are outside the requested scope, so I left them untouched.</result>
+<usage><subagent_tokens>77801</subagent_tokens><tool_uses>34</tool_uses><duration_ms>202115</duration_ms></usage>
+</task-notification>
