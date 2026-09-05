@@ -1,0 +1,15 @@
+kiruxa@MacBook-Air-Sklemin alba-content-hub % brew install tursodatabase/tap/turso
+==> Auto-updating Homebrew...
+Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+Error: turso was installed from the homebrew/core tap
+but you are trying to install it from the tursodatabase/tap tap.
+Formulae with the same name from different taps cannot be installed at the same time.
+
+To install this version, you must first uninstall the existing formula:
+  brew uninstall turso
+Then you can install the desired version:
+  brew install tursodatabase/tap/turso
+kiruxa@MacBook-Air-Sklemin alba-content-hub % turso auth signup
+zsh: command not found: turso
+kiruxa@MacBook-Air-Sklemin alba-content-hub %
