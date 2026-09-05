@@ -1,0 +1,94 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "01M1RPZ6MZTPKZGQRQWYB7H50R",
+  "session_id": "ce2c234a-a392-4523-81ee-12b7539fd8ba",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-05T11:58:56.663843Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "infra/ansible/tasks/print_env_summary.yml",
+    "infra/ansible/tasks/setup_selfhosted_ufw.yml",
+    "scrape-worker/README.md",
+    "scrape-worker/docker-compose.yml"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "1160809389a7",
+  "checkpoint_transcript_start": 1512,
+  "transcript_lines_at_start": 1512,
+  "compact_transcript_start": 277,
+  "token_usage": {
+    "input_tokens": 42,
+    "cache_creation_tokens": 17179,
+    "cache_read_tokens": 8532693,
+    "output_tokens": 10092,
+    "api_call_count": 21
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01S8hSQqt9H2m3nUpWghCcib",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "graphify"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "feaf50c0d655",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 277,
+        "end": 278,
+        "entry_ids": [
+          "9734e564-6a52-499f-86f1-24f597590ded"
+        ],
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: graphify",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-05T11:58:56.515819Z",
+    "agent_lines": 34,
+    "agent_removed": 4,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 2,
+    "total_committed": 34,
+    "total_lines_changed": 40,
+    "agent_percentage": 95,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 9,
+      "user_lines_removed": 2,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "scrape-worker/README.md": 4,
+        "scrape-worker/docker-compose.yml": 5
+      },
+      "user_removed_per_file": {
+        "scrape-worker/README.md": 1,
+        "scrape-worker/docker-compose.yml": 1
+      }
+    }
+  ]
+}
