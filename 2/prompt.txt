@@ -1,0 +1,2 @@
+kiruxa@MacBook-Air-Sklemin scrape-worker % docker compose up -d --build
+failed to connect to the docker API at unix:///Users/kiruxa/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/kiruxa/.docker/run/docker.sock: connect: no such file or directory
