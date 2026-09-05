@@ -1,0 +1,60 @@
+<task-notification>
+<task-id>a731c41b04825e85b</task-id>
+<tool-use-id>toolu_01DcNwuajvRvncPy8yJkfREJ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/a731c41b04825e85b.output</output-file>
+<status>completed</status>
+<summary>Agent "Insights Agent backend groundwork" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Summary
+
+Built the backend groundwork for the weekly Insights Agent, mirroring the Researcher/Generator pattern.
+
+**Files:**
+- `server/routes/insights.js` (new)
+- `server/app.js` (mount only — one import line, one `app.use` line; note the file also picked up an unrelated Metrics Sync/Video Assembly mount from the parallel in-flight task while I was working, left untouched)
+- `docs/insights-agent-routine.md` (new)
+- No `server/db.js` changes — `agent_runs` already had everything needed (`brief_json` reused, documented in-code as a naming leftover from Researcher).
+
+### `GET /api/insights/brief?days=N` (default 7, max 90)
+
+No data in window →
+```json
+{ "status": "insufficient_data", "periodStart": "...", "periodEnd": "...", "days": 7, "publishedCount": 0, "message": "..." }
+```
+
+Data present →
+```json
+{
+  "status": "ok", "periodStart", "periodEnd", "days", "publishedCount",
+  "metricsPending": false,       // true if every row in-window has zero views/saves/clicks (metrics-sync hasn't populated yet)
+  "byFormat": [{ "format", "count", "avgViews", "avgSaves", "avgClicks" }],
+  "byProduct": [{ "product", "count", "avgViews", "avgSaves" }],
+  "byProductNote": "...",        // explains the attribution limitation below
+  "topPerformers": [{ "ideaId", "title", "format", "platform", "rawDate", "views", "saves", "clicks" }],  // top 5 by views
+  "underperformers": [ ... same shape, bottom 5 ],
+  "rubricPerformance": [{ "rubricId", "rubricName", "count", "avgViews", "avgSaves" }]
+}
+```
+
+Important caveat I flagged in code and docs: `ideas` has **no persisted `product_id` column**, so `byProduct` is best-effort — it only picks up `agentMeta.targetProduct`/`target_product` when present, which today is essentially nothing (Generator's `agentMeta` currently only carries `sourceUrl`). It's honest rather than padded with a misleading "unknown" bucket.
+
+### `POST /api/insights/conclusions`
+Body: `{ summary: string (required), recommendations: array (optional) }` → stores into `agent_runs` with `agent_name: 'insights'`, `log = summary`, `brief_json = JSON.stringify({summary, recommendations, generatedAt})`. Missing summary → `400`. Success → `201 { ok: true, runDate }`.
+
+### `GET /api/insights/latest`
+Mirrors `agent-researcher/latest-brief` exactly: `404 { error: 'no successful insights run yet' }` when nothing stored, otherwise returns the stored payload unwrapped.
+
+### Testing (against the real dev Turso DB, `TURSO_DATABASE_URL` is set in `.env`)
+- Fresh state: `/brief` → clean `insufficient_data`. `/latest` → `404`.
+- Inserted 4 fake `ideas`+`scheduled_events` rows (mixed formats/rubrics/metrics) → `/brief` computed correct per-format averages, correct top/underperformer ordering, correct rubric grouping (verified numbers by hand).
+- `?days=30` picked up 11 real pre-existing rows correctly; `?days=1` correctly returned `insufficient_data`.
+- POST with empty body → `400`; valid POST → `201`; `/latest` then returned it correctly.
+- Deleted all 4 test ideas/events and the test `agent_runs` row; re-verified `/brief` and `/latest` are back to empty-state (`remaining test ideas: 0`).
+- `node --check` passed on both `insights.js` and `app.js`. No server left running (port 8001 confirmed not listening).
+
+### `docs/insights-agent-routine.md`
+Self-contained, prompt-ready doc in the same style as `generator-regeneration.md`: fetch `GET /api/insights/brief`, analysis guidance (weight `byFormat` by count, don't over-read `byProduct` given the attribution caveat, treat `metricsPending: true` as "no signal" not "bad performance"), exact `POST /api/insights/conclusions` shape with a realistic example, `GET /api/insights/latest` for verification, a loop summary, and a closing note flagging a Content Plan UI panel surfacing `/latest` as a natural (unbuilt) follow-up.
+
+One judgment call worth your review before wiring up `RemoteTrigger`: whether `byProduct`'s current near-always-empty state is acceptable for the first version, or whether it's worth adding a real `product_id` column to `ideas` first so this endpoint has something meaningful to report there.</result>
+<usage><subagent_tokens>105795</subagent_tokens><tool_uses>42</tool_uses><duration_ms>302649</duration_ms></usage>
+</task-notification>
