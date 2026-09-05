@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "01M1R8EAVMDCZECHC2J4B403TP",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "local-claude-agent/server.js",
+    "server/lib/localClaudeAgent.js",
+    "server/lib/systemContext.js",
+    "server/routes/contentDrafts.js",
+    "server/routes/ideas.js",
+    "server/routes/niches.js",
+    "server/routes/projectInfo.js"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 15806,
+    "cache_read_tokens": 1987345,
+    "output_tokens": 4658,
+    "api_call_count": 7
+  }
+}
