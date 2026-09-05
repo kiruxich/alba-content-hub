@@ -115,7 +115,7 @@
                     <p>Каталог продуктов</p>
                     <h1 id="product-detail-title">Продукт</h1>
                 </div>
-                <button class="edit-btn" onclick="closeProductDetailPage()">← Назад к продуктам</button>
+                <button class="ui-btn ui-btn--secondary" onclick="closeProductDetailPage()">← Назад к продуктам</button>
             </div>
             <div class="clients-container" style="max-width:900px;">
                 <div id="product-detail-body"></div>
@@ -143,7 +143,7 @@
                         <span class="cc-flow-arrow">→</span>
                         <span class="cc-flow-step"><b>4</b>Хранилище</span>
                     </div>
-                    <button class="cc-primary cc-primary-inline" id="cc-add-draft-btn" onclick="addContentDraft()">+ Новая тема</button>
+                    <button class="ui-btn ui-btn--primary" id="cc-add-draft-btn" onclick="addContentDraft()">+ Новая тема</button>
                 </div>
                 <div id="content-drafts-list"></div>
 
@@ -172,10 +172,10 @@
                 <div class="controls-row">
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Управление гипотезами и связи с продуктами</p>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="edit-btn" onclick="openPublishSettingsModal()">⚙️ Настройки публикаций</button>
-                        <button class="edit-btn" onclick="document.getElementById('import-file-input').click()">📂 Импорт</button>
-                        <button class="edit-btn" onclick="exportIdeasJSON()">💾 Экспорт</button>
-                        <button class="schedule-btn" onclick="openNewIdeaModal()">+ Новая идея</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="openPublishSettingsModal()">⚙️ Настройки публикаций</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="document.getElementById('import-file-input').click()">📂 Импорт</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="exportIdeasJSON()">💾 Экспорт</button>
+                        <button class="ui-btn ui-btn--primary" onclick="openNewIdeaModal()">+ Новая идея</button>
                     </div>
                 </div>
                 <div id="bank-list-content"></div>
@@ -199,10 +199,10 @@
 
             <div class="crm-objects">
                 <button class="crm-obj" data-crm-obj="overview" onclick="switchCrmObject('overview')">Обзор</button>
-                <button class="crm-obj" data-crm-obj="companies" onclick="switchCrmObject('companies')">Компании <span class="crm-obj-count" id="crm-count-companies"></span></button>
-                <button class="crm-obj" data-crm-obj="contacts" onclick="switchCrmObject('contacts')">Контакты <span class="crm-obj-count" id="crm-count-contacts"></span></button>
-                <button class="crm-obj" data-crm-obj="deals" onclick="switchCrmObject('deals')">Сделки <span class="crm-obj-count" id="crm-count-deals"></span></button>
-                <button class="crm-obj" data-crm-obj="tasks" onclick="switchCrmObject('tasks')">Задачи <span class="crm-obj-count" id="crm-count-tasks"></span></button>
+                <button class="crm-obj" data-crm-obj="companies" onclick="switchCrmObject('companies')">Компании <span class="ui-badge" id="crm-count-companies"></span></button>
+                <button class="crm-obj" data-crm-obj="contacts" onclick="switchCrmObject('contacts')">Контакты <span class="ui-badge" id="crm-count-contacts"></span></button>
+                <button class="crm-obj" data-crm-obj="deals" onclick="switchCrmObject('deals')">Сделки <span class="ui-badge" id="crm-count-deals"></span></button>
+                <button class="crm-obj" data-crm-obj="tasks" onclick="switchCrmObject('tasks')">Задачи <span class="ui-badge" id="crm-count-tasks"></span></button>
                 <button class="crm-obj" data-crm-obj="content" onclick="switchCrmObject('content')">Контент</button>
             </div>
 
@@ -227,8 +227,8 @@
                     <h1 id="crm-record-title">Запись</h1>
                 </div>
                 <div class="ie-header-actions">
-                    <button class="cc-secondary" onclick="closeCrmRecord()">← Назад</button>
-                    <button class="cc-secondary cc-danger" id="crm-record-delete" onclick="deleteCrmRecordFromPage()">🗑 Удалить</button>
+                    <button class="ui-btn ui-btn--secondary" onclick="closeCrmRecord()">← Назад</button>
+                    <button class="ui-btn ui-btn--danger" id="crm-record-delete" onclick="deleteCrmRecordFromPage()">🗑 Удалить</button>
                 </div>
             </div>
             <div class="crm-record-layout">
@@ -266,7 +266,7 @@
                             <label class="form-label" style="margin-top:0;">План на неделю (постов):</label>
                             <input type="number" id="plan-weekly-input" class="form-input" min="1" value="7">
                         </div>
-                        <button class="schedule-btn" style="height:42px; margin-top:18px;" onclick="savePlanSettings()">Применить</button>
+                        <button class="ui-btn ui-btn--primary" style="height:42px; margin-top:18px;" onclick="savePlanSettings()">Применить</button>
                     </div>
 
                     <div class="plan-progress-section">
@@ -327,9 +327,9 @@
                 <div class="controls-row">
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Квартальная дорожная карта — правьте прямо здесь и сохраняйте</p>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="edit-btn" onclick="addPlanNote()">+ Заметка</button>
-                        <button class="edit-btn" onclick="addPlanQuarter()">+ Квартал</button>
-                        <button class="schedule-btn" onclick="saveContentPlan()">💾 Сохранить план</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="addPlanNote()">+ Заметка</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="addPlanQuarter()">+ Квартал</button>
+                        <button class="ui-btn ui-btn--primary" onclick="saveContentPlan()">💾 Сохранить план</button>
                     </div>
                 </div>
 
@@ -358,7 +358,7 @@
             <div class="clients-container">
                 <div class="controls-row">
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Скрипты живых звонков по нишам — открой карточку, чтобы редактировать</p>
-                    <button class="schedule-btn" onclick="openNewNicheModal()">+ Новая ниша</button>
+                    <button class="ui-btn ui-btn--primary" onclick="openNewNicheModal()">+ Новая ниша</button>
                 </div>
                 <div class="products-grid" id="niches-grid"></div>
             </div>
@@ -372,8 +372,8 @@
                     <h1 id="niche-detail-title">Ниша</h1>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button class="schedule-btn" id="niche-mode-toggle-btn" onclick="toggleCallMode()">🎙 Режим звонка</button>
-                    <button class="edit-btn" onclick="closeNicheDetailPage()">← Назад к нишам</button>
+                    <button class="ui-btn ui-btn--primary" id="niche-mode-toggle-btn" onclick="toggleCallMode()">🎙 Режим звонка</button>
+                    <button class="ui-btn ui-btn--secondary" onclick="closeNicheDetailPage()">← Назад к нишам</button>
                 </div>
             </div>
             <div class="clients-container" style="max-width:800px;">
@@ -388,7 +388,7 @@
                     <p>Сетка публикаций</p>
                     <h1 id="day-detail-title">День</h1>
                 </div>
-                <button class="edit-btn" onclick="closeDayDetailPage()">← Назад к календарю</button>
+                <button class="ui-btn ui-btn--secondary" onclick="closeDayDetailPage()">← Назад к календарю</button>
             </div>
             <div class="clients-container" style="max-width:800px;">
                 <div id="day-detail-body"></div>
@@ -417,7 +417,7 @@
                 <div id="cust-pane-parser" class="cust-pane">
                     <div class="controls-row">
                         <p style="color:var(--text-secondary); font-size:13px; margin:0;">Парсер 2ГИС по нишам — заведите карточку на каждую нишу, которую нужно собрать</p>
-                        <button class="schedule-btn" onclick="addParserNicheCard()">+ Добавить нишу</button>
+                        <button class="ui-btn ui-btn--primary" onclick="addParserNicheCard()">+ Добавить нишу</button>
                     </div>
                     <div class="parser-niches-grid" id="parser-niches-grid"></div>
                 </div>
@@ -425,7 +425,7 @@
                 <div id="cust-pane-scrape" class="cust-pane" style="display:none;">
                     <div class="controls-row">
                         <p style="color:var(--text-secondary); font-size:13px; margin:0;">Обход сайтов компаний моделью: локальный агент ищет сайты по нише и городу, воркер снимает с них контакты</p>
-                        <button class="schedule-btn" onclick="addScrapeNicheCard()">+ Добавить нишу</button>
+                        <button class="ui-btn ui-btn--primary" onclick="addScrapeNicheCard()">+ Добавить нишу</button>
                     </div>
                     <div id="scrape-worker-health" class="cc-hint" style="margin:0 0 12px;"></div>
                     <div id="scrape-niches-list"></div>
@@ -437,8 +437,8 @@
                             <option value="">— все ниши —</option>
                         </select>
                         <div style="display:flex; gap:8px;">
-                            <button class="cc-secondary" onclick="renderMergedBase()">↻ Пересобрать</button>
-                            <button class="schedule-btn" onclick="downloadMergedBase()">⬇ Скачать XLSX</button>
+                            <button class="ui-btn ui-btn--secondary" onclick="renderMergedBase()">↻ Пересобрать</button>
+                            <button class="ui-btn ui-btn--primary" onclick="downloadMergedBase()">⬇ Скачать XLSX</button>
                         </div>
                     </div>
                     <div id="merged-stats"></div>
@@ -454,7 +454,7 @@
                     <p>Сбор базы клиентов</p>
                     <h1 id="parser-niche-detail-title">Ниша</h1>
                 </div>
-                <button class="edit-btn" onclick="closeParserNicheDetailPage()">← Назад к нишам</button>
+                <button class="ui-btn ui-btn--secondary" onclick="closeParserNicheDetailPage()">← Назад к нишам</button>
             </div>
             <div class="clients-container" style="max-width:800px;">
                 <div id="parser-niche-detail-body"></div>
@@ -471,13 +471,13 @@
                 <div class="controls-row">
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Каталог обложек и роликов — вставьте ссылку на уже размещённый файл (S3 alba-creation.ru и т.п.) или загрузите файл напрямую</p>
                     <div style="display:flex; gap:8px;">
-                        <button class="schedule-btn" onclick="openAddMediaAssetForm()">+ Добавить медиа</button>
-                        <button class="schedule-btn" style="background:var(--accent-purple);" onclick="openGenerateMediaAssetForm()">✨ Сгенерировать обложку</button>
-                        <button class="schedule-btn" onclick="openVoiceoverForm()">🎙️ Сгенерировать озвучку</button>
+                        <button class="ui-btn ui-btn--primary" onclick="openAddMediaAssetForm()">+ Добавить медиа</button>
+                        <button class="ui-btn ui-btn--primary" style="background:var(--accent-purple);" onclick="openGenerateMediaAssetForm()">✨ Сгенерировать обложку</button>
+                        <button class="ui-btn ui-btn--primary" onclick="openVoiceoverForm()">🎙️ Сгенерировать озвучку</button>
                     </div>
                 </div>
 
-                <div id="media-asset-form" class="info-box" style="display:none; margin-bottom:16px;">
+                <div id="media-asset-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
                     <label class="form-label">URL изображения/видео:</label>
                     <input type="text" id="ma-url-input" class="form-input" placeholder="https://alba-creation.ru/assets/cover.jpg" oninput="onMediaAssetUrlInput()">
 
@@ -501,12 +501,12 @@
                     <input type="text" id="ma-tags-input" class="form-input" placeholder="обложка, промо, reels">
 
                     <div style="display:flex; gap:8px;">
-                        <button class="submit-btn" style="margin-top:0;" onclick="submitNewMediaAsset()">Добавить</button>
-                        <button class="edit-btn" onclick="closeAddMediaAssetForm()">Отмена</button>
+                        <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:0;" onclick="submitNewMediaAsset()">Добавить</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="closeAddMediaAssetForm()">Отмена</button>
                     </div>
                 </div>
 
-                <div id="media-asset-generate-form" class="info-box" style="display:none; margin-bottom:16px;">
+                <div id="media-asset-generate-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
                     <label class="form-label">Опишите, что должно быть на обложке:</label>
                     <textarea id="ma-gen-prompt-input" class="form-textarea" style="min-height:70px;" placeholder="Например: минималистичная обложка для поста про AI-аналитику, тёмный фон, синие акценты"></textarea>
 
@@ -529,8 +529,8 @@
                     <p style="color:var(--text-secondary); font-size:12px; margin:4px 0 0;">Генерация может занять до нескольких минут — окно можно не закрывать, кнопка заблокируется на время запроса.</p>
 
                     <div style="display:flex; gap:8px;">
-                        <button class="submit-btn" style="margin-top:0;" id="ma-gen-submit-btn" onclick="submitGenerateMediaAsset()">Сгенерировать</button>
-                        <button class="edit-btn" onclick="closeGenerateMediaAssetForm()">Отмена</button>
+                        <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:0;" id="ma-gen-submit-btn" onclick="submitGenerateMediaAsset()">Сгенерировать</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="closeGenerateMediaAssetForm()">Отмена</button>
                     </div>
                     <div id="ma-gen-status" class="generation-status" style="display:none;"></div>
                 </div>
@@ -539,7 +539,7 @@
                      text in, ai-generated media_assets row (type=audio) out. Gated server-side
                      behind ELEVENLABS_API_KEY; the "not configured" case surfaces as a normal
                      error toast, same as the Telegram integration elsewhere in this app. -->
-                <div id="voiceover-form" class="info-box" style="display:none; margin-bottom:16px;">
+                <div id="voiceover-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
                     <label class="form-label">Текст для озвучки:</label>
                     <textarea id="vo-text-input" class="form-textarea" placeholder="Текст, который нужно озвучить..."></textarea>
 
@@ -563,8 +563,8 @@
                     </select>
 
                     <div style="display:flex; gap:8px;">
-                        <button class="submit-btn" style="margin-top:0;" id="vo-generate-btn" onclick="submitVoiceoverGeneration()">Сгенерировать</button>
-                        <button class="edit-btn" onclick="closeVoiceoverForm()">Отмена</button>
+                        <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:0;" id="vo-generate-btn" onclick="submitVoiceoverGeneration()">Сгенерировать</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="closeVoiceoverForm()">Отмена</button>
                     </div>
                     <div id="vo-gen-status" class="generation-status" style="display:none;"></div>
                 </div>
@@ -601,7 +601,7 @@
                                 <option value="live">Полная проверка (с браузером)</option>
                             </select>
                         </div>
-                        <button class="cc-primary cc-primary-inline uc-submit" id="url-checker-scan-btn" onclick="runUrlCheck()">Проверить</button>
+                        <button class="ui-btn ui-btn--primary uc-submit" id="url-checker-scan-btn" onclick="runUrlCheck()">Проверить</button>
                     </div>
 
                     <!-- Полный ручной контроль над нагрузочным тестом - см.
@@ -640,7 +640,7 @@
                 <div id="url-checker-live-view" style="display:none; margin-top:16px;">
                     <div class="p-section-title" style="margin-top:0;">ЧТО СЕЙЧАС ДЕЛАЕТ БРАУЗЕР</div>
                     <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Если браузер спросит логин/пароль для noVNC — это отдельные креды, не от хаба: <strong>admin</strong> / <strong>AlbaVnc2026!</strong> Экран почернеет, когда браузер на сервере закроется после навигации — это нормально, анализ в это время ещё продолжается.</p>
-                    <div class="info-box" style="padding:0; overflow:hidden; border-radius:12px;">
+                    <div class="ui-card info-box" style="padding:0; overflow:hidden; border-radius:12px;">
                         <iframe id="url-checker-live-iframe" style="width:100%; height:420px; border:0; display:block; background:#000;"></iframe>
                     </div>
                 </div>
@@ -658,25 +658,25 @@
                 <div class="p-section-title" style="margin-top:8px;">АРХИТЕКТУРА</div>
 
                 <!-- LEGEND -->
-                <div class="info-box" style="display:flex; flex-wrap:wrap; gap:8px 24px; align-items:center; margin-bottom:20px;">
-                    <span class="parser-niche-status done">● работает</span>
+                <div class="ui-card info-box" style="display:flex; flex-wrap:wrap; gap:8px 24px; align-items:center; margin-bottom:20px;">
+                    <span class="ui-badge ui-badge--caps ui-badge--green">● работает</span>
                     <span style="color:var(--text-secondary); font-size:12px;">работает в проде</span>
-                    <span class="parser-niche-status captcha" style="margin-left:12px;">○ ждёт ключей</span>
+                    <span class="ui-badge ui-badge--caps ui-badge--orange" style="margin-left:12px;">○ ждёт ключей</span>
                     <span style="color:var(--text-secondary); font-size:12px;">код готов, ждёт ключей/деплоя</span>
-                    <span class="parser-niche-status running" style="margin-left:12px;">○ ждёт активации</span>
+                    <span class="ui-badge ui-badge--caps ui-badge--blue" style="margin-left:12px;">○ ждёт активации</span>
                     <span style="color:var(--text-secondary); font-size:12px;">код готов, ждёт cron/routine</span>
-                    <span class="parser-niche-status idle" style="margin-left:12px;">◌ внешний</span>
+                    <span class="ui-badge ui-badge--caps" style="margin-left:12px;">◌ внешний</span>
                     <span style="color:var(--text-secondary); font-size:12px;">сторонний сервис, не наш код</span>
                 </div>
 
                 <!-- Layer: clients -->
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Браузер</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Браузер</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Админ-панель на hub.alba-creation.ru. Открывается только после входа — single-admin логин (signed cookie + bcrypt), больше никто зайти не может.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Telegram-бот</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Telegram-бот</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Сводки тем от Researcher, черновики от Generator на approve/reject/regenerate, уведомления от hub — всё в одном чате.</p>
                     </div>
                 </div>
@@ -684,16 +684,16 @@
 
                 <!-- Layer: nginx -->
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>nginx (VPS)</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>nginx (VPS)</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Единая точка входа: SSL-терминация, роутинг по доменам (hub / alba-creation / …), проксирует /media/ до SeaweedFS и /vnc/ до parser-worker.</p>
                     </div>
                 </div>
                 <div style="text-align:center; color:var(--text-secondary); opacity:0.5; font-size:18px; margin:2px 0 18px;">↓</div>
 
                 <!-- Layer: hub (hero) -->
-                <div class="parser-niche-card" style="background:linear-gradient(165deg, rgba(10,132,255,0.16), rgba(10,132,255,0.03) 65%); border-color:rgba(10,132,255,0.4);">
-                    <div class="parser-niche-head"><b style="font-size:15px;">hub — Express API</b><span class="parser-niche-status done">● работает</span></div>
+                <div class="ui-card ui-card--gradient parser-niche-card" style="background:linear-gradient(165deg, rgba(10,132,255,0.16), rgba(10,132,255,0.03) 65%); border-color:rgba(10,132,255,0.4);">
+                    <div class="parser-niche-head"><b style="font-size:15px;">hub — Express API</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                     <p class="idea-desc-text" style="margin-bottom:0;">Coolify-контейнер с основной бизнес-логикой: REST API, статика фронтенда, Editor-валидация черновиков без AI, auth-гейт (signed cookie + bcrypt) перед всеми роутами. Обращается ко всем сервисам и внешним API ниже.</p>
                 </div>
                 <div style="text-align:center; color:var(--accent-blue); opacity:0.7; font-size:12px; margin:10px 0 22px;">↓ hub обращается ко всем блокам ниже (они не связаны между собой напрямую)</div>
@@ -701,12 +701,12 @@
                 <!-- Layer: data & storage -->
                 <div class="p-section-title">ДАННЫЕ И ХРАНИЛИЩЕ</div>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Turso (libSQL)</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Turso (libSQL)</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Облачная БД со всеми бизнес-данными — продукты, идеи, медиа, настройки агентов. Отдельный сервис, не в Coolify.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>S3-хранилище (SeaweedFS)</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>S3-хранилище (SeaweedFS)</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Self-hosted S3-совместимое хранилище на Coolify. Постоянные ссылки на обложки/видео/озвучку вместо base64 и временных URL от kie.ai. Публично раздаётся через nginx /media/.</p>
                     </div>
                 </div>
@@ -714,24 +714,24 @@
                 <!-- Layer: self-hosted workers -->
                 <div class="p-section-title">SELF-HOSTED СЕРВИСЫ (COOLIFY)</div>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>parser-worker</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>parser-worker</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Xvfb + headed Chromium + Playwright — обходит блокировку headless-браузеров у <b>2ГИС</b> (внешний сервис). Очередь job'ов, noVNC для ручного решения капчи, + загрузка готовых Excel-списков.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>LibreTranslate</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>LibreTranslate</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Свои модели en/ru, переводит карточки идей на английский. Бесплатная альтернатива платным translation API.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Piper TTS</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Piper TTS</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Офлайн нейросетевая озвучка (ru_RU-dmitri). Бесплатная альтернатива ElevenLabs — выбирается в форме генерации озвучки.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>video-worker</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>video-worker</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">FFmpeg-сборка Shorts: видео-клип + озвучка + субтитры → готовый вертикальный ролик. Порт 8788 опубликован, VIDEO_WORKER_URL настроен — финальная сборка ролика в кнопке «Сгенерировать» доступна.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>scrape-worker (ScrapeGraphAI)</b><span class="parser-niche-status captcha">○ ждёт ключей</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>scrape-worker (ScrapeGraphAI)</b><span class="ui-badge ui-badge--caps ui-badge--orange">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Вторая база заказчиков — обходит произвольные сайты компаний Playwright'ом и разбирает контакты моделью на локальной Ollama (не 2ГИС, дополняет его). Отдельный docker compose (см. scrape-worker/README.md): поднять контейнеры, один раз выполнить <code>ollama pull qwen2.5:7b</code> и <code>ollama pull nomic-embed-text</code> (иначе первый job падает с «model not found»), затем в `.env` хаба — SCRAPE_WORKER_URL и тот же SCRAPE_WORKER_TOKEN, что задан воркеру. Проверить связку — «Заказчики» → ScrapeGraph, вверху панели видно, на связи ли воркер.</p>
                     </div>
                 </div>
@@ -739,12 +739,12 @@
                 <!-- Layer: generation APIs -->
                 <div class="p-section-title">ГЕНЕРАЦИЯ МЕДИА (ВНЕШНИЕ API)</div>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>kie.ai (Flux / Kling)</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>kie.ai (Flux / Kling)</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">AI-обложки (Flux) и видео-клипы (Kling) по запросу. KIE_API_KEY настроен.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>ElevenLabs</b><span class="parser-niche-status captcha">○ требует оплаты</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>ElevenLabs</b><span class="ui-badge ui-badge--caps ui-badge--orange">○ требует оплаты</span></div>
                         <p class="idea-desc-text">Платная озвучка высокого качества, несколько голосов на выбор. Ключ добавлен, но план ElevenLabs не оплачен — запросы будут падать с ошибкой оплаты, пока не куплен тариф.</p>
                     </div>
                 </div>
@@ -752,24 +752,24 @@
                 <!-- Layer: publish platforms -->
                 <div class="p-section-title">ПУБЛИКАЦИЯ (ВНЕШНИЕ API)</div>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>VK</b><span class="parser-niche-status captcha" id="ps-status-vk">○ ждёт ключей</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>VK</b><span class="ui-badge ui-badge--caps ui-badge--orange" id="ps-status-vk">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">wall.post, один community-токен на всё (как у Telegram — не два аккаунта). Публикует в любое из добавленных сообществ (vk_groups) — сообщество выбирается в модалке публикации/планирования, с подсказкой по умолчанию исходя из языка поста. Ждёт токена в настройках.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Instagram</b><span class="parser-niche-status captcha" id="ps-status-instagram">○ ждёт ключей</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Instagram</b><span class="ui-badge ui-badge--caps ui-badge--orange" id="ps-status-instagram">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Graph API, нужен Business-аккаунт. Два отдельных аккаунта — RU и EN, аккаунт выбирается автоматически по языку публикуемого поста, без ручного пикера. Оба ждут токена в настройках (переключатель RU/EN в форме).</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>YouTube</b><span class="parser-niche-status captcha" id="ps-status-youtube">○ ждёт ключей</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>YouTube</b><span class="ui-badge ui-badge--caps ui-badge--orange" id="ps-status-youtube">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Data API v3, resumable upload. Два отдельных OAuth-аккаунта — RU и EN, выбор автоматический по языку поста. register-youtube-oauth.mjs теперь принимает --lang ru|en, нужно прогнать дважды по одному на каждый аккаунт.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Threads</b><span class="parser-niche-status captcha" id="ps-status-threads">○ ждёт ключей</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Threads</b><span class="ui-badge ui-badge--caps ui-badge--orange" id="ps-status-threads">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">Отдельный API Meta (graph.threads.net), не тот же что у Instagram. Два отдельных аккаунта — RU и EN, выбор автоматический по языку поста. Ждёт App Review от Meta для обоих.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Pinterest</b><span class="parser-niche-status captcha" id="ps-status-pinterest">○ ждёт ключей</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Pinterest</b><span class="ui-badge ui-badge--caps ui-badge--orange" id="ps-status-pinterest">○ ждёт ключей</span></div>
                         <p class="idea-desc-text">API v5, каждый пин обязательно на доску (board_id) — доска выбирается при публикации или задаётся по умолчанию в настройках. Требует обложку, текст-онли пины не поддерживаются. Один аккаунт на оба языка (как VK) — у Pinterest нет RU/EN-разделения.</p>
                     </div>
                 </div>
@@ -779,12 +779,12 @@
                 <div class="p-section-title">ЛОКАЛЬНЫЙ АГЕНТ (ВАШ ПК)</div>
                 <p class="idea-desc-text" style="margin-top:-4px;">Не на VPS — два Docker-контейнера на вашем компьютере (docker-compose, restart:unless-stopped), пробрасываются наружу постоянным доменом ngrok.</p>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>local-claude-agent</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>local-claude-agent</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Обёртка над настоящим `claude` CLI (не root, --allowedTools WebSearch, авторизован вашей подпиской через CLAUDE_CODE_OAUTH_TOKEN). Фиксированный набор задач, не generic-исполнение промптов: поиск RSS-источников и ключевых слов, описание ниши парсера, сценарий для Reels, определение города для 2ГИС-парсера, питч для холодных звонков, генерация раздела скрипта звонка, AI-ревью юридических находок, «с чистого листа» генерация поста (4 формата + перевод), подбор актуальной темы с источниками.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>ngrok-туннель</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>ngrok-туннель</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Сайдкар-контейнер, постоянный зарезервированный домен (не меняется при перезапуске). hub стучится в него как в обычный HTTPS-эндпоинт через LOCAL_CLAUDE_AGENT_URL.</p>
                     </div>
                 </div>
@@ -792,35 +792,35 @@
                 <div class="p-section-title">АГЕНТЫ (АВТОМАТИЗАЦИЯ)</div>
                 <p class="idea-desc-text" style="margin-top:-4px;">Стрелка обратная: агенты сами дёргают REST API hub'а по расписанию (cron / routine), а не hub вызывает их.</p>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Researcher</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Researcher</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">System cron на VPS, каждый день в 8:30. Читает RSS, считает embeddings локально (без LLM) и находит ближайший по смыслу продукт — cosine similarity. → POST /agent-researcher/run.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Generator</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Generator</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый день в 9:15 (Amsterdam). Читает бриф от Researcher и текущий стратегический контекст (GET /api/content-plan/context — цель, дистрибуция, фокус квартала и дня, подтягивается прямо из «Контент-плана»), пишет пост по формуле «Золотая середина», шлёт черновик в Telegram на approve.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Insights</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Insights</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый понедельник в 8:20 (Amsterdam летом — UTC-время фиксировано, зимой сдвинется на час). Читает /insights/brief за 7 дней, ищет закономерности по форматам/рубрикам, пишет выводы в agent_runs.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Маркетолог (Marketing)</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Маркетолог (Marketing)</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">Claude Code routine в облаке Anthropic, каждый понедельник в 8:37 (сразу после Insights). Читает /api/marketing/brief (трата по агентам, cost-per-post, cost-per-lead) плюс последние выводы Insights и текущий квартал контент-плана, пишет вывод по эффективности расходов в agent_runs. Эти выводы попадают в /api/content-plan/context — тот же контекст, что читают Researcher и Generator, так что вся система реагирует на них, а не только страница Аналитики.</p>
                     </div>
-                    <div class="parser-niche-card">
-                        <div class="parser-niche-head"><b>Metrics Sync</b><span class="parser-niche-status done">● работает</span></div>
+                    <div class="ui-card ui-card--gradient parser-niche-card">
+                        <div class="parser-niche-head"><b>Metrics Sync</b><span class="ui-badge ui-badge--caps ui-badge--green">● работает</span></div>
                         <p class="idea-desc-text">System cron на VPS, каждые 6 часов. Подтягивает просмотры/лайки/сохранения с VK/Instagram/YouTube/Pinterest обратно в scheduled_events по опубликованным постам. Telegram — исключение: Bot API физически не отдаёт число просмотров, это ограничение платформы, не баг.</p>
                     </div>
                 </div>
 
                 <div class="p-section-title" style="margin-top:24px;">КАК РАБОТАЮТ АГЕНТЫ (ТЕХНИЧЕСКИ)</div>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Researcher — от RSS до брифа в Telegram</b>
                         <p class="idea-desc-text">Раз в день (8:30, system cron на VPS, дожил ещё с эпохи Vercel Cron — сейчас просто curl POST на /api/agent-researcher/run) агент читает список RSS-источников из agent_settings, чистит HTML из каждой статьи, считает embedding для каждого кандидата и для описания каждого продукта (project_info: about + ЦА + посыл + отличия + возражения + ключевые слова + роадмап продвижения — конкатенация всех полей, не только about). Дальше — не LLM, а обычная косинусная близость между векторами: у какого продукта вектор ближе, тот и «выиграл» этот кандидат. Топ-3 по релевантности сохраняются как «тренды» в agent_runs.brief_json, отдаются наружу через /latest-brief и коротко пересказываются в Telegram.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Generator — облачная рутина, а не сервер</b>
                         <p class="idea-desc-text">Это не код в этом репозитории, а Claude Code routine в облаке Anthropic (создана через RemoteTrigger, cron 9:15 Amsterdam). Работает в собственном изолированном окружении с Custom network access — по умолчанию облачная песочница блокирует произвольные исходящие домены, поэтому hub.alba-creation.ru явно добавлен в allowlist. Каждый запуск: GET /latest-brief → GET /agent-settings → пишет пост по формуле «Золотая середина» СТРОГО как 4 отдельных поля (businessProblem/technicalSolution/businessResult/cta), не единым текстом → POST /api/ideas. Сервер сам собирает финальный текст и прогоняет его через Editor (validateDraft — обычный код, без AI): проверка длины полей, наличие измеримой метрики в результате (регулярка на %, «в N раз», сумму), лимит символов под формат. Готовый черновик уходит в Telegram на approve/reject/regenerate.</p>
                     </div>
@@ -828,35 +828,35 @@
 
                 <div class="p-section-title" style="margin-top:24px;">КЛЮЧЕВЫЕ РЕШЕНИЯ</div>
                 <div class="parser-niches-grid">
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему Telegram-запросы идут через Cloudflare Worker, а не напрямую</b>
                         <p class="idea-desc-text">api.telegram.org недоступен напрямую с VPS (проверено: стабильный таймаут 10 сек, при этом google.com/github.com открываются мгновенно — точечная блокировка именно этого хоста, не общая проблема сети). Все обращения к Telegram в этом приложении идут через telegramApiBase() (server/lib/telegramApiBase.js), которая читает TELEGRAM_API_BASE_URL — бесплатный Cloudflare Worker (cloudflare-worker-telegram-proxy/) просто перебрасывает запрос на настоящий api.telegram.org со своей инфраструктуры.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему RSS-поиск и описание ниши работают через ваш ПК, а не через API-ключ на сервере</b>
                         <p class="idea-desc-text">Разовый запуск `claude` CLI под вашей же подпиской (не отдельный платный Anthropic API-ключ) дешевле и не требует нового биллинга. Из-за этого он физически должен работать там, где есть подписка — на вашем компьютере, а не на VPS — отсюда local-claude-agent + туннель наружу, а не обычный серверный вызов.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему parser-worker не в обычном Docker-приложении Coolify</b>
                         <p class="idea-desc-text">2ГИС блокирует headless-браузеры. Xvfb внутри контейнера создаёт виртуальный дисплей, Chromium запускается в обычном (не headless) режиме и выглядит как настоящий браузер — тот же трюк, что у официальных Selenium-образов.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему Coolify-контейнеры видны друг другу только по портам, не по имени</b>
                         <p class="idea-desc-text">Имя контейнера у Coolify меняется на каждом деплое. Поэтому hub достаётся до parser-worker, LibreTranslate, Piper и video-worker через docker bridge gateway (10.0.1.1) + опубликованный на хосте порт — этот адрес стабилен независимо от редеплоя. Каждый порт дополнительно закрыт правилом ufw только для подсети Coolify.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему перевод и генерация запросов парсера — не через Claude API</b>
                         <p class="idea-desc-text">Это либо детерминированная задача (разбивка текста на ключевые слова), либо задача, для которой есть бесплатный специализированный инструмент (LibreTranslate) — платный LLM-вызов был бы избыточен для обеих.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему Editor проверяет черновики без AI</b>
                         <p class="idea-desc-text">Generator обязан отдавать структуру поста как отдельные поля (проблема/решение/результат), а не единым текстом — тогда проверка «всё на месте» становится обычным кодом, не задачей на понимание смысла.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему Piper — рядом с ElevenLabs, а не вместо</b>
                         <p class="idea-desc-text">Piper бесплатный и офлайн, но с одним голосом среднего качества. ElevenLabs — платный, но заметно лучше по качеству и выбору голосов. Оба провайдера выбираются в форме генерации озвучки, ни один не убирает другой.</p>
                     </div>
-                    <div class="parser-niche-card">
+                    <div class="ui-card ui-card--gradient parser-niche-card">
                         <b>Почему X (Twitter) нет в списке площадок публикации</b>
                         <p class="idea-desc-text">У X с недавнего времени платный API для постинга. Threads (отдельное приложение Meta) закрывает тот же формат «тред» бесплатно (с App Review), поэтому в качестве формата контента остался только «Threads», без привязки к X.</p>
                     </div>
@@ -936,12 +936,12 @@
             <div class="clients-container">
                 <div class="controls-row">
                     <p style="color:var(--text-secondary); font-size:13px; margin:0;">Источники, тон голоса и промпты, которыми сейчас пользуются Researcher и Generator</p>
-                    <button class="schedule-btn" onclick="saveAgentSettingsForm()">💾 Сохранить</button>
+                    <button class="ui-btn ui-btn--primary" onclick="saveAgentSettingsForm()">💾 Сохранить</button>
                 </div>
 
                 <div class="controls-row" style="margin-top:8px; align-items:flex-end;">
                     <div class="p-section-title" style="margin:0;">RSS-ИСТОЧНИКИ RESEARCHER (по одному URL на строку) — <span id="as-sources-count">0</span></div>
-                    <button class="edit-btn" id="as-discover-btn" onclick="discoverRssSources()" title="Найти новые источники через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
+                    <button class="ui-btn ui-btn--secondary" id="as-discover-btn" onclick="discoverRssSources()" title="Найти новые источники через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
                 </div>
                 <textarea id="as-sources-input" class="form-textarea" style="min-height:90px;" placeholder="https://example.com/rss" oninput="updateAgentSettingsCounts()"></textarea>
                 <div id="as-discover-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:-8px 0 12px;"></div>
@@ -953,7 +953,7 @@
 
                 <div class="controls-row" style="margin-top:20px; align-items:flex-end;">
                     <div class="p-section-title" style="margin:0;">КЛЮЧЕВЫЕ СЛОВА (через запятую) — <span id="as-keywords-count">0</span></div>
-                    <button class="edit-btn" id="as-keywords-discover-btn" onclick="discoverKeywords()" title="Предложить новые ключевые слова через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
+                    <button class="ui-btn ui-btn--secondary" id="as-keywords-discover-btn" onclick="discoverKeywords()" title="Предложить новые ключевые слова через local-claude-agent на вашем ПК, показать на подтверждение">✨ Предложить новые</button>
                 </div>
                 <input type="text" id="as-keywords-input" class="form-input" placeholder="AI, SaaS, автоматизация" oninput="updateAgentSettingsCounts()">
                 <div id="as-keywords-discover-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:-8px 0 12px;"></div>
@@ -971,11 +971,11 @@
 
                 <div class="controls-row" style="margin-top:28px;">
                     <div class="p-section-title" style="margin:0;">РУБРИКИ КОНТЕНТА</div>
-                    <button class="schedule-btn" onclick="openAddRubricForm()">+ Добавить рубрику</button>
+                    <button class="ui-btn ui-btn--primary" onclick="openAddRubricForm()">+ Добавить рубрику</button>
                 </div>
                 <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Готовые структуры постов ("Кейс недели" и т.п.) - Generator заполняет проверенный каркас вместо изобретения формы поста заново. В выборе при создании идеи доступны только активные рубрики.</p>
 
-                <div id="rubric-form" class="info-box" style="display:none; margin-bottom:16px;">
+                <div id="rubric-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
                     <input type="hidden" id="rb-id-input">
                     <label class="form-label">Название:</label>
                     <input type="text" id="rb-name-input" class="form-input" placeholder="Кейс недели">
@@ -998,8 +998,8 @@
                     </label>
 
                     <div style="display:flex; gap:8px; margin-top:14px;">
-                        <button class="submit-btn" style="margin-top:0;" onclick="submitRubric()">Сохранить</button>
-                        <button class="edit-btn" onclick="closeRubricForm()">Отмена</button>
+                        <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:0;" onclick="submitRubric()">Сохранить</button>
+                        <button class="ui-btn ui-btn--secondary" onclick="closeRubricForm()">Отмена</button>
                     </div>
                 </div>
 
@@ -1024,7 +1024,7 @@
                     <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Стены этих сообществ Researcher сканирует автоматически, как RSS — использует токен из настроек публикации VK.</p>
                     <div class="controls-row">
                         <input type="text" id="vkts-add-input" class="form-input" placeholder="короткое имя или ID сообщества" style="max-width:260px;">
-                        <button class="schedule-btn" onclick="addVkTrendSource()">+ Добавить</button>
+                        <button class="ui-btn ui-btn--primary" onclick="addVkTrendSource()">+ Добавить</button>
                     </div>
                     <div id="vkts-list" style="margin:10px 0 20px;"></div>
 
@@ -1035,19 +1035,19 @@
                     <input type="text" id="as-youtube-api-key-input" class="form-input" placeholder="YouTube Data API v3 key" style="margin-bottom:10px;">
                     <div class="controls-row">
                         <input type="text" id="ytts-add-input" class="form-input" placeholder="ID канала (UC...)" style="max-width:260px;">
-                        <button class="schedule-btn" onclick="addYoutubeTrendSource()">+ Добавить</button>
+                        <button class="ui-btn ui-btn--primary" onclick="addYoutubeTrendSource()">+ Добавить</button>
                     </div>
                     <div id="ytts-list" style="margin:10px 0 20px;"></div>
 
                     <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
                         <div class="controls-row">
                             <div class="p-section-title" style="margin:0;">TELEGRAM — ОТСЛЕЖИВАНИЕ КАНАЛОВ</div>
-                            <button class="edit-btn" id="tgw-scan-btn" onclick="scanTelegramWatch()">🔄 Обновить</button>
+                            <button class="ui-btn ui-btn--secondary" id="tgw-scan-btn" onclick="scanTelegramWatch()">🔄 Обновить</button>
                         </div>
                         <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список каналов для вдохновения — не RSS, требует запущенного Telegram-сессии на вашем Маке (local-claude-agent). Список не трогается ничем другим на этой странице.</p>
                         <div class="controls-row">
                             <input type="text" id="tgw-add-input" class="form-input" placeholder="@username канала" style="max-width:260px;">
-                            <button class="schedule-btn" onclick="addTelegramWatchChannel()">+ Добавить источник</button>
+                            <button class="ui-btn ui-btn--primary" onclick="addTelegramWatchChannel()">+ Добавить источник</button>
                         </div>
                         <div id="tgw-channels-list" style="margin:10px 0 16px;"></div>
                         <div id="tgw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
@@ -1057,12 +1057,12 @@
                     <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
                         <div class="controls-row">
                             <div class="p-section-title" style="margin:0;">INSTAGRAM — ОТСЛЕЖИВАНИЕ АККАУНТОВ</div>
-                            <button class="edit-btn" id="igw-scan-btn" onclick="scanInstagramWatch()">🔄 Обновить</button>
+                            <button class="ui-btn ui-btn--secondary" id="igw-scan-btn" onclick="scanInstagramWatch()">🔄 Обновить</button>
                         </div>
                         <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список конкурентов для вдохновения — у Instagram нет открытого поиска, аккаунты нужно находить самостоятельно. Требует настроенный Instagram (см. docs/inst.md). Список не трогается ничем другим на этой странице.</p>
                         <div class="controls-row">
                             <input type="text" id="igw-add-input" class="form-input" placeholder="@username аккаунта" style="max-width:260px;">
-                            <button class="schedule-btn" onclick="addInstagramWatchAccount()">+ Добавить источник</button>
+                            <button class="ui-btn ui-btn--primary" onclick="addInstagramWatchAccount()">+ Добавить источник</button>
                         </div>
                         <div id="igw-accounts-list" style="margin:10px 0 16px;"></div>
                         <div id="igw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
@@ -1072,12 +1072,12 @@
                     <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
                         <div class="controls-row">
                             <div class="p-section-title" style="margin:0;">PINTEREST — ОТСЛЕЖИВАНИЕ БОРДОВ</div>
-                            <button class="edit-btn" id="ptw-scan-btn" onclick="scanPinterestWatch()">🔄 Обновить</button>
+                            <button class="ui-btn ui-btn--secondary" id="ptw-scan-btn" onclick="scanPinterestWatch()">🔄 Обновить</button>
                         </div>
                         <p style="color:var(--text-secondary); font-size:12px; margin:0 0 8px;">Ручной список бордов/профилей для вдохновения — у Pinterest нет открытого поиска по API, но есть публичный RSS-фид на профиль/борд, поэтому «Обновить» не требует токена.</p>
                         <div class="controls-row">
                             <input type="text" id="ptw-add-input" class="form-input" placeholder="username или username/board" style="max-width:260px;">
-                            <button class="schedule-btn" onclick="addPinterestWatchBoard()">+ Добавить источник</button>
+                            <button class="ui-btn ui-btn--primary" onclick="addPinterestWatchBoard()">+ Добавить источник</button>
                         </div>
                         <div id="ptw-boards-list" style="margin:10px 0 16px;"></div>
                         <div id="ptw-scan-status" style="display:none; font-size:12px; color:var(--text-secondary); margin:0 0 12px;"></div>
@@ -1089,15 +1089,15 @@
                 <div style="margin-top:36px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.08);">
                     <div class="p-section-title" style="margin-top:0;">НАБЛЮДАЕМОСТЬ</div>
                     <div class="uc-stats-row" id="ac-summary-stats">
-                        <div class="stat-box"><div class="p-section-title" style="margin:0 0 4px;">Потрачено сегодня</div><div style="font-size:22px; font-weight:700;" id="ac-stat-today">$0.00</div></div>
-                        <div class="stat-box"><div class="p-section-title" style="margin:0 0 4px;">Потрачено в этом месяце</div><div style="font-size:22px; font-weight:700;" id="ac-stat-month">$0.00</div></div>
+                        <div class="ui-card ui-card--sunken stat-box"><div class="p-section-title" style="margin:0 0 4px;">Потрачено сегодня</div><div style="font-size:22px; font-weight:700;" id="ac-stat-today">$0.00</div></div>
+                        <div class="ui-card ui-card--sunken stat-box"><div class="p-section-title" style="margin:0 0 4px;">Потрачено в этом месяце</div><div style="font-size:22px; font-weight:700;" id="ac-stat-month">$0.00</div></div>
                     </div>
 
                     <div class="p-section-title" style="margin-top:24px;">ИСТОРИЯ ЗАПУСКОВ АГЕНТОВ</div>
                     <div id="ac-runs-list"></div>
 
                     <div class="p-section-title" style="margin-top:24px;">РАСХОДЫ АГЕНТОВ</div>
-                    <div class="info-box" style="padding:0; overflow-x:auto;">
+                    <div class="ui-card info-box" style="padding:0; overflow-x:auto;">
                         <table class="ac-expenses-table" id="ac-expenses-table">
                             <thead>
                                 <tr>
@@ -1133,8 +1133,8 @@
                     <h1 id="edit-modal-title">Редактировать идею</h1>
                 </div>
                 <div class="ie-header-actions">
-                    <button class="cc-secondary" onclick="closeIdeaEditorPage()">← Отмена</button>
-                    <button class="cc-primary cc-primary-inline" onclick="saveIdeaChanges()">Сохранить</button>
+                    <button class="ui-btn ui-btn--secondary" onclick="closeIdeaEditorPage()">← Отмена</button>
+                    <button class="ui-btn ui-btn--primary" onclick="saveIdeaChanges()">Сохранить</button>
                 </div>
             </div>
 
@@ -1148,8 +1148,8 @@
                     <div class="cc-label-row">
                         <label class="cc-label" for="edit-idea-desc-input">Суть / текст поста</label>
                         <div class="ie-text-tools">
-                            <span id="limit-validator-badge" class="limit-badge">0 / 4096 симв.</span>
-                            <button class="cc-link" type="button" onclick="toggleIdeaEditorFocus()" id="ie-focus-btn">⤢ Во весь экран</button>
+                            <span id="limit-validator-badge" class="ui-badge ui-badge--green ui-badge--outline">0 / 4096 симв.</span>
+                            <button class="ui-btn ui-btn--link" type="button" onclick="toggleIdeaEditorFocus()" id="ie-focus-btn">⤢ Во весь экран</button>
                         </div>
                     </div>
                     <textarea id="edit-idea-desc-input" class="form-textarea cc-input ie-textarea" placeholder="Подробности контента или тезисы..." oninput="validateLimits()"></textarea>
@@ -1160,7 +1160,7 @@
                     <div id="edit-idea-en-section" class="ie-en" style="display:none;">
                         <div class="cc-label-row">
                             <span class="cc-label">English version</span>
-                            <button class="cc-link" type="button" onclick="translateIdeaToEnglish()">🌍 Перевести на английский</button>
+                            <button class="ui-btn ui-btn--link" type="button" onclick="translateIdeaToEnglish()">🌍 Перевести на английский</button>
                         </div>
 
                         <label class="cc-label" for="edit-idea-title-en-input">Title</label>
@@ -1211,24 +1211,24 @@
                         <input type="hidden" id="edit-idea-cover-asset-id">
                         <div id="edit-idea-cover-preview" class="ie-asset-preview">Не выбрана</div>
                         <div class="ie-panel-actions">
-                            <button class="cc-secondary" type="button" onclick="openCoverPickerModal()">🖼 Выбрать</button>
-                            <button class="cc-secondary" type="button" onclick="clearCoverAsset()">✕ Убрать</button>
+                            <button class="ui-btn ui-btn--secondary" type="button" onclick="openCoverPickerModal()">🖼 Выбрать</button>
+                            <button class="ui-btn ui-btn--secondary" type="button" onclick="clearCoverAsset()">✕ Убрать</button>
                         </div>
 
                         <span class="cc-label">Озвучка <span class="cc-optional">из Медиатеки</span></span>
                         <input type="hidden" id="edit-idea-voiceover-asset-id">
                         <div id="edit-idea-voiceover-preview" class="ie-asset-preview">Не выбрана</div>
                         <div class="ie-panel-actions">
-                            <button class="cc-secondary" type="button" onclick="openVoiceoverPickerModal()">🎙 Выбрать</button>
-                            <button class="cc-secondary" type="button" onclick="clearVoiceoverAsset()">✕ Убрать</button>
+                            <button class="ui-btn ui-btn--secondary" type="button" onclick="openVoiceoverPickerModal()">🎙 Выбрать</button>
+                            <button class="ui-btn ui-btn--secondary" type="button" onclick="clearVoiceoverAsset()">✕ Убрать</button>
                         </div>
                     </div>
                 </aside>
             </div>
 
             <div class="ie-footer">
-                <button class="cc-secondary" onclick="closeIdeaEditorPage()">Отмена</button>
-                <button class="cc-primary cc-primary-inline" onclick="saveIdeaChanges()">Сохранить изменения</button>
+                <button class="ui-btn ui-btn--secondary" onclick="closeIdeaEditorPage()">Отмена</button>
+                <button class="ui-btn ui-btn--primary" onclick="saveIdeaChanges()">Сохранить изменения</button>
             </div>
         </div>
 
@@ -1240,7 +1240,7 @@
         <div class="drawer-content">
             <div class="nav-bar">
                 <span style="font-weight:600; font-size:16px;">Выбрать обложку</span>
-                <button class="back-btn" onclick="closeOverlay('cover-picker-overlay')">Закрыть ✕</button>
+                <button class="ui-btn ui-btn--link" onclick="closeOverlay('cover-picker-overlay')">Закрыть ✕</button>
             </div>
             <div class="modal-body">
                 <div class="media-assets-grid" id="cover-picker-grid"></div>
@@ -1253,7 +1253,7 @@
         <div class="drawer-content">
             <div class="nav-bar">
                 <span style="font-weight:600; font-size:16px;">Выбрать озвучку</span>
-                <button class="back-btn" onclick="closeOverlay('voiceover-picker-overlay')">Закрыть ✕</button>
+                <button class="ui-btn ui-btn--link" onclick="closeOverlay('voiceover-picker-overlay')">Закрыть ✕</button>
             </div>
             <div class="modal-body">
                 <div class="media-assets-grid" id="voiceover-picker-grid"></div>
@@ -1266,13 +1266,13 @@
         <div class="drawer-content">
             <div class="nav-bar">
                 <span style="font-weight:600; font-size:16px;">Прикрепить к идее</span>
-                <button class="back-btn" onclick="closeOverlay('use-asset-overlay')">Закрыть ✕</button>
+                <button class="ui-btn ui-btn--link" onclick="closeOverlay('use-asset-overlay')">Закрыть ✕</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="use-asset-id">
                 <label class="form-label" style="margin-top:0;">Идея:</label>
                 <select id="use-asset-idea-select" class="form-select"></select>
-                <button class="submit-btn" onclick="confirmUseAsset()">Прикрепить</button>
+                <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="confirmUseAsset()">Прикрепить</button>
             </div>
         </div>
     </div>
@@ -1295,7 +1295,7 @@
         <div class="drawer-content">
             <div class="nav-bar">
                 <span style="font-weight:600; font-size:16px;">Запланировать пост</span>
-                <button class="back-btn" onclick="closeOverlay('schedule-overlay')">Отмена</button>
+                <button class="ui-btn ui-btn--link" onclick="closeOverlay('schedule-overlay')">Отмена</button>
             </div>
             <div class="modal-body">
                 <h3 id="schedule-title" style="margin-top:0;">Название идеи</h3>
@@ -1332,13 +1332,13 @@
 
                 <label class="form-label" style="margin-top:8px;">Язык:</label>
                 <div style="display:flex; gap:8px; margin-bottom:12px;">
-                    <button id="schedule-lang-ru-btn" class="edit-btn" onclick="setScheduleLang('ru')">🇷🇺 RU</button>
-                    <button id="schedule-lang-en-btn" class="edit-btn" onclick="setScheduleLang('en')">🇬🇧 EN</button>
+                    <button id="schedule-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setScheduleLang('ru')">🇷🇺 RU</button>
+                    <button id="schedule-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setScheduleLang('en')">🇬🇧 EN</button>
                 </div>
                 <div id="schedule-not-configured-box" class="warning-banner" style="display:none; margin-bottom:12px;"></div>
 
                 <p style="color:var(--text-secondary); font-size:11px; margin:0 0 12px;">Пост опубликуется автоматически в указанные дату и время. Если публикация не удастся — запись останется в календаре с пометкой ошибки и кнопкой «Повторить».</p>
-                <button class="submit-btn" id="schedule-confirm-btn" onclick="confirmSchedule()">Подтвердить и добавить</button>
+                <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" id="schedule-confirm-btn" onclick="confirmSchedule()">Подтвердить и добавить</button>
             </div>
         </div>
     </div>
@@ -1348,7 +1348,7 @@
         <div class="drawer-content">
             <div class="nav-bar">
                 <span style="font-weight:600; font-size:16px;">Новая ниша</span>
-                <button class="back-btn" onclick="closeOverlay('new-niche-overlay')">Отмена</button>
+                <button class="ui-btn ui-btn--link" onclick="closeOverlay('new-niche-overlay')">Отмена</button>
             </div>
             <div class="modal-body">
                 <label class="form-label" style="margin-top:0;">Название ниши:</label>
@@ -1357,7 +1357,7 @@
                 <label class="form-label">Описание:</label>
                 <input type="text" id="new-niche-subtitle-input" class="form-input" placeholder="Когда и для чего использовать скрипт">
 
-                <button class="submit-btn" onclick="createNiche()">Создать нишу</button>
+                <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="createNiche()">Создать нишу</button>
             </div>
         </div>
     </div>
@@ -1370,16 +1370,16 @@
         <div class="drawer-content">
             <div class="nav-bar">
                 <span style="font-weight:600; font-size:16px;">Настройки публикаций</span>
-                <button class="back-btn" onclick="closeOverlay('publish-settings-overlay')">Закрыть ✕</button>
+                <button class="ui-btn ui-btn--link" onclick="closeOverlay('publish-settings-overlay')">Закрыть ✕</button>
             </div>
             <div class="modal-body">
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px;">
-                    <button class="edit-btn ps-tab-btn" data-ps-tab="tg" onclick="switchPublishSettingsTab('tg')">✈️ Telegram</button>
-                    <button class="edit-btn ps-tab-btn" data-ps-tab="vk" onclick="switchPublishSettingsTab('vk')">🔵 VK</button>
-                    <button class="edit-btn ps-tab-btn" data-ps-tab="ig" onclick="switchPublishSettingsTab('ig')">📸 Instagram</button>
-                    <button class="edit-btn ps-tab-btn" data-ps-tab="yt" onclick="switchPublishSettingsTab('yt')">▶️ YouTube</button>
-                    <button class="edit-btn ps-tab-btn" data-ps-tab="th" onclick="switchPublishSettingsTab('th')">🧵 Threads</button>
-                    <button class="edit-btn ps-tab-btn" data-ps-tab="pin" onclick="switchPublishSettingsTab('pin')">📌 Pinterest</button>
+                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="tg" onclick="switchPublishSettingsTab('tg')">✈️ Telegram</button>
+                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="vk" onclick="switchPublishSettingsTab('vk')">🔵 VK</button>
+                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="ig" onclick="switchPublishSettingsTab('ig')">📸 Instagram</button>
+                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="yt" onclick="switchPublishSettingsTab('yt')">▶️ YouTube</button>
+                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="th" onclick="switchPublishSettingsTab('th')">🧵 Threads</button>
+                    <button class="ui-btn ui-btn--secondary ps-tab-btn" data-ps-tab="pin" onclick="switchPublishSettingsTab('pin')">📌 Pinterest</button>
                 </div>
 
                 <!-- TELEGRAM TAB -->
@@ -1390,23 +1390,23 @@
                     <label class="form-label">Chat ID / @ChannelUsername (админ-чат для уведомлений и модерации, не публикация):</label>
                     <input type="text" id="tg-chat-input" class="form-input" placeholder="@my_channel или -10012345678">
 
-                    <button class="submit-btn" onclick="saveTgSettings()">Сохранить токен</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveTgSettings()">Сохранить токен</button>
 
-                    <div class="info-box" style="margin-top:20px;">
+                    <div class="ui-card info-box" style="margin-top:20px;">
                         <strong>Каналы для публикации</strong>
                         <p style="color:var(--text-secondary); font-size:12px; margin:6px 0 12px;">Один бот (токен выше) может публиковать в несколько каналов, где он админ. Эти каналы появятся в выборе при публикации идеи из «Банка идей».</p>
                         <div id="tg-channels-list"></div>
                         <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-start;">
                             <input type="text" id="tg-new-channel-label" class="form-input" style="margin:0;" placeholder="Название (например, Основной канал)">
                             <input type="text" id="tg-new-channel-chatid" class="form-input" style="margin:0;" placeholder="Chat ID / @username">
-                            <button class="schedule-btn" style="white-space:nowrap;" onclick="addTelegramChannel()">+ Добавить</button>
+                            <button class="ui-btn ui-btn--primary" style="white-space:nowrap;" onclick="addTelegramChannel()">+ Добавить</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- VK TAB -->
                 <div id="ps-tab-vk" class="ps-tab-content" style="display:none;">
-                    <div class="info-box">
+                    <div class="ui-card info-box">
                         <strong>Сообщества для публикации</strong>
                         <p style="color:var(--text-secondary); font-size:12px; margin:6px 0 12px;">В отличие от Telegram-бота, токен доступа VK привязан к своему сообществу — у каждого сообщества свой токен (Управление сообществом → Работа с API → Ключи доступа), не общий. Вставьте токен — сообщество определится по нему автоматически, название можно не указывать.</p>
                         <div id="vk-groups-list"></div>
@@ -1418,7 +1418,7 @@
                                 <option value="ru">🇷🇺 RU</option>
                                 <option value="en">🇬🇧 EN</option>
                             </select>
-                            <button class="schedule-btn" style="white-space:nowrap;" onclick="addVkGroup()">+ Добавить</button>
+                            <button class="ui-btn ui-btn--primary" style="white-space:nowrap;" onclick="addVkGroup()">+ Добавить</button>
                         </div>
                     </div>
 
@@ -1427,7 +1427,7 @@
                         <div style="margin-top:10px;">
                             <label class="form-label">Access Token:</label>
                             <input type="text" id="vk-token-input" class="form-input" placeholder="vk1.a.xxxxxxxx...">
-                            <button class="submit-btn" onclick="saveVkSettings()">Сохранить общий токен</button>
+                            <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveVkSettings()">Сохранить общий токен</button>
                         </div>
                     </details>
                 </div>
@@ -1436,8 +1436,8 @@
                 <div id="ps-tab-ig" class="ps-tab-content" style="display:none;">
                     <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Page access token из приложения Meta Graph API, привязанного к странице Facebook с подключённым Instagram Business/Creator аккаунтом. Два отдельных аккаунта — RU и EN, выбирается автоматически по языку публикуемого поста.</p>
                     <div style="display:flex; gap:8px; margin-bottom:16px;">
-                        <button id="ig-lang-ru-btn" class="edit-btn" onclick="setPublishSettingsLang('ig','ru')">🇷🇺 RU-аккаунт</button>
-                        <button id="ig-lang-en-btn" class="edit-btn" onclick="setPublishSettingsLang('ig','en')">🇬🇧 EN-аккаунт</button>
+                        <button id="ig-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('ig','ru')">🇷🇺 RU-аккаунт</button>
+                        <button id="ig-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('ig','en')">🇬🇧 EN-аккаунт</button>
                     </div>
                     <label class="form-label">Page Access Token:</label>
                     <input type="text" id="ig-token-input" class="form-input" placeholder="EAAxxxxxxxx...">
@@ -1445,15 +1445,15 @@
                     <label class="form-label">Instagram Business Account ID:</label>
                     <input type="text" id="ig-account-input" class="form-input" placeholder="17841400000000000">
 
-                    <button class="submit-btn" onclick="saveIgSettings()">Сохранить настройки</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveIgSettings()">Сохранить настройки</button>
                 </div>
 
                 <!-- YOUTUBE TAB -->
                 <div id="ps-tab-yt" class="ps-tab-content" style="display:none;">
                     <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">OAuth2-приложение из Google Cloud Console + refresh token, полученный один раз через экран согласия (не просто токен, как в Telegram/VK). Два отдельных канала/аккаунта — RU и EN, выбирается автоматически по языку публикуемого поста (см. scripts/register-youtube-oauth.mjs --lang).</p>
                     <div style="display:flex; gap:8px; margin-bottom:16px;">
-                        <button id="yt-lang-ru-btn" class="edit-btn" onclick="setPublishSettingsLang('yt','ru')">🇷🇺 RU-канал</button>
-                        <button id="yt-lang-en-btn" class="edit-btn" onclick="setPublishSettingsLang('yt','en')">🇬🇧 EN-канал</button>
+                        <button id="yt-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('yt','ru')">🇷🇺 RU-канал</button>
+                        <button id="yt-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('yt','en')">🇬🇧 EN-канал</button>
                     </div>
                     <label class="form-label">OAuth Client ID:</label>
                     <input type="text" id="yt-client-id-input" class="form-input" placeholder="xxxxx.apps.googleusercontent.com">
@@ -1467,15 +1467,15 @@
                     <label class="form-label">Название канала (опционально, для справки):</label>
                     <input type="text" id="yt-channel-title-input" class="form-input" placeholder="Alba Creation">
 
-                    <button class="submit-btn" onclick="saveYtSettings()">Сохранить настройки</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveYtSettings()">Сохранить настройки</button>
                 </div>
 
                 <!-- THREADS TAB -->
                 <div id="ps-tab-th" class="ps-tab-content" style="display:none;">
                     <p style="color:var(--text-secondary); font-size:12px; margin-top:0;">Threads user access token из приложения Meta с use case "Threads" (не Facebook Graph API) — нужны разрешения threads_basic и threads_content_publish, аккаунт должен пройти App Review. Два отдельных аккаунта — RU и EN, выбирается автоматически по языку публикуемого поста.</p>
                     <div style="display:flex; gap:8px; margin-bottom:16px;">
-                        <button id="th-lang-ru-btn" class="edit-btn" onclick="setPublishSettingsLang('th','ru')">🇷🇺 RU-аккаунт</button>
-                        <button id="th-lang-en-btn" class="edit-btn" onclick="setPublishSettingsLang('th','en')">🇬🇧 EN-аккаунт</button>
+                        <button id="th-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('th','ru')">🇷🇺 RU-аккаунт</button>
+                        <button id="th-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishSettingsLang('th','en')">🇬🇧 EN-аккаунт</button>
                     </div>
                     <label class="form-label">Threads Access Token:</label>
                     <input type="text" id="th-token-input" class="form-input" placeholder="THQVJ...xxxxxxxx...">
@@ -1483,7 +1483,7 @@
                     <label class="form-label">Threads User ID:</label>
                     <input type="text" id="th-user-input" class="form-input" placeholder="17841400000000000">
 
-                    <button class="submit-btn" onclick="saveThSettings()">Сохранить настройки</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="saveThSettings()">Сохранить настройки</button>
                 </div>
 
                 <!-- PINTEREST TAB -->
@@ -1495,13 +1495,13 @@
                     <label class="form-label">Доска по умолчанию:</label>
                     <select id="pin-board-select" class="form-select"></select>
 
-                    <button class="submit-btn" onclick="savePinSettings()">Сохранить настройки</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="savePinSettings()">Сохранить настройки</button>
 
-                    <div class="info-box" style="margin-top:20px;">
+                    <div class="ui-card info-box" style="margin-top:20px;">
                         <strong>Создать новую доску</strong>
                         <div style="display:flex; gap:8px; margin-top:12px; align-items:flex-start;">
                             <input type="text" id="pin-new-board-name" class="form-input" style="margin:0;" placeholder="Название доски">
-                            <button class="schedule-btn" style="white-space:nowrap;" onclick="createPinterestBoard()">+ Создать</button>
+                            <button class="ui-btn ui-btn--primary" style="white-space:nowrap;" onclick="createPinterestBoard()">+ Создать</button>
                         </div>
                     </div>
                 </div>
@@ -1517,7 +1517,7 @@
         <div class="drawer-content">
             <div class="nav-bar">
                 <span style="font-weight:600; font-size:16px;">Опубликовать</span>
-                <button class="back-btn" onclick="closeOverlay('publish-overlay')">Отмена</button>
+                <button class="ui-btn ui-btn--link" onclick="closeOverlay('publish-overlay')">Отмена</button>
             </div>
             <div class="modal-body">
                 <h3 id="publish-idea-title" style="margin-top:0;">Название идеи</h3>
@@ -1540,23 +1540,23 @@
                     <select id="publish-vk-group-select" class="form-select" onchange="onPublishVkGroupChange()"></select>
                 </div>
 
-                <div id="publish-not-configured-box" class="info-box" style="display:none; margin-bottom:16px; border-color: rgba(255,69,58,0.35);"></div>
+                <div id="publish-not-configured-box" class="ui-card info-box" style="display:none; margin-bottom:16px; border-color: rgba(255,69,58,0.35);"></div>
 
                 <label class="form-label">Язык публикации:</label>
                 <div style="display:flex; gap:8px; margin-bottom:6px;">
-                    <button id="publish-lang-ru-btn" class="edit-btn" onclick="setPublishLang('ru')">🇷🇺 RU</button>
-                    <button id="publish-lang-en-btn" class="edit-btn" onclick="setPublishLang('en')">🇬🇧 EN</button>
+                    <button id="publish-lang-ru-btn" class="ui-btn ui-btn--secondary" onclick="setPublishLang('ru')">🇷🇺 RU</button>
+                    <button id="publish-lang-en-btn" class="ui-btn ui-btn--secondary" onclick="setPublishLang('en')">🇬🇧 EN</button>
                 </div>
                 <p id="publish-lang-hint" style="color:var(--text-secondary); font-size:12px; margin:0 0 16px;"></p>
 
                 <label class="form-label" style="margin-top:0;">Предпросмотр:</label>
-                <div class="info-box">
+                <div class="ui-card info-box">
                     <strong id="publish-preview-title"></strong>
                     <p id="publish-preview-desc" style="margin:8px 0; white-space:pre-wrap;"></p>
                     <p id="publish-preview-cta" style="color:var(--accent-blue); font-style:italic; margin:0;"></p>
                 </div>
 
-                <button id="publish-confirm-btn" class="submit-btn" onclick="confirmPublish()">Подтвердить публикацию</button>
+                <button id="publish-confirm-btn" class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" onclick="confirmPublish()">Подтвердить публикацию</button>
             </div>
         </div>
     </div>

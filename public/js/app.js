@@ -361,7 +361,7 @@ async function renderBankView() {
     filtered = filtered.filter(i => (i.status || 'idea') !== 'idea');
 
     if (filtered.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Идеи не найдены или банк пуст</div>`;
+        container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Идеи не найдены или банк пуст</div>`;
         return;
     }
 
@@ -381,18 +381,18 @@ async function renderBankView() {
         const activeProducts = productsData.filter(p => idea.targetGroups && idea.targetGroups.includes(p.id));
 
         html += `
-        <div class="idea-card" draggable="true" ondragstart="handleDragStart(event, '${idea.id}')">
+        <div class="ui-card idea-card" draggable="true" ondragstart="handleDragStart(event, '${idea.id}')">
             <div class="idea-header">
                 <div class="idea-title">${escapeHtml(idea.title)}</div>
                 <div class="idea-badges">
-                    <span class="funnel-badge" style="background:${funnelColor}22; color:${funnelColor};">${escapeHtml(idea.funnel || 'TOFU')}</span>
-                    <span class="format-tag">${escapeHtml(normalizeIdeaFormat(idea.format))}</span>
+                    <span class="ui-badge ui-badge--caps" style="background:${funnelColor}22; color:${funnelColor};">${escapeHtml(idea.funnel || 'TOFU')}</span>
+                    <span class="ui-badge ui-badge--orange">${escapeHtml(normalizeIdeaFormat(idea.format))}</span>
                 </div>
             </div>
 
             ${idea.desc ? `
                 <div class="idea-desc-text ${isLong ? 'clamped' : ''}" id="idea-desc-${idea.id}">${escapeHtml(idea.desc)}</div>
-                ${isLong ? `<button class="cc-link idea-desc-toggle" onclick="toggleIdeaText('${idea.id}', this)">Показать полностью</button>` : ''}
+                ${isLong ? `<button class="ui-btn ui-btn--link idea-desc-toggle" onclick="toggleIdeaText('${idea.id}', this)">Показать полностью</button>` : ''}
             ` : ''}
             ${idea.cta ? `<div class="idea-cta">${escapeHtml(idea.cta)}</div>` : ''}
 
@@ -414,14 +414,14 @@ async function renderBankView() {
             </details>
 
             <div class="cc-actions idea-actions">
-                <button class="cc-secondary" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
-                <button class="cc-secondary" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
+                <button class="ui-btn ui-btn--secondary" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
+                <button class="ui-btn ui-btn--secondary" onclick="openScheduleForIdea('${idea.id}')">📅 В календарь</button>
                 ${(idea.status === 'ready' || idea.status === 'done')
-                    ? `<button class="cc-secondary" ${idea.generatingVoiceover ? 'disabled' : ''} onclick="generateIdeaVoiceover('${idea.id}')">${idea.generatingVoiceover ? '⏳ Озвучиваем…' : (idea.voiceoverAssetId ? '🎙 Переозвучить' : '🎙 Озвучка')}</button>`
+                    ? `<button class="ui-btn ui-btn--secondary" ${idea.generatingVoiceover ? 'disabled' : ''} onclick="generateIdeaVoiceover('${idea.id}')">${idea.generatingVoiceover ? '⏳ Озвучиваем…' : (idea.voiceoverAssetId ? '🎙 Переозвучить' : '🎙 Озвучка')}</button>`
                     : ''}
-                <button class="cc-secondary cc-danger" onclick="deleteIdea('${idea.id}')">🗑</button>
+                <button class="ui-btn ui-btn--danger" onclick="deleteIdea('${idea.id}')">🗑</button>
                 <div class="cc-actions-spacer"></div>
-                <button class="cc-primary cc-primary-inline" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
+                <button class="ui-btn ui-btn--primary" onclick="openPublishModal('${idea.id}')">📤 Опубликовать</button>
             </div>
             <div id="idea-gen-status-${idea.id}" class="generation-status" style="display:none;"></div>
         </div>`;
@@ -756,13 +756,13 @@ async function promoteAllContentDraftFormats(id) {
 }
 
 function contentDraftStatusPill(draft) {
-    if (draft.status === 'generating') return `<span class="cc-pill cc-pill-work">⏳ Генерируем</span>`;
-    if (draft.status === 'translating') return `<span class="cc-pill cc-pill-work">⏳ Переводим</span>`;
-    if (!draft.ru) return `<span class="cc-pill">Настройка</span>`;
+    if (draft.status === 'generating') return `<span class="ui-badge ui-badge--orange">⏳ Генерируем</span>`;
+    if (draft.status === 'translating') return `<span class="ui-badge ui-badge--orange">⏳ Переводим</span>`;
+    if (!draft.ru) return `<span class="ui-badge">Настройка</span>`;
     const total = CONTENT_FORMAT_DEFS.filter(f => draft.ru[f.key]).length;
     const done = Object.keys(draft.promoted || {}).length;
-    if (done >= total) return `<span class="cc-pill cc-pill-done">✓ В хранилище</span>`;
-    return `<span class="cc-pill cc-pill-ready">Правка · ${done}/${total} в хранилище</span>`;
+    if (done >= total) return `<span class="ui-badge ui-badge--green">✓ В хранилище</span>`;
+    return `<span class="ui-badge ui-badge--blue">Правка · ${done}/${total} в хранилище</span>`;
 }
 
 // Шаг пайплайна показываем явной полоской, а не абзацем текста наверху
@@ -798,14 +798,14 @@ function renderContentDraftCard(draft) {
                 <div class="cc-head-title">${escapeHtml(draft.topic) || '<span class="cc-muted">Без темы</span>'}</div>
                 <div class="cc-head-meta">
                     ${contentDraftStatusPill(draft)}
-                    ${draft.productId ? `<span class="cc-pill">${escapeHtml(productsData.find(p => p.id === draft.productId)?.title || 'Продукт')}</span>` : ''}
-                    ${hasEn ? `<span class="cc-pill">RU + EN</span>` : ''}
+                    ${draft.productId ? `<span class="ui-badge">${escapeHtml(productsData.find(p => p.id === draft.productId)?.title || 'Продукт')}</span>` : ''}
+                    ${hasEn ? `<span class="ui-badge">RU + EN</span>` : ''}
                 </div>
             </div>
-            <button class="delete-btn" onclick="removeContentDraft('${draft.id}')" title="Удалить черновик">🗑</button>
+            <button class="ui-btn ui-btn--danger" onclick="removeContentDraft('${draft.id}')" title="Удалить черновик">🗑</button>
         </div>`;
 
-    if (draft.collapsed) return `<div class="cc-card collapsed">${head}</div>`;
+    if (draft.collapsed) return `<div class="ui-card cc-card collapsed">${head}</div>`;
 
     const research = hasResearch ? `
         <div class="cc-research">
@@ -820,7 +820,7 @@ function renderContentDraftCard(draft) {
 
     if (!hasRu) {
         return `
-        <div class="cc-card">
+        <div class="ui-card cc-card">
             ${head}
             ${contentDraftSteps(draft)}
             <div class="cc-body">
@@ -828,7 +828,7 @@ function renderContentDraftCard(draft) {
                 <div class="cc-topic-row">
                     <input type="text" class="form-input cc-input" id="cd-topic-${draft.id}" placeholder="Например: как выбрать CRM для малого бизнеса" value="${escapeHtml(draft.topic)}"
                         oninput="setContentDraftTopic('${draft.id}', this.value)">
-                    <button class="edit-btn cc-suggest" ${draft.suggestingTopic ? 'disabled' : ''} onclick="suggestContentDraftTopic('${draft.id}')">${draft.suggestingTopic ? '⏳ Подбираем…' : '🔎 Подобрать тему'}</button>
+                    <button class="ui-btn ui-btn--secondary cc-suggest" ${draft.suggestingTopic ? 'disabled' : ''} onclick="suggestContentDraftTopic('${draft.id}')">${draft.suggestingTopic ? '⏳ Подбираем…' : '🔎 Подобрать тему'}</button>
                 </div>
                 ${research}
 
@@ -847,7 +847,7 @@ function renderContentDraftCard(draft) {
                         </button>`).join('')}
                 </div>
 
-                <button class="cc-primary" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">
+                <button class="ui-btn ui-btn--primary ui-btn--block" ${isGenerating ? 'disabled' : ''} onclick="generateContentDraft('${draft.id}')">
                     ${isGenerating ? '⏳ Генерируем через ИИ (Sonnet)…' : `✨ Сгенерировать ${selectedFormats.length} ${pluralFormats(selectedFormats.length)}`}
                 </button>
                 ${isGenerating ? `<p class="cc-hint cc-center">Обычно занимает 30–60 секунд. Вкладку можно не держать открытой — черновик сохранится.</p>` : ''}
@@ -856,7 +856,7 @@ function renderContentDraftCard(draft) {
     }
 
     return `
-    <div class="cc-card">
+    <div class="ui-card cc-card">
         ${head}
         ${contentDraftSteps(draft)}
         <div class="cc-body">
@@ -890,24 +890,24 @@ function renderContentDraftCard(draft) {
                 <label class="cc-label" for="cd-cta-${draft.id}">Призыв к действию (CTA)</label>
                 <input type="text" class="form-input cc-input" id="cd-cta-${draft.id}" placeholder="Например: напишите нам в личные сообщения" value="${escapeHtml(block.cta)}"
                     oninput="setContentDraftBlockField('${draft.id}', '${lang}', '${draft.activeFormat}', 'cta', this.value)">
-            ` : `<div class="cc-empty">Для этого формата текста нет.</div>`}
+            ` : `<div class="ui-empty ui-empty--inline">Для этого формата текста нет.</div>`}
 
             <div class="cc-label-row">
                 <span class="cc-label">Обложка <span class="cc-optional">необязательно</span></span>
-                <button class="cc-link" ${draft.generatingCover ? 'disabled' : ''} onclick="generateDraftCover('${draft.id}')">${draft.generatingCover ? '⏳ Генерируем…' : '🎨 Сгенерировать вариант'}</button>
+                <button class="ui-btn ui-btn--link" ${draft.generatingCover ? 'disabled' : ''} onclick="generateDraftCover('${draft.id}')">${draft.generatingCover ? '⏳ Генерируем…' : '🎨 Сгенерировать вариант'}</button>
             </div>
             <div class="cc-covers">
                 ${(draft.coverCandidates && draft.coverCandidates.length)
                     ? draft.coverCandidates.map(c => `<img src="${escapeHtml(c.url)}" class="cc-cover ${draft.selectedCoverAssetId === c.id ? 'on' : ''}" onclick="selectDraftCover('${draft.id}', '${c.id}')" alt="">`).join('')
-                    : `<div class="cc-empty cc-empty-inline">Вариантов пока нет — все сгенерированные попадут в Медиатеку в папку по теме.</div>`}
+                    : `<div class="ui-empty ui-empty--inline">Вариантов пока нет — все сгенерированные попадут в Медиатеку в папку по теме.</div>`}
             </div>
 
             <div class="cc-actions">
-                <button class="cc-secondary" onclick="reopenContentDraftSetup('${draft.id}')">↩︎ Другая тема</button>
-                <button class="cc-secondary" ${(isTranslating || hasEn) ? 'disabled' : ''} onclick="translateContentDraft('${draft.id}')">${isTranslating ? '⏳ Переводим…' : (hasEn ? '✓ Переведено' : '🇬🇧 Перевести на английский')}</button>
+                <button class="ui-btn ui-btn--secondary" onclick="reopenContentDraftSetup('${draft.id}')">↩︎ Другая тема</button>
+                <button class="ui-btn ui-btn--secondary" ${(isTranslating || hasEn) ? 'disabled' : ''} onclick="translateContentDraft('${draft.id}')">${isTranslating ? '⏳ Переводим…' : (hasEn ? '✓ Переведено' : '🇬🇧 Перевести на английский')}</button>
                 <div class="cc-actions-spacer"></div>
-                ${generatedFormatDefs.length > 1 && pendingCount > 1 ? `<button class="cc-secondary" onclick="promoteAllContentDraftFormats('${draft.id}')">Добавить все (${pendingCount})</button>` : ''}
-                <button class="cc-primary cc-primary-inline" onclick="promoteContentDraftFormat('${draft.id}')">
+                ${generatedFormatDefs.length > 1 && pendingCount > 1 ? `<button class="ui-btn ui-btn--secondary" onclick="promoteAllContentDraftFormats('${draft.id}')">Добавить все (${pendingCount})</button>` : ''}
+                <button class="ui-btn ui-btn--primary" onclick="promoteContentDraftFormat('${draft.id}')">
                     ${promoted[draft.activeFormat] ? '✓ Добавлено · добавить ещё' : `➕ В хранилище: ${def.label}${hasEn ? ' (RU+EN)' : ''}`}
                 </button>
             </div>
@@ -986,7 +986,7 @@ function renderAgentContentDrafts() {
     const counter = document.getElementById('content-agent-drafts-count');
     if (counter) counter.textContent = drafts.length ? `(${drafts.length})` : '';
     if (drafts.length === 0) {
-        list.innerHTML = `<div class="cc-placeholder">Нет черновиков на проверке. Сюда попадают идеи в статусе «Идея» — от агента Generator и созданные вручную.</div>`;
+        list.innerHTML = `<div class="ui-empty">Нет черновиков на проверке. Сюда попадают идеи в статусе «Идея» — от агента Generator и созданные вручную.</div>`;
         return;
     }
     const todayStr = new Date().toDateString();
@@ -994,23 +994,23 @@ function renderAgentContentDrafts() {
         const isAgent = idea.source === 'agent';
         const isToday = new Date(Number(idea.id)).toDateString() === todayStr;
         return `
-        <div class="cc-card cc-review-card">
+        <div class="ui-card cc-card cc-review-card">
             <div class="cc-head">
                 <div class="cc-head-main">
                     <div class="cc-head-title">${escapeHtml(idea.title)}</div>
                     <div class="cc-head-meta">
-                        <span class="cc-pill ${isAgent ? 'cc-pill-agent' : ''}">${isAgent ? `🤖 От генератора${isToday ? ' · сегодня' : ''}` : '✍️ Черновик'}</span>
-                        <span class="cc-pill">${escapeHtml(normalizeIdeaFormat(idea.format))}</span>
+                        <span class="ui-badge ${isAgent ? 'ui-badge--purple' : ''}">${isAgent ? `🤖 От генератора${isToday ? ' · сегодня' : ''}` : '✍️ Черновик'}</span>
+                        <span class="ui-badge">${escapeHtml(normalizeIdeaFormat(idea.format))}</span>
                     </div>
                 </div>
             </div>
             ${idea.desc ? `<div class="cc-review-text">${escapeHtml(idea.desc)}</div>` : ''}
             ${idea.cta ? `<div class="cc-review-cta">CTA: ${escapeHtml(idea.cta)}</div>` : ''}
             <div class="cc-actions">
-                <button class="cc-secondary" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
-                <button class="cc-secondary cc-danger" onclick="deleteIdea('${idea.id}')">🗑 Отклонить</button>
+                <button class="ui-btn ui-btn--secondary" onclick="openEditIdeaModal('${idea.id}')">✏️ Изменить</button>
+                <button class="ui-btn ui-btn--danger" onclick="deleteIdea('${idea.id}')">🗑 Отклонить</button>
                 <div class="cc-actions-spacer"></div>
-                <button class="cc-primary cc-primary-inline" onclick="promoteAgentDraft('${idea.id}')">➕ В хранилище</button>
+                <button class="ui-btn ui-btn--primary" onclick="promoteAgentDraft('${idea.id}')">➕ В хранилище</button>
             </div>
         </div>`;
     }).join('');
@@ -1036,11 +1036,11 @@ function renderContentCreationView() {
     if (addBtn) addBtn.style.display = contentDrafts.length === 0 ? 'none' : '';
     if (list) {
         list.innerHTML = contentDrafts.length === 0
-            ? `<div class="cc-placeholder cc-placeholder-hero">
-                    <div class="cc-placeholder-icon">✍️</div>
+            ? `<div class="ui-empty ui-empty--hero">
+                    <div class="ui-empty__icon">✍️</div>
                     <b>Здесь рождается контент</b>
                     <p>Одна тема — до четырёх готовых форматов. Начните с «+ Новая тема»: можно вписать тему самому или попросить ИИ подобрать актуальную.</p>
-                    <button class="cc-primary cc-primary-inline" onclick="addContentDraft()">+ Новая тема</button>
+                    <button class="ui-btn ui-btn--primary" onclick="addContentDraft()">+ Новая тема</button>
                </div>`
             : contentDrafts.map(renderContentDraftCard).join('');
     }
@@ -1100,7 +1100,7 @@ async function renderCrmView() {
         await loadCrmData();
     } catch (e) {
         const pane = document.getElementById('crm-pane-overview');
-        if (pane) pane.innerHTML = `<div class="cc-placeholder">Не удалось загрузить CRM: ${escapeHtml(e.message)}</div>`;
+        if (pane) pane.innerHTML = `<div class="ui-empty">Не удалось загрузить CRM: ${escapeHtml(e.message)}</div>`;
         return;
     }
     switchCrmObject(crmObject);
@@ -1138,16 +1138,16 @@ function renderCrmHeaderActions() {
     const box = document.getElementById('crm-header-actions');
     if (!box) return;
     const actions = {
-        overview: `<button class="cc-secondary" onclick="importCrmFromMerged()">⬇ Импорт из сводной базы</button>`,
-        companies: `<button class="cc-secondary" onclick="importCrmFromMerged()">⬇ Импорт из сводной базы</button>
-                    <button class="cc-primary cc-primary-inline" onclick="createCrmRecord('company')">+ Компания</button>`,
-        contacts: `<button class="cc-primary cc-primary-inline" onclick="createCrmRecord('contact')">+ Контакт</button>`,
+        overview: `<button class="ui-btn ui-btn--secondary" onclick="importCrmFromMerged()">⬇ Импорт из сводной базы</button>`,
+        companies: `<button class="ui-btn ui-btn--secondary" onclick="importCrmFromMerged()">⬇ Импорт из сводной базы</button>
+                    <button class="ui-btn ui-btn--primary" onclick="createCrmRecord('company')">+ Компания</button>`,
+        contacts: `<button class="ui-btn ui-btn--primary" onclick="createCrmRecord('contact')">+ Контакт</button>`,
         deals: `<div class="cc-segment">
                     <button class="cc-seg-btn ${crmDealsView === 'board' ? 'on' : ''}" onclick="setCrmDealsView('board')">Доска</button>
                     <button class="cc-seg-btn ${crmDealsView === 'table' ? 'on' : ''}" onclick="setCrmDealsView('table')">Таблица</button>
                 </div>
-                <button class="cc-primary cc-primary-inline" onclick="createCrmRecord('deal')">+ Сделка</button>`,
-        tasks: `<button class="cc-primary cc-primary-inline" onclick="createCrmTask()">+ Задача</button>`,
+                <button class="ui-btn ui-btn--primary" onclick="createCrmRecord('deal')">+ Сделка</button>`,
+        tasks: `<button class="ui-btn ui-btn--primary" onclick="createCrmTask()">+ Задача</button>`,
         content: '',
     };
     box.innerHTML = actions[crmObject] || '';
@@ -1190,23 +1190,23 @@ function renderCrmOverview() {
 
     pane.innerHTML = `
         <div class="merged-stats">
-            <div class="merged-stat"><b>${c.companies || 0}</b><span>компаний</span></div>
-            <div class="merged-stat"><b>${c.openDeals || 0}</b><span>сделок в работе</span></div>
-            <div class="merged-stat"><b>${formatMoney(crmMeta.pipelineValue)}</b><span>в пайплайне</span></div>
-            <div class="merged-stat"><b class="ok">${formatMoney(crmMeta.wonValue)}</b><span>выиграно</span></div>
-            <div class="merged-stat"><b class="${overdue.length ? 'bad' : ''}">${c.openTasks || 0}</b><span>задач${overdue.length ? ` · ${overdue.length} просрочено` : ''}</span></div>
+            <div class="ui-card merged-stat"><b>${c.companies || 0}</b><span>компаний</span></div>
+            <div class="ui-card merged-stat"><b>${c.openDeals || 0}</b><span>сделок в работе</span></div>
+            <div class="ui-card merged-stat"><b>${formatMoney(crmMeta.pipelineValue)}</b><span>в пайплайне</span></div>
+            <div class="ui-card merged-stat"><b class="ok">${formatMoney(crmMeta.wonValue)}</b><span>выиграно</span></div>
+            <div class="ui-card merged-stat"><b class="${overdue.length ? 'bad' : ''}">${c.openTasks || 0}</b><span>задач${overdue.length ? ` · ${overdue.length} просрочено` : ''}</span></div>
         </div>
 
         ${crmCompanies.length === 0 ? `
-            <div class="cc-placeholder cc-placeholder-hero">
-                <div class="cc-placeholder-icon">🤝</div>
+            <div class="ui-empty ui-empty--hero">
+                <div class="ui-empty__icon">🤝</div>
                 <b>CRM пока пуста</b>
                 <p>Компании, которые уже собраны в «Заказчиках», можно перенести сюда одной кнопкой — со всеми телефонами, email и соцсетями. Дубли между 2ГИС и ScrapeGraph склеятся сами.</p>
-                <button class="cc-primary cc-primary-inline" onclick="importCrmFromMerged()">⬇ Импортировать из сводной базы</button>
+                <button class="ui-btn ui-btn--primary" onclick="importCrmFromMerged()">⬇ Импортировать из сводной базы</button>
             </div>
         ` : `
             <div class="crm-overview-grid">
-                <div class="crm-panel">
+                <div class="ui-card crm-panel">
                     <div class="crm-panel-head">Воронка</div>
                     ${byStage.map(s => `
                         <div class="crm-funnel-row" onclick="switchCrmObject('deals')">
@@ -1216,9 +1216,9 @@ function renderCrmOverview() {
                             <span class="crm-funnel-sum">${formatMoney(s.deals.reduce((a, d) => a + (d.amount || 0), 0))}</span>
                         </div>`).join('')}
                 </div>
-                <div class="crm-panel">
+                <div class="ui-card crm-panel">
                     <div class="crm-panel-head">Ближайшие задачи</div>
-                    ${soon.length ? soon.map(renderCrmTaskRow).join('') : `<div class="cc-empty" style="padding:8px 0;">Открытых задач нет.</div>`}
+                    ${soon.length ? soon.map(renderCrmTaskRow).join('') : `<div class="ui-empty ui-empty--inline" style="padding:8px 0;">Открытых задач нет.</div>`}
                 </div>
             </div>
         `}`;
@@ -1229,7 +1229,7 @@ function renderCrmOverview() {
 // правка идёт по blur прямо в ячейке. Без этого три почти одинаковые
 // таблицы разъехались бы поведением при первой же правке.
 function crmTable(rows, columns, type, emptyText) {
-    if (!rows.length) return `<div class="cc-placeholder">${emptyText}</div>`;
+    if (!rows.length) return `<div class="ui-empty">${emptyText}</div>`;
     return `
     <div class="crm-table-wrap">
         <table class="crm-table">
@@ -1267,7 +1267,7 @@ function renderCrmCompanies() {
         { title: 'Телефон', render: r => crmCell(r, 'company', 'phone') },
         { title: 'Email', render: r => crmCell(r, 'company', 'email') },
         { title: 'Сайт', render: r => crmCell(r, 'company', 'domain') },
-        { title: 'Источник', width: '110px', render: r => `<span class="cc-pill">${CRM_SOURCE_LABELS[r.source] || r.source}</span>` },
+        { title: 'Источник', width: '110px', render: r => `<span class="ui-badge">${CRM_SOURCE_LABELS[r.source] || r.source}</span>` },
     ], 'company', crmSearch ? 'Ничего не найдено.' : 'Компаний пока нет — импортируйте из сводной базы или добавьте вручную.');
 }
 
@@ -1316,7 +1316,7 @@ function renderCrmDeals() {
                 <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleCrmDealDrop(event, '${stage.id}')">
                     <div class="kanban-column-header">
                         <span><i class="crm-stage-dot" style="background:${stage.color};"></i>${escapeHtml(stage.title)}</span>
-                        <span class="kanban-count">${items.length}</span>
+                        <span class="ui-badge">${items.length}</span>
                     </div>
                     <div class="crm-column-sum">${formatMoney(sum)}</div>
                     <div class="kanban-cards">
@@ -1388,12 +1388,12 @@ function renderCrmTasks() {
     const open = crmTasks.filter(t => !t.done);
     const done = crmTasks.filter(t => t.done);
     pane.innerHTML = `
-        <div class="crm-panel">
+        <div class="ui-card crm-panel">
             <div class="crm-panel-head">Открытые${open.length ? ` · ${open.length}` : ''}</div>
-            ${open.length ? open.map(renderCrmTaskRow).join('') : `<div class="cc-empty" style="padding:8px 0;">Всё сделано.</div>`}
+            ${open.length ? open.map(renderCrmTaskRow).join('') : `<div class="ui-empty ui-empty--inline" style="padding:8px 0;">Всё сделано.</div>`}
         </div>
         ${done.length ? `
-        <div class="crm-panel" style="margin-top:14px;">
+        <div class="ui-card crm-panel" style="margin-top:14px;">
             <div class="crm-panel-head">Выполненные · ${done.length}</div>
             ${done.slice(0, 30).map(renderCrmTaskRow).join('')}
         </div>` : ''}`;
@@ -1551,31 +1551,31 @@ function renderCrmRecordPage() {
                 <details class="crm-script">
                     <summary>📞 Скрипт звонка для ниши «${escapeHtml(script.name)}»</summary>
                     <div class="crm-script-body">${escapeHtml(script.coldCallPitch)}</div>
-                    <button class="cc-secondary" onclick="copyCrmScript(this)">📋 Скопировать</button>
+                    <button class="ui-btn ui-btn--secondary" onclick="copyCrmScript(this)">📋 Скопировать</button>
                 </details>` : ''}
 
             <div class="crm-related">
                 <div class="crm-panel-head">Контакты · ${contacts.length}
-                    <button class="cc-link" onclick="addCrmRelated('contact','${id}')">+ Добавить</button>
+                    <button class="ui-btn ui-btn--link" onclick="addCrmRelated('contact','${id}')">+ Добавить</button>
                 </div>
                 ${contacts.length ? contacts.map(c => `
                     <div class="crm-related-row" onclick="openCrmRecord('contact','${c.id}')">
                         <b>${escapeHtml(c.name)}</b>
                         <span>${escapeHtml(c.role || '')}</span>
                         <span>${escapeHtml(c.phone || '')}</span>
-                    </div>`).join('') : `<div class="cc-empty" style="padding:6px 0;">Контактов нет.</div>`}
+                    </div>`).join('') : `<div class="ui-empty ui-empty--inline" style="padding:6px 0;">Контактов нет.</div>`}
             </div>
 
             <div class="crm-related">
                 <div class="crm-panel-head">Сделки · ${deals.length}
-                    <button class="cc-link" onclick="addCrmRelated('deal','${id}')">+ Добавить</button>
+                    <button class="ui-btn ui-btn--link" onclick="addCrmRelated('deal','${id}')">+ Добавить</button>
                 </div>
                 ${deals.length ? deals.map(d => `
                     <div class="crm-related-row" onclick="openCrmRecord('deal','${d.id}')">
                         <b>${escapeHtml(d.title)}</b>
-                        <span class="cc-pill" style="background:${crmStage(d.stage).color}22; color:${crmStage(d.stage).color};">${escapeHtml(crmStage(d.stage).title)}</span>
+                        <span class="ui-badge" style="background:${crmStage(d.stage).color}22; color:${crmStage(d.stage).color};">${escapeHtml(crmStage(d.stage).title)}</span>
                         <span>${formatMoney(d.amount)}</span>
-                    </div>`).join('') : `<div class="cc-empty" style="padding:6px 0;">Сделок нет.</div>`}
+                    </div>`).join('') : `<div class="ui-empty ui-empty--inline" style="padding:6px 0;">Сделок нет.</div>`}
             </div>`;
     }
 
@@ -1658,16 +1658,16 @@ async function loadCrmTimeline() {
     if (!side || !crmOpenRecord) return;
     const { type, id } = crmOpenRecord;
     const key = { company: 'companyId', contact: 'contactId', deal: 'dealId' }[type];
-    side.innerHTML = `<div class="cc-placeholder">Загружаем ленту…</div>`;
+    side.innerHTML = `<div class="ui-empty">Загружаем ленту…</div>`;
     let items = [];
     try {
         items = await api(`/api/crm/timeline?${key}=${encodeURIComponent(id)}`);
     } catch (e) {
-        side.innerHTML = `<div class="cc-placeholder">Не удалось загрузить ленту: ${escapeHtml(e.message)}</div>`;
+        side.innerHTML = `<div class="ui-empty">Не удалось загрузить ленту: ${escapeHtml(e.message)}</div>`;
         return;
     }
     side.innerHTML = `
-        <div class="crm-panel">
+        <div class="ui-card crm-panel">
             <div class="crm-panel-head">Добавить в ленту</div>
             <select class="form-select cc-input" id="crm-activity-kind">
                 <option value="note">📝 Заметка</option>
@@ -1678,7 +1678,7 @@ async function loadCrmTimeline() {
             </select>
             <textarea class="form-textarea cc-input" id="crm-activity-body" placeholder="Что произошло или что нужно сделать…"></textarea>
             <input type="text" class="form-input cc-input" id="crm-activity-due" placeholder="Срок для задачи: ДД.ММ.ГГГГ">
-            <button class="cc-primary" onclick="submitCrmActivity()">Добавить</button>
+            <button class="ui-btn ui-btn--primary ui-btn--block" onclick="submitCrmActivity()">Добавить</button>
         </div>
 
         <div class="crm-timeline">
@@ -1691,7 +1691,7 @@ async function loadCrmTimeline() {
                     </div>
                     <div class="crm-tl-body">${escapeHtml(a.body)}</div>
                     ${a.dueAt ? `<div class="crm-tl-due">Срок: ${formatCrmDate(a.dueAt)}${a.done ? ' · выполнено' : ''}</div>` : ''}
-                </div>`).join('') : `<div class="cc-empty" style="padding:10px 0;">Пока ничего не происходило.</div>`}
+                </div>`).join('') : `<div class="ui-empty ui-empty--inline" style="padding:10px 0;">Пока ничего не происходило.</div>`}
         </div>`;
     autoGrowAllTextareas(side);
 }
@@ -1775,12 +1775,12 @@ function kanbanProductBadge(idea) {
     if (!idea.targetGroups || !idea.targetGroups.length) return '';
     const product = productsData.find(p => p.id === idea.targetGroups[0]);
     if (!product) return '';
-    return `<span class="format-tag" style="background:${product.badgeBg}; color:${product.badgeColor};">${escapeHtml(product.title)}</span>`;
+    return `<span class="ui-badge ui-badge--orange" style="background:${product.badgeBg}; color:${product.badgeColor};">${escapeHtml(product.title)}</span>`;
 }
 
 function kanbanSourceBadge(idea) {
     return idea.source === 'agent'
-        ? `<span class="format-tag" style="background:rgba(191,90,242,0.15); color:var(--accent-purple);">🤖</span>`
+        ? `<span class="ui-badge ui-badge--orange" style="background:rgba(191,90,242,0.15); color:var(--accent-purple);">🤖</span>`
         : '';
 }
 
@@ -1863,7 +1863,7 @@ function renderKanbanView() {
         <div class="kanban-column" ${isManual ? `ondragover="allowDrop(event)" ondrop="handleDrop(event, '${col.id}')"` : ''}>
             <div class="kanban-column-header">
                 <span>${col.title}</span>
-                <span class="kanban-count">${items.length}</span>
+                <span class="ui-badge">${items.length}</span>
             </div>
             <div class="kanban-cards">`;
 
@@ -1875,7 +1875,7 @@ function renderKanbanView() {
                 const info = metricsReadyInfo(idea);
                 if (info && info.isPast) {
                     metricsBlock = `
-                <button class="edit-btn" style="width:100%; font-size:11px; margin-top:6px;" onclick="toggleKanbanAnalysis('${idea.id}')">🔍 Анализ</button>
+                <button class="ui-btn ui-btn--secondary" style="width:100%; font-size:11px; margin-top:6px;" onclick="toggleKanbanAnalysis('${idea.id}')">🔍 Анализ</button>
                 <div id="kanban-analysis-${idea.id}" style="display:none; margin-top:6px; padding:8px; background:rgba(255,255,255,0.05); border-radius:8px; font-size:11px; line-height:1.5;">${buildKanbanAnalysis(idea)}</div>`;
                 } else if (info) {
                     metricsBlock = `<div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">Сбор метрик до ${formatRuDateDMY(info.readyDate)}</div>`;
@@ -1888,7 +1888,7 @@ function renderKanbanView() {
                 <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">${escapeHtml(idea.format || '')} • ${escapeHtml(idea.funnel || 'TOFU')}</div>
                 ${badges ? `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;">${badges}</div>` : ''}
                 ${metricsBlock}
-                <button class="edit-btn" style="width:100%; font-size:11px; margin-top:6px;" onclick="openEditIdeaModal('${idea.id}')">Изменить</button>
+                <button class="ui-btn ui-btn--secondary" style="width:100%; font-size:11px; margin-top:6px;" onclick="openEditIdeaModal('${idea.id}')">Изменить</button>
             </div>`;
         });
 
@@ -1984,26 +1984,26 @@ async function renderAnalyticsView() {
     const costPerLead = totalLeads > 0 ? (expenseSummary.monthUsd / totalLeads) : null;
 
     let html = `
-    <div class="analytics-card">
+    <div class="ui-card analytics-card">
         <h3>💸 Эффективность расходов</h3>
         <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Расход AI-агентов (Cost Tracker) за текущий месяц, делённый на результат</p>
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px;">
-            <div class="stat-box">
+            <div class="ui-card ui-card--sunken stat-box">
                 <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">$${expenseSummary.monthUsd.toFixed(2)}</div>
                 <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Расход за месяц</div>
             </div>
-            <div class="stat-box">
+            <div class="ui-card ui-card--sunken stat-box">
                 <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">${costPerPost !== null ? '$' + costPerPost.toFixed(2) : '—'}</div>
                 <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Стоимость поста (${postsThisMonth} опубл. за месяц)</div>
             </div>
-            <div class="stat-box">
+            <div class="ui-card ui-card--sunken stat-box">
                 <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">${costPerLead !== null ? '$' + costPerLead.toFixed(2) : '—'}</div>
                 <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Стоимость лида (${totalLeads} лидов всего)</div>
             </div>
         </div>
     </div>
 
-    <div class="analytics-card">
+    <div class="ui-card analytics-card">
         <h3>📡 Автосводка по площадкам</h3>
         <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Суммы по всем запланированным/опубликованным постам (${scheduledEvents.length}), собранные автоматически из GET /api/events. 0 означает "ещё не синхронизировано" - это нормально, если токен площадки не подключен, не ошибка.</p>
         <div style="overflow-x:auto;">
@@ -2043,13 +2043,13 @@ async function renderAnalyticsView() {
             </tbody>
         </table>
         </div>
-        <div class="info-box" style="margin-top:12px; font-size:12px;">
+        <div class="ui-card info-box" style="margin-top:12px; font-size:12px;">
             <strong>✈️ Telegram:</strong> просмотры недоступны в принципе — у Bot API нет метода, который возвращает счётчик просмотров поста канала (эта цифра существует только в MTProto/клиентском API, для которого нужна полноценная user-сессия, а не бот-токен). Из-за этого автосинк метрик для Telegram не запускается вовсе.<br>
             <strong>📌 Pinterest:</strong> просмотры/сохранения/клики синкаются автоматически (Pinterest API v5, метрики пина), как только подключён токен — до этого площадка в таблице выше будет показывать 0.
         </div>
     </div>
 
-    <div class="analytics-card">
+    <div class="ui-card analytics-card">
         <h3>🏆 Рейтинг конверсий & ROI (Топ по B2B лидам)</h3>
         <div style="margin-top:10px;">`;
 
@@ -2066,7 +2066,7 @@ async function renderAnalyticsView() {
                 <div style="font-size:12px; color:var(--text-secondary);">${escapeHtml(item.format)} • ${item.funnel || 'TOFU'}</div>
             </div>
             <div style="text-align:right;">
-                <span class="funnel-badge" style="background:rgba(48,209,88,0.2); color:var(--accent-green); font-size:13px;">🎯 ${leads} лидов</span>
+                <span class="ui-badge ui-badge--caps" style="background:rgba(48,209,88,0.2); color:var(--accent-green); font-size:13px;">🎯 ${leads} лидов</span>
                 <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${clicks} кликов</div>
             </div>
         </div>`;
@@ -2074,7 +2074,7 @@ async function renderAnalyticsView() {
 
     html += `</div></div>
 
-    <div class="analytics-card">
+    <div class="ui-card analytics-card">
         <h3>✍️ Лиды и заявки (вводится вручную)</h3>
         <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Лиды нигде в системе не считаются автоматически — их вводит человек. Просмотры/сохранения/клики здесь редактируемы только как запасной вариант для площадок, которые ещё не синхронизируются (см. автосводку выше).</p>`;
 
@@ -2103,7 +2103,7 @@ async function renderAnalyticsView() {
                     <label style="font-size:11px; color:var(--accent-green); font-weight:600;">Лиды*<br>
                         <input type="number" id="am-leads-${idea.id}" class="form-input" style="width:90px; margin:4px 0 0; border-color:var(--accent-green);" value="${m.leads || 0}">
                     </label>
-                    <button class="submit-btn" style="margin:0; padding:12px 16px;" onclick="saveIdeaMetricsInline('${idea.id}')">Сохранить</button>
+                    <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin:0; padding:12px 16px;" onclick="saveIdeaMetricsInline('${idea.id}')">Сохранить</button>
                 </div>
             </div>`;
         });
@@ -2112,13 +2112,13 @@ async function renderAnalyticsView() {
 
     html += `</div>
 
-    <div class="analytics-card">
+    <div class="ui-card analytics-card">
         <h3>🎯 Сплит форматов</h3>
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-top:12px;">`;
 
     formatStats.forEach(fs => {
         html += `
-        <div class="stat-box">
+        <div class="ui-card ui-card--sunken stat-box">
             <div style="font-size:20px; font-weight:700; color:var(--accent-blue);">${fs.count}</div>
             <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${escapeHtml(fs.format)}</div>
         </div>`;
@@ -2126,7 +2126,7 @@ async function renderAnalyticsView() {
 
     html += `</div></div>
 
-    <div class="analytics-card">
+    <div class="ui-card analytics-card">
         <h3>📊 Дашборд баланса продуктов</h3>
         <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Распределение контент-гипотез по направлениям студии</p>`;
 
@@ -2146,9 +2146,9 @@ async function renderAnalyticsView() {
 
     html += `</div>
 
-    <div class="analytics-card">
+    <div class="ui-card analytics-card">
         <h3>📖 Глоссарий метрик</h3>
-        <div class="info-box" style="font-size:13px; line-height:1.6;">
+        <div class="ui-card info-box" style="font-size:13px; line-height:1.6;">
             <p style="margin:0 0 10px;"><strong>Просмотры (views)</strong> — сколько раз пост показали пользователю. Источник: авто, из <code>metrics_views</code> — синкается по VK/Instagram/YouTube через <code>server/lib/metricsSync.js</code>, когда подключён токен площадки; для Telegram недоступно (см. заметку в автосводке выше); можно поправить вручную в разделе "Лиды и заявки", если площадка ещё не синхронизируется. Показывает охват контента.</p>
             <p style="margin:0 0 10px;"><strong>Сохранения (saves)</strong> — пользователь сохранил/оценил пост (для VK и YouTube это proxy-метрика — лайки, т.к. у площадок нет отдельного счётчика "сохранений"; для Instagram — буквально saved). Источник: авто (те же условия, что и просмотры) или вручную. Показывает, насколько контент оказался ценным, а не просто просмотренным.</p>
             <p style="margin:0 0 10px;"><strong>Клики (clicks)</strong> — переходы/репосты/комментарии в зависимости от площадки (VK — репосты, Instagram — шеринги, YouTube — комментарии; см. комментарии в <code>metricsSync.js</code> — ни у одной площадки нет прямого "клика по ссылке" без отдельного ads-API). Источник: авто или вручную. Proxy-метрика вовлечённости/распространения.</p>
@@ -2252,7 +2252,7 @@ function renderArchiveView() {
     rows.sort((a, b) => (b.event.publishAt || 0) - (a.event.publishAt || 0));
 
     if (rows.length === 0) {
-        list.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Пока ничего не опубликовано.</div>`;
+        list.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Пока ничего не опубликовано.</div>`;
         return;
     }
 
@@ -2261,10 +2261,10 @@ function renderArchiveView() {
         const date = event.publishAt ? new Date(event.publishAt * 1000).toLocaleDateString('ru-RU') : '—';
         const m = event.metrics || {};
         return `
-        <div class="idea-card" style="margin-bottom:12px;">
+        <div class="ui-card idea-card" style="margin-bottom:12px;">
             <div class="idea-header">
                 <div class="idea-title">${escapeHtml(idea.title)}</div>
-                <div>${kanbanProductBadge(idea)}<span class="format-tag">${escapeHtml(platformLabel(event.platform))}</span></div>
+                <div>${kanbanProductBadge(idea)}<span class="ui-badge ui-badge--orange">${escapeHtml(platformLabel(event.platform))}</span></div>
             </div>
             <div class="meta-stats">
                 <span>📅 ${date}</span>
@@ -2274,7 +2274,7 @@ function renderArchiveView() {
                 <span>🎯 ${idea.metrics?.leads || 0} лидов</span>
             </div>
             <div class="action-btn-row">
-                <button class="edit-btn" onclick="openEditIdeaModal('${idea.id}')">✏️ Открыть идею</button>
+                <button class="ui-btn ui-btn--secondary" onclick="openEditIdeaModal('${idea.id}')">✏️ Открыть идею</button>
             </div>
         </div>`;
     }).join('');
@@ -2479,25 +2479,25 @@ function clearCoverAsset() {
 
 async function openCoverPickerModal() {
     const grid = document.getElementById('cover-picker-grid');
-    grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
+    grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
     openOverlay('cover-picker-overlay');
     try {
         // Always fetch fresh - the picker can be opened before the user ever
         // visits the Медиатека tab, so the module-level cache may be empty.
         mediaAssets = await api('/api/media-assets');
     } catch (e) {
-        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
         return;
     }
     if (mediaAssets.length === 0) {
-        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">В медиатеке пока пусто — добавьте медиа во вкладке «Медиатека».</div>`;
+        grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">В медиатеке пока пусто — добавьте медиа во вкладке «Медиатека».</div>`;
         return;
     }
     grid.innerHTML = mediaAssets.map(asset => `
         <div class="media-asset-card" style="cursor:pointer;" onclick="selectCoverAsset('${asset.id}')">
             ${mediaAssetPreviewHtml(asset)}
             <div class="media-asset-body">
-                <div class="media-asset-meta-row"><span class="format-tag">${escapeHtml(asset.type)}</span></div>
+                <div class="media-asset-meta-row"><span class="ui-badge ui-badge--orange">${escapeHtml(asset.type)}</span></div>
                 ${mediaAssetSubtextHtml(asset)}
             </div>
         </div>
@@ -2530,24 +2530,24 @@ function clearVoiceoverAsset() {
 
 async function openVoiceoverPickerModal() {
     const grid = document.getElementById('voiceover-picker-grid');
-    grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
+    grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
     openOverlay('voiceover-picker-overlay');
     try {
         mediaAssets = await api('/api/media-assets');
     } catch (e) {
-        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
         return;
     }
     const audioAssets = mediaAssets.filter(a => a.type === 'audio');
     if (audioAssets.length === 0) {
-        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">В медиатеке пока нет аудио — сгенерируйте озвучку или добавьте её вручную во вкладке «Медиатека».</div>`;
+        grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">В медиатеке пока нет аудио — сгенерируйте озвучку или добавьте её вручную во вкладке «Медиатека».</div>`;
         return;
     }
     grid.innerHTML = audioAssets.map(asset => `
         <div class="media-asset-card" style="cursor:pointer;" onclick="selectVoiceoverAsset('${asset.id}')">
             ${mediaAssetPreviewHtml(asset)}
             <div class="media-asset-body">
-                <div class="media-asset-meta-row"><span class="format-tag">${escapeHtml(asset.type)}</span></div>
+                <div class="media-asset-meta-row"><span class="ui-badge ui-badge--orange">${escapeHtml(asset.type)}</span></div>
                 ${mediaAssetSubtextHtml(asset)}
             </div>
         </div>
@@ -2823,7 +2823,7 @@ function renderTelegramChannelsList() {
                 <div style="font-weight:600; font-size:13px;">${escapeHtml(ch.label)}</div>
                 <div style="font-size:12px; color:var(--text-secondary);">${escapeHtml(ch.chatId)}</div>
             </div>
-            <button class="delete-btn" onclick="deleteTelegramChannel(${ch.id})">🗑</button>
+            <button class="ui-btn ui-btn--danger" onclick="deleteTelegramChannel(${ch.id})">🗑</button>
         </div>`).join('');
 }
 
@@ -2885,7 +2885,7 @@ function renderVkGroupsList() {
                 <div style="font-weight:600; font-size:13px;">${escapeHtml(g.label)} ${g.lang ? `<span style="font-weight:400; color:var(--text-secondary); font-size:11px;">${langLabel[g.lang] || ''}</span>` : ''}</div>
                 <div style="font-size:12px; color:var(--text-secondary);">ID ${escapeHtml(g.groupId)} · токен ${g.hasToken ? escapeHtml(g.tokenPreview) : '<span style="color:var(--accent-red);">не задан</span>'}</div>
             </div>
-            <button class="delete-btn" onclick="deleteVkGroup(${g.id})">🗑</button>
+            <button class="ui-btn ui-btn--danger" onclick="deleteVkGroup(${g.id})">🗑</button>
         </div>`).join('');
 }
 
@@ -3118,7 +3118,7 @@ async function renderPlatformStatuses() {
         let cls = 'captcha', label = '○ ждёт ключей';
         if (ruOk && enOk) { cls = 'done'; label = '● подключено'; }
         else if (ruOk || enOk) { cls = 'running'; label = `◐ только ${ruOk ? 'RU' : 'EN'}`; }
-        el.className = `parser-niche-status ${cls}`;
+        el.className = statusBadgeClass(cls);
         el.innerText = label;
     })();
 
@@ -3140,7 +3140,7 @@ async function renderPlatformStatuses() {
         let cls = 'captcha', label = '○ ждёт ключей';
         if (ruOk && (enOk || singleAccount)) { cls = 'done'; label = '● подключено'; }
         else if (ruOk || enOk) { cls = 'running'; label = `◐ только ${ruOk ? 'RU' : 'EN'}`; }
-        el.className = `parser-niche-status ${cls}`;
+        el.className = statusBadgeClass(cls);
         el.innerText = label;
     }
 }
@@ -3243,7 +3243,7 @@ function renderPublishModal() {
         const configured = p.isConfigured();
         const active = publishModalState.platform === p.id;
         const dimStyle = configured ? '' : 'opacity:0.55;';
-        return `<button class="edit-btn${active ? ' on' : ''}" style="${dimStyle}" onclick="setPublishPlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
+        return `<button class="ui-btn ui-btn--secondary${active ? ' on' : ''}" style="${dimStyle}" onclick="setPublishPlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
     }).join('');
 
     const currentPlatform = PUBLISH_PLATFORMS.find(p => p.id === publishModalState.platform);
@@ -3297,7 +3297,7 @@ function renderPublishModal() {
     }
     if (warnMsg) {
         warnBox.style.display = '';
-        warnBox.innerHTML = `<p style="margin:0 0 8px;">${escapeHtml(warnMsg)}</p><button class="edit-btn" onclick="closeOverlay('publish-overlay'); openPublishSettingsModal();">Открыть настройки публикаций</button>`;
+        warnBox.innerHTML = `<p style="margin:0 0 8px;">${escapeHtml(warnMsg)}</p><button class="ui-btn ui-btn--secondary" onclick="closeOverlay('publish-overlay'); openPublishSettingsModal();">Открыть настройки публикаций</button>`;
     } else {
         warnBox.style.display = 'none';
         warnBox.innerHTML = '';
@@ -3519,7 +3519,7 @@ function renderRoadmapPreview(productId, candidates) {
     roadmapPreviewChecked = new Set(candidates.map((c, i) => i));
     box.style.display = 'block';
     box.innerHTML = `
-        <div class="info-box">
+        <div class="ui-card info-box">
             ${candidates.map((c, i) => `
                 <label style="display:flex; align-items:flex-start; gap:8px; padding:4px 0;">
                     <input type="checkbox" style="margin-top:3px;" checked
@@ -3530,8 +3530,8 @@ function renderRoadmapPreview(productId, candidates) {
                     </span>
                 </label>`).join('')}
             <div style="margin-top:10px; display:flex; gap:8px;">
-                <button class="submit-btn" style="margin-top:0;" onclick="confirmRoadmapPreview('${productId}')">Добавить выбранные</button>
-                <button class="edit-btn" onclick="document.getElementById('roadmap-generate-preview').style.display='none';">Отмена</button>
+                <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:0;" onclick="confirmRoadmapPreview('${productId}')">Добавить выбранные</button>
+                <button class="ui-btn ui-btn--secondary" onclick="document.getElementById('roadmap-generate-preview').style.display='none';">Отмена</button>
             </div>
         </div>`;
 }
@@ -3563,11 +3563,11 @@ function renderProductsGrid() {
 
     productsData.forEach(p => {
         html += `
-        <div class="product-card" onclick="openProductDetail('${p.id}')">
+        <div class="ui-card ui-card--interactive product-card" onclick="openProductDetail('${p.id}')">
             <div>
                 <div class="card-header">
                     <div class="card-title">${p.title}</div>
-                    <span class="card-badge" style="background:${p.badgeBg}; color:${p.badgeColor}">${p.badge}</span>
+                    <span class="ui-badge ui-badge--caps" style="background:${p.badgeBg}; color:${p.badgeColor}">${p.badge}</span>
                 </div>
                 <div class="card-desc">${p.desc}</div>
             </div>
@@ -3633,20 +3633,20 @@ function renderProductDetailContent(productId) {
         <label class="form-label">Ключевые слова (через запятую):</label>
         <input type="text" id="pi-keywords-input" class="form-input" placeholder="ключевое слово 1, ключевое слово 2, ..." value="${escapeHtml(keywords)}">
 
-        <button class="submit-btn" style="margin-top:4px;" onclick="saveProjectInfo('${productId}')">💾 Сохранить</button>
+        <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:4px;" onclick="saveProjectInfo('${productId}')">💾 Сохранить</button>
 
         <div class="controls-row" style="margin-top:28px;">
             <div class="p-section-title" style="margin:0;">ROADMAP ПРОДВИЖЕНИЯ</div>
             <div style="display:flex; gap:8px;">
-                <button class="edit-btn" id="roadmap-generate-btn" title="Сгенерировать через local-claude-agent на вашем ПК, по описанию проекта выше" onclick="generateRoadmapSteps('${productId}', '${escapeHtml(product.title).replace(/'/g, "\\'")}')">✨ Сгенерировать через ИИ</button>
-                <button class="schedule-btn" onclick="openAddRoadmapItemForm()">+ Добавить этап</button>
+                <button class="ui-btn ui-btn--secondary" id="roadmap-generate-btn" title="Сгенерировать через local-claude-agent на вашем ПК, по описанию проекта выше" onclick="generateRoadmapSteps('${productId}', '${escapeHtml(product.title).replace(/'/g, "\\'")}')">✨ Сгенерировать через ИИ</button>
+                <button class="ui-btn ui-btn--primary" onclick="openAddRoadmapItemForm()">+ Добавить этап</button>
             </div>
         </div>
 
         <div id="roadmap-generate-status" style="display:none; font-size:12px; color:var(--text-secondary); margin-bottom:8px;"></div>
         <div id="roadmap-generate-preview" style="display:none; margin-bottom:16px;"></div>
 
-        <div id="roadmap-item-form" class="info-box" style="display:none; margin-bottom:16px;">
+        <div id="roadmap-item-form" class="ui-card info-box" style="display:none; margin-bottom:16px;">
             <input type="hidden" id="ri-id-input">
             <label class="form-label">Название этапа:</label>
             <input type="text" id="ri-title-input" class="form-input" placeholder="MVP">
@@ -3662,15 +3662,15 @@ function renderProductDetailContent(productId) {
             </select>
 
             <div style="display:flex; gap:8px; margin-top:14px;">
-                <button class="submit-btn" style="margin-top:0;" onclick="submitRoadmapItem('${productId}')">Сохранить</button>
-                <button class="edit-btn" onclick="closeRoadmapItemForm()">Отмена</button>
+                <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:0;" onclick="submitRoadmapItem('${productId}')">Сохранить</button>
+                <button class="ui-btn ui-btn--secondary" onclick="closeRoadmapItemForm()">Отмена</button>
             </div>
         </div>
 
         <div class="roadmap-list">`;
 
     if (roadmap.length === 0) {
-        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Этапов роадмапа пока нет — добавьте первый кнопкой выше.</div>`;
+        html += `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Этапов роадмапа пока нет — добавьте первый кнопкой выше.</div>`;
     } else {
         roadmap.forEach(r => {
             const status = r.status || 'planned';
@@ -3682,8 +3682,8 @@ function renderProductDetailContent(productId) {
                 </div>
                 ${r.description ? `<div class="step-desc">${escapeHtml(r.description)}</div>` : ''}
                 <div class="action-btn-row" style="margin-top:10px;">
-                    <button class="edit-btn" onclick="editRoadmapItem('${productId}', '${r.id}')">✏️ Изменить</button>
-                    <button class="delete-btn" onclick="deleteRoadmapItem('${productId}', '${r.id}')">Удалить</button>
+                    <button class="ui-btn ui-btn--secondary" onclick="editRoadmapItem('${productId}', '${r.id}')">✏️ Изменить</button>
+                    <button class="ui-btn ui-btn--danger" onclick="deleteRoadmapItem('${productId}', '${r.id}')">Удалить</button>
                 </div>
             </div>`;
         });
@@ -3795,7 +3795,7 @@ function renderScheduleModal() {
         const configured = p.isConfigured();
         const active = scheduleModalState.platform === p.id;
         const dimStyle = configured ? '' : 'opacity:0.55;';
-        return `<button class="edit-btn${active ? ' on' : ''}" style="${dimStyle}" onclick="setSchedulePlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
+        return `<button class="ui-btn ui-btn--secondary${active ? ' on' : ''}" style="${dimStyle}" onclick="setSchedulePlatform('${p.id}')">${p.label}${configured ? '' : ' (не настроено)'}</button>`;
     }).join('');
 
     const currentPlatform = PUBLISH_PLATFORMS.find(p => p.id === scheduleModalState.platform);
@@ -4025,7 +4025,7 @@ function renderDayDetailPage(dateStr) {
     let html = `<div class="p-section-title" style="margin-top:0;">ПУБЛИКАЦИИ НА ЭТОТ ДЕНЬ (${events.length})</div>`;
 
     if (events.length === 0) {
-        html += `<div class="info-box" style="text-align:center; margin-bottom:24px;">На этот день публикаций пока нет.</div>`;
+        html += `<div class="ui-card info-box" style="text-align:center; margin-bottom:24px;">На этот день публикаций пока нет.</div>`;
     } else {
         events.forEach(item => {
             const statusInfo = {
@@ -4041,12 +4041,12 @@ function renderDayDetailPage(dateStr) {
                 </div>
                 <div style="font-size:16px; font-weight:600; margin-bottom:6px;">${item.title}</div>
                 <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">${item.desc}</div>
-                <div class="info-box" style="font-size:12px; margin-bottom:10px; padding:8px;"><strong>CTA:</strong> ${item.cta}</div>
+                <div class="ui-card info-box" style="font-size:12px; margin-bottom:10px; padding:8px;"><strong>CTA:</strong> ${item.cta}</div>
                 ${item.publishAt && statusInfo ? `<div style="font-size:12px; color:${statusInfo.color}; margin-bottom:8px;">${statusInfo.label} — ${(PUBLISH_PLATFORMS.find(p => p.id === item.platform) || {}).label || item.platform}</div>` : ''}
                 ${item.publishStatus === 'failed' && item.publishError ? `<div class="warning-banner" style="font-size:12px; margin-bottom:10px;">${escapeHtml(item.publishError)}</div>` : ''}
                 <div style="display:flex; gap:8px;">
-                    ${item.publishStatus === 'failed' ? `<button class="edit-btn" style="flex:1;" onclick="retryScheduledEvent(${item.id})">↻ Повторить</button>` : ''}
-                    <button class="delete-btn" style="flex:1; justify-content:center; padding:8px;" onclick="deleteEvent(${item.id}, '${dateStr}')">🗑 Удалить публикацию</button>
+                    ${item.publishStatus === 'failed' ? `<button class="ui-btn ui-btn--secondary" style="flex:1;" onclick="retryScheduledEvent(${item.id})">↻ Повторить</button>` : ''}
+                    <button class="ui-btn ui-btn--danger" style="flex:1; justify-content:center; padding:8px;" onclick="deleteEvent(${item.id}, '${dateStr}')">🗑 Удалить публикацию</button>
                 </div>
             </div>`;
         });
@@ -4059,17 +4059,17 @@ function renderDayDetailPage(dateStr) {
     const availableIdeas = ideasBank.filter(idea => !scheduledIdeaIds.includes(idea.id));
 
     if (availableIdeas.length === 0) {
-        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Все идеи из банка уже запланированы или банк пуст</div>`;
+        html += `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Все идеи из банка уже запланированы или банк пуст</div>`;
     } else {
         availableIdeas.forEach(idea => {
             html += `
-            <div class="idea-card">
+            <div class="ui-card idea-card">
                 <div class="idea-header">
                     <div class="idea-title">${idea.title}</div>
-                    <span class="format-tag">${idea.format || 'TG Пост'}</span>
+                    <span class="ui-badge ui-badge--orange">${idea.format || 'TG Пост'}</span>
                 </div>
                 ${idea.desc ? `<div class="idea-desc-text">${idea.desc}</div>` : ''}
-                <button class="schedule-btn" style="width:100%; margin-top:8px;" onclick="attachIdeaToDay('${idea.id}', '${dateStr}')">+ Запланировать публикацию</button>
+                <button class="ui-btn ui-btn--primary" style="width:100%; margin-top:8px;" onclick="attachIdeaToDay('${idea.id}', '${dateStr}')">+ Запланировать публикацию</button>
             </div>`;
         });
     }
@@ -4124,7 +4124,7 @@ function renderWeeklySchedule() {
 
     const schedule = agentSettings.weeklySchedule || [];
     if (schedule.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Расписание пока не задано.</div>`;
+        container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Расписание пока не задано.</div>`;
         return;
     }
 
@@ -4195,7 +4195,7 @@ function renderPlanNotes() {
 
     const notes = contentPlanBlocks.filter(b => b.kind !== 'quarter');
     if (notes.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Заметок пока нет — добавьте первую.</div>`;
+        container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Заметок пока нет — добавьте первую.</div>`;
         return;
     }
 
@@ -4219,7 +4219,7 @@ function renderPlanTimeline() {
 
     const quarters = contentPlanBlocks.filter(b => b.kind === 'quarter');
     if (quarters.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Кварталов пока нет — добавьте первый.</div>`;
+        container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Кварталов пока нет — добавьте первый.</div>`;
         return;
     }
 
@@ -4305,7 +4305,7 @@ function renderClientsView() {
     if (!container) return;
 
     if (niches.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую.</div>`;
+        container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую.</div>`;
         return;
     }
 
@@ -4313,11 +4313,11 @@ function renderClientsView() {
     niches.forEach(n => {
         const sectionsCount = (n.sections || []).length;
         html += `
-        <div class="product-card" onclick="openNicheDetail('${n.id}')">
+        <div class="ui-card ui-card--interactive product-card" onclick="openNicheDetail('${n.id}')">
             <div>
                 <div class="card-header">
                     <div class="card-title">${n.name}</div>
-                    <span class="card-badge" style="background:rgba(10,132,255,0.15); color:var(--accent-blue)">${sectionsCount} раздел.</span>
+                    <span class="ui-badge ui-badge--caps" style="background:rgba(10,132,255,0.15); color:var(--accent-blue)">${sectionsCount} раздел.</span>
                 </div>
                 <div class="card-desc">${n.subtitle || 'Без описания'}</div>
             </div>
@@ -4395,7 +4395,7 @@ function renderCallModeHtml(niche) {
     });
 
     if (sections.length === 0) {
-        html += `<div class="info-box" style="text-align:center; color:var(--text-secondary);">В скрипте пока нет разделов.</div>`;
+        html += `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">В скрипте пока нет разделов.</div>`;
     }
     return html;
 }
@@ -4416,8 +4416,8 @@ function renderEditModeHtml(niche) {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px;">
             <div class="p-section-title" style="margin:0;">СКРИПТ ЖИВОГО ЗВОНКА</div>
             <div style="display:flex; gap:6px;">
-                <button class="edit-btn" style="font-size:11px; padding:6px 10px;" onclick="expandAllNicheSections(true)">Развернуть все</button>
-                <button class="edit-btn" style="font-size:11px; padding:6px 10px;" onclick="expandAllNicheSections(false)">Свернуть все</button>
+                <button class="ui-btn ui-btn--secondary" style="font-size:11px; padding:6px 10px;" onclick="expandAllNicheSections(true)">Развернуть все</button>
+                <button class="ui-btn ui-btn--secondary" style="font-size:11px; padding:6px 10px;" onclick="expandAllNicheSections(false)">Свернуть все</button>
             </div>
         </div>
         <div id="niche-sections-list">`;
@@ -4429,35 +4429,35 @@ function renderEditModeHtml(niche) {
             <div class="script-section-head ${collapsed ? '' : 'expanded'}" onclick="toggleNicheSection('${s.id}')">
                 <span class="section-chevron">${collapsed ? '▶' : '▼'}</span>
                 <input type="text" class="form-input script-section-heading" value="${escapeHtml(s.heading)}" placeholder="Название раздела" onclick="event.stopPropagation()" oninput="setNicheSectionField(${idx}, 'heading', this.value)">
-                <button class="delete-btn" onclick="event.stopPropagation(); removeNicheSection(${idx})">🗑</button>
+                <button class="ui-btn ui-btn--danger" onclick="event.stopPropagation(); removeNicheSection(${idx})">🗑</button>
             </div>
             ${collapsed ? '' : `
                 <textarea class="form-textarea script-section-text" placeholder="Текст раздела скрипта..." onclick="event.stopPropagation()" oninput="setNicheSectionField(${idx}, 'text', this.value)">${escapeHtml(s.text)}</textarea>
                 <div style="display:flex; gap:8px; margin:-6px 0 10px;" onclick="event.stopPropagation()">
                     <input type="text" class="form-input" id="niche-section-prompt-${s.id}" style="margin:0;" placeholder="Что сгенерировать для этого раздела...">
-                    <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheSectionText(${idx}, '${s.id}')">✨</button>
+                    <button class="ui-btn ui-btn--secondary" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheSectionText(${idx}, '${s.id}')">✨</button>
                 </div>
                 <div id="niche-section-status-${s.id}" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin:-6px 0 10px;"></div>`}
         </div>`;
     });
 
     html += `</div>
-        <button class="edit-btn" style="width:100%; margin-top:8px;" onclick="addNicheSection()">+ Добавить раздел</button>
-        <div class="info-box" style="margin-top:16px; font-size:12px; color:var(--text-secondary);">
+        <button class="ui-btn ui-btn--secondary" style="width:100%; margin-top:8px;" onclick="addNicheSection()">+ Добавить раздел</button>
+        <div class="ui-card info-box" style="margin-top:16px; font-size:12px; color:var(--text-secondary);">
             Генерация каждого раздела использует общий «Тон голоса» из настроек Центра агентов плюс промпт, который вы укажете для конкретного раздела — так стиль остаётся единым по всему скрипту, даже если разделы генерируются по отдельности.
         </div>
 
         <div class="p-section-title" style="margin-top:24px;">ПРЕДЛОЖЕНИЕ ДЛЯ ХОЛОДНЫХ ЗВОНКОВ</div>
         <div style="display:flex; gap:8px; margin-bottom:6px;">
             <input type="text" class="form-input" style="margin:0;" id="niche-pitch-prompt" placeholder="Что учесть при генерации (кейс из портфолио, акцент)...">
-            <button class="edit-btn" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNichePitchText()">✨</button>
+            <button class="ui-btn ui-btn--secondary" style="flex-shrink:0;" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNichePitchText()">✨</button>
         </div>
         <div id="niche-pitch-status" style="font-size:11px; color:var(--text-secondary); min-height:14px; margin-bottom:4px;"></div>
         <textarea class="form-textarea script-section-text" id="niche-pitch-input" placeholder="Текст сообщения, которое отправляете лиду в Telegram, если он ещё думает..." oninput="setNichePitchField(this.value)">${escapeHtml(niche.coldCallPitch || '')}</textarea>
-        <button class="edit-btn" style="margin-top:6px;" onclick="copyNichePitch()">📋 Скопировать</button>
+        <button class="ui-btn ui-btn--secondary" style="margin-top:6px;" onclick="copyNichePitch()">📋 Скопировать</button>
 
-        <button class="submit-btn" style="margin-top:16px;" onclick="saveNicheDetail()">Сохранить скрипт</button>
-        <button class="delete-btn" style="width:100%; margin-top:8px; justify-content:center;" onclick="deleteNiche('${niche.id}')">🗑 Удалить нишу</button>`;
+        <button class="ui-btn ui-btn--primary ui-btn--block ui-btn--lg" style="margin-top:16px;" onclick="saveNicheDetail()">Сохранить скрипт</button>
+        <button class="ui-btn ui-btn--danger" style="width:100%; margin-top:8px; justify-content:center;" onclick="deleteNiche('${niche.id}')">🗑 Удалить нишу</button>`;
 
     return html;
 }
@@ -4645,7 +4645,7 @@ async function runUrlCheck() {
     const loadingText = mode === 'live'
         ? 'Открываю сайт в браузере (полная проверка), это займёт больше времени...'
         : 'Сканирую сайт и запускаю нагрузочный тест...';
-    document.getElementById('url-checker-results').innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary); margin-top:20px;">${loadingText}</div>`;
+    document.getElementById('url-checker-results').innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary); margin-top:20px;">${loadingText}</div>`;
 
     const liveView = document.getElementById('url-checker-live-view');
     if (mode === 'live') {
@@ -4663,7 +4663,7 @@ async function runUrlCheck() {
         urlCheckerLastReport = report;
         renderUrlCheckReport(report);
     } catch (e) {
-        document.getElementById('url-checker-results').innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red); margin-top:20px;">Ошибка: ${escapeHtml(e.message)}</div>`;
+        document.getElementById('url-checker-results').innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--accent-red); margin-top:20px;">Ошибка: ${escapeHtml(e.message)}</div>`;
     } finally {
         btn.disabled = false;
         btn.textContent = 'Проверить';
@@ -4745,13 +4745,13 @@ function renderUrlCheckReport(report) {
     }[v]);
 
     const findingsHtml = findings.length === 0
-        ? `<div class="info-box" style="color:var(--text-secondary);">Находок не обнаружено статическим анализом HTML.</div>`
+        ? `<div class="ui-card info-box" style="color:var(--text-secondary);">Находок не обнаружено статическим анализом HTML.</div>`
         : findings.map(f => {
             const verdictInfo = verdictInfoFor(f.verdict);
             return `
             <div class="uc-finding">
                 <div class="uc-finding-head">
-                    <span class="format-tag" style="background:${severityBg[f.severity] || severityBg.low}; color:${severityColor[f.severity] || severityColor.low}">${escapeHtml(String(f.severity || '').toUpperCase())}</span>
+                    <span class="ui-badge ui-badge--orange" style="background:${severityBg[f.severity] || severityBg.low}; color:${severityColor[f.severity] || severityColor.low}">${escapeHtml(String(f.severity || '').toUpperCase())}</span>
                     <b>${escapeHtml(f.ruleId || '')}</b>
                 </div>
                 <div class="idea-desc-text">${escapeHtml(f.message || '')}</div>
@@ -4762,7 +4762,7 @@ function renderUrlCheckReport(report) {
         }).join('');
 
     const loadTestHtml = lt.error
-        ? `<div class="info-box" style="color:var(--accent-red);">Ошибка нагрузочного теста: ${escapeHtml(lt.error)}</div>`
+        ? `<div class="ui-card info-box" style="color:var(--accent-red);">Ошибка нагрузочного теста: ${escapeHtml(lt.error)}</div>`
         : `<div class="uc-stats-row" style="margin-bottom:12px;">
             <div class="uc-stat"><span class="uc-stat-label">Запросов</span><span class="uc-stat-value">${lt.totalRequests ?? '—'}</span></div>
             <div class="uc-stat"><span class="uc-stat-label">Ошибок</span><span class="uc-stat-value">${lt.errors ?? 0} (${Math.round((lt.errorRate || 0) * 100)}%)</span></div>
@@ -4784,7 +4784,7 @@ function renderUrlCheckReport(report) {
 
     const cookieBanner = report.cookieBanner;
     const cookieBannerHtml = cookieBanner ? `
-        <div class="info-box" style="margin-top:10px; color:${cookieBanner.clicked ? 'var(--accent-green)' : 'var(--text-secondary)'};">
+        <div class="ui-card info-box" style="margin-top:10px; color:${cookieBanner.clicked ? 'var(--accent-green)' : 'var(--text-secondary)'};">
             ${cookieBanner.clicked
                 ? `Баннер cookie обнаружен, нажата кнопка отклонения: «${escapeHtml(cookieBanner.buttonText || '')}»`
                 : cookieBanner.detected
@@ -4813,7 +4813,7 @@ function renderUrlCheckReport(report) {
 
         <div class="controls-row" style="margin-top:24px;">
             <p style="color:var(--text-secondary); font-size:11px; margin:0;">Эвристическая проверка, не юридическое заключение. Нагрузочный тест — только для своих/клиентских проектов.</p>
-            <button class="edit-btn" id="url-checker-pdf-btn" onclick="generateUrlCheckPdf()">📄 Сформировать и скачать PDF</button>
+            <button class="ui-btn ui-btn--secondary" id="url-checker-pdf-btn" onclick="generateUrlCheckPdf()">📄 Сформировать и скачать PDF</button>
         </div>
     `;
 }
@@ -4898,7 +4898,7 @@ async function renderScrapeNiches() {
     try {
         scrapeNiches = await api('/api/scrape-niches');
     } catch (e) {
-        list.innerHTML = `<div class="cc-placeholder">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        list.innerHTML = `<div class="ui-empty">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
         return;
     }
     drawScrapeNiches();
@@ -4930,11 +4930,11 @@ function drawScrapeNiches() {
     const list = document.getElementById('scrape-niches-list');
     if (!list) return;
     if (scrapeNiches.length === 0) {
-        list.innerHTML = `<div class="cc-placeholder cc-placeholder-hero">
-            <div class="cc-placeholder-icon">🤖</div>
+        list.innerHTML = `<div class="ui-empty ui-empty--hero">
+            <div class="ui-empty__icon">🤖</div>
             <b>Вторая база — по сайтам компаний</b>
             <p>Локальный агент найдёт сайты по нише и городу, воркер обойдёт их и снимет телефоны, email и соцсети. То, чего нет в 2ГИС.</p>
-            <button class="cc-primary cc-primary-inline" onclick="addScrapeNicheCard()">+ Добавить нишу</button>
+            <button class="ui-btn ui-btn--primary" onclick="addScrapeNicheCard()">+ Добавить нишу</button>
         </div>`;
         return;
     }
@@ -4947,18 +4947,18 @@ function renderScrapeNicheCard(n) {
     const done = stats.sites_done || 0;
     const total = stats.sites_total || 0;
     return `
-    <div class="cc-card">
+    <div class="ui-card cc-card">
         <div class="cc-head">
             <div class="cc-head-main">
                 <div class="cc-head-title">${escapeHtml(n.category)}</div>
                 <div class="cc-head-meta">
-                    <span class="parser-niche-status ${n.status}">${SCRAPE_STATUS_LABELS[n.status] || n.status}</span>
-                    ${n.city ? `<span class="cc-pill">${escapeHtml(n.city)}</span>` : ''}
-                    ${n.results.length ? `<span class="cc-pill cc-pill-done">Собрано: ${n.results.length}</span>` : ''}
-                    ${total ? `<span class="cc-pill">${done}/${total} сайтов</span>` : ''}
+                    <span class="${statusBadgeClass(n.status)}">${SCRAPE_STATUS_LABELS[n.status] || n.status}</span>
+                    ${n.city ? `<span class="ui-badge">${escapeHtml(n.city)}</span>` : ''}
+                    ${n.results.length ? `<span class="ui-badge ui-badge--green">Собрано: ${n.results.length}</span>` : ''}
+                    ${total ? `<span class="ui-badge">${done}/${total} сайтов</span>` : ''}
                 </div>
             </div>
-            <button class="delete-btn" onclick="deleteScrapeNiche('${n.id}')" title="Удалить нишу">🗑</button>
+            <button class="ui-btn ui-btn--danger" onclick="deleteScrapeNiche('${n.id}')" title="Удалить нишу">🗑</button>
         </div>
         <div class="cc-body">
             <div class="cc-topic-row">
@@ -4998,9 +4998,9 @@ function renderScrapeNicheCard(n) {
 
             <div class="cc-actions">
                 ${active
-                    ? `<button class="cc-secondary cc-danger" onclick="cancelScrapeNiche('${n.id}')">⏹ Остановить</button>`
-                    : `<button class="cc-primary cc-primary-inline" onclick="runScrapeNiche('${n.id}')">${n.results.length ? '🔁 Дособрать новые' : '🔎 Найти и собрать'}</button>`}
-                ${n.results.length ? `<button class="cc-secondary" onclick="window.location='/api/scrape-niches/${n.id}/download'">⬇ XLSX</button>` : ''}
+                    ? `<button class="ui-btn ui-btn--danger" onclick="cancelScrapeNiche('${n.id}')">⏹ Остановить</button>`
+                    : `<button class="ui-btn ui-btn--primary" onclick="runScrapeNiche('${n.id}')">${n.results.length ? '🔁 Дособрать новые' : '🔎 Найти и собрать'}</button>`}
+                ${n.results.length ? `<button class="ui-btn ui-btn--secondary" onclick="window.location='/api/scrape-niches/${n.id}/download'">⬇ XLSX</button>` : ''}
             </div>
         </div>
     </div>`;
@@ -5096,13 +5096,13 @@ async function renderMergedBase() {
     const tableBox = document.getElementById('merged-table');
     if (!tableBox) return;
     const category = document.getElementById('merged-category-select')?.value || '';
-    tableBox.innerHTML = `<div class="cc-placeholder">Собираем сводную базу…</div>`;
+    tableBox.innerHTML = `<div class="ui-empty">Собираем сводную базу…</div>`;
 
     let data;
     try {
         data = await api(`/api/scrape-niches/merged${category ? `?category=${encodeURIComponent(category)}` : ''}`);
     } catch (e) {
-        tableBox.innerHTML = `<div class="cc-placeholder">Не удалось собрать: ${escapeHtml(e.message)}</div>`;
+        tableBox.innerHTML = `<div class="ui-empty">Не удалось собрать: ${escapeHtml(e.message)}</div>`;
         return;
     }
 
@@ -5115,15 +5115,15 @@ async function renderMergedBase() {
     const s = data.stats;
     statsBox.innerHTML = `
         <div class="merged-stats">
-            <div class="merged-stat"><b>${s.total}</b><span>всего организаций</span></div>
-            <div class="merged-stat"><b class="ok">${s.both}</b><span>в обеих базах</span></div>
-            <div class="merged-stat"><b>${s.onlyParser}</b><span>только 2ГИС</span></div>
-            <div class="merged-stat"><b>${s.onlyScrape}</b><span>только ScrapeGraph</span></div>
-            <div class="merged-stat"><b>${s.withEmail}</b><span>с email</span></div>
+            <div class="ui-card merged-stat"><b>${s.total}</b><span>всего организаций</span></div>
+            <div class="ui-card merged-stat"><b class="ok">${s.both}</b><span>в обеих базах</span></div>
+            <div class="ui-card merged-stat"><b>${s.onlyParser}</b><span>только 2ГИС</span></div>
+            <div class="ui-card merged-stat"><b>${s.onlyScrape}</b><span>только ScrapeGraph</span></div>
+            <div class="ui-card merged-stat"><b>${s.withEmail}</b><span>с email</span></div>
         </div>`;
 
     if (!data.rows.length) {
-        tableBox.innerHTML = `<div class="cc-placeholder">Пусто. Соберите хотя бы одну нишу в 2ГИС-парсере или в ScrapeGraph — сводная строится из них.</div>`;
+        tableBox.innerHTML = `<div class="ui-empty">Пусто. Соберите хотя бы одну нишу в 2ГИС-парсере или в ScrapeGraph — сводная строится из них.</div>`;
         return;
     }
 
@@ -5144,8 +5144,8 @@ async function renderMergedBase() {
                             <td>${escapeHtml(r.email || '')}</td>
                             <td>${[r.telegram, r.vk, r.instagram].filter(Boolean).map(escapeHtml).join('<br>')}</td>
                             <td>${r.sources.length > 1
-                                ? `<span class="cc-pill cc-pill-done">оба</span>`
-                                : `<span class="cc-pill">${SOURCE_LABELS[r.sources[0]] || r.sources[0]}</span>`}</td>
+                                ? `<span class="ui-badge ui-badge--green">оба</span>`
+                                : `<span class="ui-badge">${SOURCE_LABELS[r.sources[0]] || r.sources[0]}</span>`}</td>
                         </tr>`).join('')}
                 </tbody>
             </table>
@@ -5163,13 +5163,26 @@ async function renderParserNiches() {
     try {
         parserNiches = await api('/api/parser-niches');
     } catch (e) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
         return;
     }
     drawParserNiches();
     parserNiches.forEach(n => {
         if (['queued', 'running', 'captcha', 'dedupe_running'].includes(n.status)) startParserPolling(n.id);
     });
+}
+
+// Состояние задачи парсера -> тон бейджа (.ui-badge). Отдельная таблица, а не
+// класс на каждое состояние в CSS: состояний девять, а тонов пять, и часть
+// состояний делит один тон - «в очереди» и «идёт» оба синие.
+const STATUS_TONES = {
+    idle: '', cancelled: '',
+    queued: 'ui-badge--blue', running: 'ui-badge--blue', searching: 'ui-badge--purple',
+    captcha: 'ui-badge--orange', done: 'ui-badge--green', error: 'ui-badge--red',
+    dedupe_running: 'ui-badge--purple',
+};
+function statusBadgeClass(status) {
+    return `ui-badge ui-badge--caps ${STATUS_TONES[status] || ''}`.trim();
 }
 
 const PARSER_STATUS_LABELS = {
@@ -5188,14 +5201,14 @@ function drawParserNiches() {
     const container = document.getElementById('parser-niches-grid');
     if (container) {
         if (parserNiches.length === 0) {
-            container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую кнопкой выше.</div>`;
+            container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Ниш пока нет — добавьте первую кнопкой выше.</div>`;
         } else {
             container.innerHTML = parserNiches.map(n => `
-                <div class="product-card" onclick="openParserNicheDetail('${n.id}')">
+                <div class="ui-card ui-card--interactive product-card" onclick="openParserNicheDetail('${n.id}')">
                     <div>
                         <div class="card-header">
                             <div class="card-title">${escapeHtml(n.category || 'Без названия')}</div>
-                            <span class="parser-niche-status ${n.status}">${PARSER_STATUS_LABELS[n.status] || n.status}</span>
+                            <span class="${statusBadgeClass(n.status)}">${PARSER_STATUS_LABELS[n.status] || n.status}</span>
                         </div>
                         <div class="card-desc">${escapeHtml(n.city || 'Москва')}</div>
                     </div>
@@ -5263,7 +5276,7 @@ function renderParserNicheDetailContent(id) {
 
         <div class="cc-label-row">
             <label class="cc-label" for="parser-desc-${n.id}">Ключевые слова для 2ГИС</label>
-            <button class="cc-link" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨ Подобрать</button>
+            <button class="ui-btn ui-btn--link" title="Сгенерировать через local-claude-agent на вашем ПК" onclick="generateNicheDescription('${n.id}')">✨ Подобрать</button>
         </div>
         <textarea class="form-textarea cc-input" id="parser-desc-${n.id}"
             placeholder="кальянная, лаунж, hookah, кальян-бар"
@@ -5292,21 +5305,21 @@ function renderParserNicheDetailContent(id) {
         <div class="pn-actions">
             <div class="pn-actions-group">
                 ${active
-                    ? `<button class="cc-secondary cc-danger" onclick="cancelParserNiche('${n.id}')">⏹ Остановить</button>`
-                    : `<button class="cc-primary cc-primary-inline" onclick="runParserNiche('${n.id}')">▶ Обновить парсер</button>`}
-                ${n.status === 'captcha' ? `<a class="cc-secondary" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
+                    ? `<button class="ui-btn ui-btn--danger" onclick="cancelParserNiche('${n.id}')">⏹ Остановить</button>`
+                    : `<button class="ui-btn ui-btn--primary" onclick="runParserNiche('${n.id}')">▶ Обновить парсер</button>`}
+                ${n.status === 'captcha' ? `<a class="ui-btn ui-btn--secondary" href="/vnc/vnc.html?autoconnect=true" target="_blank" style="text-decoration:none;">🖥 Открыть VNC</a>` : ''}
             </div>
             <div class="pn-actions-group">
-                <label class="cc-secondary parser-upload-btn" ${active ? 'style="opacity:.5; pointer-events:none;"' : ''}>
+                <label class="ui-btn ui-btn--secondary parser-upload-btn" ${active ? 'style="opacity:.5; pointer-events:none;"' : ''}>
                     📤 Загрузить Excel
                     <input type="file" accept=".xlsx" style="display:none;" onchange="uploadParserNicheFile('${n.id}', this)">
                 </label>
-                ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="cc-secondary" onclick="dedupeParserNiche('${n.id}')">🧹 Убрать дубли</button>` : ''}
-                ${n.canDedupeUpload && !n.files.dedup ? `<button class="cc-secondary" onclick="dedupeParserNicheUpload('${n.id}')">🧹 Убрать дубли</button>` : ''}
-                ${n.files.raw && n.jobId ? `<button class="cc-secondary" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
+                ${n.files.raw && n.jobId && !n.files.dedup ? `<button class="ui-btn ui-btn--secondary" onclick="dedupeParserNiche('${n.id}')">🧹 Убрать дубли</button>` : ''}
+                ${n.canDedupeUpload && !n.files.dedup ? `<button class="ui-btn ui-btn--secondary" onclick="dedupeParserNicheUpload('${n.id}')">🧹 Убрать дубли</button>` : ''}
+                ${n.files.raw && n.jobId ? `<button class="ui-btn ui-btn--secondary" onclick="archiveParserNiche('${n.id}')">🗄 Архивировать</button>` : ''}
             </div>
             <div class="pn-actions-spacer"></div>
-            <button class="cc-secondary cc-danger" onclick="removeParserNiche('${n.id}')">🗑 Удалить нишу</button>
+            <button class="ui-btn ui-btn--danger" onclick="removeParserNiche('${n.id}')">🗑 Удалить нишу</button>
         </div>
     `;
 
@@ -5608,7 +5621,7 @@ async function renderMediaAssets() {
         const qs = params.toString();
         mediaAssets = await api(`/api/media-assets${qs ? '?' + qs : ''}`);
     } catch (e) {
-        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
         return;
     }
     drawMediaAssetFilters();
@@ -5704,7 +5717,7 @@ function drawMediaAssetsGrid() {
     if (!grid) return;
 
     if (mediaAssets.length === 0) {
-        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Медиа пока нет — добавьте первую ссылку кнопкой выше.</div>`;
+        grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Медиа пока нет — добавьте первую ссылку кнопкой выше.</div>`;
         return;
     }
 
@@ -5719,11 +5732,11 @@ function drawMediaAssetsGrid() {
             const items = groups[key];
             const label = key === MEDIA_NO_FOLDER_KEY ? 'Без темы' : key;
             return `
-            <div class="product-card" onclick="openMediaFolder('${escapeHtml(key).replace(/'/g, "\\'")}')">
+            <div class="ui-card ui-card--interactive product-card" onclick="openMediaFolder('${escapeHtml(key).replace(/'/g, "\\'")}')">
                 ${mediaAssetPreviewHtml(items[0])}
                 <div class="card-header" style="margin-top:10px;">
                     <div class="card-title" style="font-size:15px;">${escapeHtml(label)}</div>
-                    <span class="card-badge" style="background:rgba(255,255,255,0.08); color:var(--text-secondary);">${items.length}</span>
+                    <span class="ui-badge ui-badge--caps" style="background:rgba(255,255,255,0.08); color:var(--text-secondary);">${items.length}</span>
                 </div>
             </div>`;
         }).join('');
@@ -5734,7 +5747,7 @@ function drawMediaAssetsGrid() {
     const folderLabel = mediaAssetOpenFolder === MEDIA_NO_FOLDER_KEY ? 'Без темы' : mediaAssetOpenFolder;
     grid.innerHTML = `
         <div style="grid-column:1/-1; display:flex; align-items:center; gap:10px; margin-bottom:4px;">
-            <button class="edit-btn" onclick="openMediaFolder(null)">← Все папки</button>
+            <button class="ui-btn ui-btn--secondary" onclick="openMediaFolder(null)">← Все папки</button>
             <b>${escapeHtml(folderLabel)}</b>
         </div>` +
         folderAssets.map(asset => `
@@ -5742,16 +5755,16 @@ function drawMediaAssetsGrid() {
             ${mediaAssetPreviewHtml(asset)}
             <div class="media-asset-body">
                 <div class="media-asset-meta-row">
-                    <span class="format-tag">${escapeHtml(asset.type)}</span>
-                    ${asset.productId ? `<span class="format-tag" style="color:var(--accent-blue);">${escapeHtml(mediaAssetProductLabel(asset.productId))}</span>` : ''}
+                    <span class="ui-badge ui-badge--orange">${escapeHtml(asset.type)}</span>
+                    ${asset.productId ? `<span class="ui-badge ui-badge--orange" style="color:var(--accent-blue);">${escapeHtml(mediaAssetProductLabel(asset.productId))}</span>` : ''}
                     <span style="font-size:11px; color:var(--text-secondary); margin-left:auto;">исп.: ${asset.usedCount}</span>
                 </div>
                 ${asset.tags.length ? `<div class="media-asset-tags">${asset.tags.map(t => `<span class="group-chip" style="cursor:default;">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
                 ${mediaAssetSubtextHtml(asset)}
                 <div class="parser-niche-actions">
-                    <button class="edit-btn" onclick="openMediaLightbox('${asset.id}')">Открыть</button>
-                    <button class="schedule-btn" onclick="openUseAssetModal('${asset.id}')">▶ Использовать</button>
-                    <button class="delete-btn" onclick="deleteMediaAsset('${asset.id}')">Удалить</button>
+                    <button class="ui-btn ui-btn--secondary" onclick="openMediaLightbox('${asset.id}')">Открыть</button>
+                    <button class="ui-btn ui-btn--primary" onclick="openUseAssetModal('${asset.id}')">▶ Использовать</button>
+                    <button class="ui-btn ui-btn--danger" onclick="deleteMediaAsset('${asset.id}')">Удалить</button>
                 </div>
             </div>
         </div>
@@ -6198,8 +6211,8 @@ function renderSourcesPreview(candidates) {
                 </label>`).join('')}
         </div>
         <div style="margin-top:8px;">
-            <button class="schedule-btn" onclick="confirmSourcesPreview()">Добавить выбранные</button>
-            <button class="edit-btn" onclick="document.getElementById('as-sources-preview').style.display='none';">Отмена</button>
+            <button class="ui-btn ui-btn--primary" onclick="confirmSourcesPreview()">Добавить выбранные</button>
+            <button class="ui-btn ui-btn--secondary" onclick="document.getElementById('as-sources-preview').style.display='none';">Отмена</button>
         </div>`;
 }
 
@@ -6225,8 +6238,8 @@ function renderKeywordsPreview(candidates) {
                 </label>`).join('')}
         </div>
         <div style="margin-top:8px;">
-            <button class="schedule-btn" onclick="confirmKeywordsPreview()">Добавить выбранные</button>
-            <button class="edit-btn" onclick="document.getElementById('as-keywords-preview').style.display='none';">Отмена</button>
+            <button class="ui-btn ui-btn--primary" onclick="confirmKeywordsPreview()">Добавить выбранные</button>
+            <button class="ui-btn ui-btn--secondary" onclick="document.getElementById('as-keywords-preview').style.display='none';">Отмена</button>
         </div>`;
 }
 
@@ -6278,11 +6291,11 @@ async function confirmKeywordsPreview() {
 // это конфигурация контент-производства, как тон голоса и промпты выше)
 async function loadContentRubrics() {
     const grid = document.getElementById('rubrics-grid');
-    if (grid) grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
+    if (grid) grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Загрузка...</div>`;
     try {
         contentRubrics = await api('/api/content-rubrics?all=1');
     } catch (e) {
-        if (grid) grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+        if (grid) grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
         return;
     }
     drawRubricsGrid();
@@ -6294,23 +6307,23 @@ function drawRubricsGrid() {
     if (!grid) return;
 
     if (contentRubrics.length === 0) {
-        grid.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Рубрик пока нет — добавьте первую кнопкой выше.</div>`;
+        grid.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Рубрик пока нет — добавьте первую кнопкой выше.</div>`;
         return;
     }
 
     grid.innerHTML = contentRubrics.map(r => `
-        <div class="parser-niche-card">
+        <div class="ui-card ui-card--gradient parser-niche-card">
             <div class="parser-niche-head">
                 <b>${escapeHtml(r.name)}</b>
-                <span class="parser-niche-status ${r.isActive ? 'done' : 'idle'}">${r.isActive ? 'Активна' : 'Отключена'}</span>
+                <span class="${statusBadgeClass(r.isActive ? 'done' : 'idle')}">${r.isActive ? 'Активна' : 'Отключена'}</span>
             </div>
             ${r.description ? `<p class="idea-desc-text" style="margin:0;">${escapeHtml(r.description)}</p>` : ''}
-            <div class="media-asset-meta-row"><span class="format-tag">${escapeHtml(r.targetFunnel)}</span></div>
+            <div class="media-asset-meta-row"><span class="ui-badge ui-badge--orange">${escapeHtml(r.targetFunnel)}</span></div>
             ${r.structureTemplate.length ? `<div class="media-asset-tags">${r.structureTemplate.map(s => `<span class="group-chip" style="cursor:default;">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
             <div class="parser-niche-actions">
-                <button class="edit-btn" onclick="editRubric('${r.id}')">✏️ Изменить</button>
-                <button class="edit-btn" onclick="toggleRubricActive('${r.id}')">${r.isActive ? '🚫 Отключить' : '✅ Включить'}</button>
-                <button class="delete-btn" onclick="deleteRubric('${r.id}')">Удалить</button>
+                <button class="ui-btn ui-btn--secondary" onclick="editRubric('${r.id}')">✏️ Изменить</button>
+                <button class="ui-btn ui-btn--secondary" onclick="toggleRubricActive('${r.id}')">${r.isActive ? '🚫 Отключить' : '✅ Включить'}</button>
+                <button class="ui-btn ui-btn--danger" onclick="deleteRubric('${r.id}')">Удалить</button>
             </div>
         </div>
     `).join('');
@@ -6478,17 +6491,17 @@ async function scanTelegramWatch() {
         const channels = result.channels || [];
         feed.innerHTML = channels.map(ch => {
             if (ch.error) {
-                return `<div class="info-box" style="border-color:var(--accent-red);"><b>@${escapeHtml(ch.username)}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(ch.error)}</p></div>`;
+                return `<div class="ui-card info-box" style="border-color:var(--accent-red);"><b>@${escapeHtml(ch.username)}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(ch.error)}</p></div>`;
             }
             if (!ch.posts.length) {
-                return `<div class="info-box"><b>${escapeHtml(ch.title)}</b><p class="idea-desc-text">Постов не найдено.</p></div>`;
+                return `<div class="ui-card info-box"><b>${escapeHtml(ch.title)}</b><p class="idea-desc-text">Постов не найдено.</p></div>`;
             }
             return ch.posts.map(p => `
-                <div class="info-box">
+                <div class="ui-card info-box">
                     <div class="media-asset-meta-row" style="margin-bottom:6px;">
                         <b>${escapeHtml(ch.title)}</b>
                         ${p.date ? `<span style="color:var(--text-secondary); font-size:11px;">${new Date(p.date).toLocaleString('ru-RU')}</span>` : ''}
-                        ${p.views !== null ? `<span class="format-tag">👁 ${p.views}</span>` : ''}
+                        ${p.views !== null ? `<span class="ui-badge ui-badge--orange">👁 ${p.views}</span>` : ''}
                     </div>
                     <p class="idea-desc-text" style="white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(p.text)}</p>
                     <a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" style="font-size:12px;">Открыть в Telegram →</a>
@@ -6577,18 +6590,18 @@ async function scanInstagramWatch() {
         feed.innerHTML = accounts.map(acc => {
             const header = `@${escapeHtml(acc.username)}${acc.followersCount !== null ? ` · ${acc.followersCount.toLocaleString('ru-RU')} подписчиков` : ''}`;
             if (acc.error) {
-                return `<div class="info-box" style="border-color:var(--accent-red);"><b>${header}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(acc.error)}</p></div>`;
+                return `<div class="ui-card info-box" style="border-color:var(--accent-red);"><b>${header}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(acc.error)}</p></div>`;
             }
             if (!acc.posts.length) {
-                return `<div class="info-box"><b>${header}</b><p class="idea-desc-text">Постов не найдено.</p></div>`;
+                return `<div class="ui-card info-box"><b>${header}</b><p class="idea-desc-text">Постов не найдено.</p></div>`;
             }
             return acc.posts.map(p => `
-                <div class="info-box">
+                <div class="ui-card info-box">
                     <div class="media-asset-meta-row" style="margin-bottom:6px;">
                         <b>${header}</b>
                         ${p.timestamp ? `<span style="color:var(--text-secondary); font-size:11px;">${new Date(p.timestamp).toLocaleString('ru-RU')}</span>` : ''}
-                        ${p.likeCount !== null ? `<span class="format-tag">❤️ ${p.likeCount}</span>` : ''}
-                        ${p.commentsCount !== null ? `<span class="format-tag">💬 ${p.commentsCount}</span>` : ''}
+                        ${p.likeCount !== null ? `<span class="ui-badge ui-badge--orange">❤️ ${p.likeCount}</span>` : ''}
+                        ${p.commentsCount !== null ? `<span class="ui-badge ui-badge--orange">💬 ${p.commentsCount}</span>` : ''}
                     </div>
                     <p class="idea-desc-text" style="white-space:pre-wrap; margin:0 0 6px;">${escapeHtml(p.caption || '')}</p>
                     ${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" style="font-size:12px;">Открыть в Instagram →</a>` : ''}
@@ -6675,13 +6688,13 @@ async function scanPinterestWatch() {
         feed.innerHTML = boards.map(b => {
             const header = escapeHtml(b.label || b.path);
             if (b.error) {
-                return `<div class="info-box" style="border-color:var(--accent-red);"><b>${header}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(b.error)}</p></div>`;
+                return `<div class="ui-card info-box" style="border-color:var(--accent-red);"><b>${header}</b><p class="idea-desc-text" style="color:var(--accent-red);">${escapeHtml(b.error)}</p></div>`;
             }
             if (!b.posts.length) {
-                return `<div class="info-box"><b>${header}</b><p class="idea-desc-text">Пинов не найдено.</p></div>`;
+                return `<div class="ui-card info-box"><b>${header}</b><p class="idea-desc-text">Пинов не найдено.</p></div>`;
             }
             return b.posts.map(p => `
-                <div class="info-box">
+                <div class="ui-card info-box">
                     <div class="media-asset-meta-row" style="margin-bottom:6px;">
                         <b>${header}</b>
                         ${p.pubDate ? `<span style="color:var(--text-secondary); font-size:11px;">${new Date(p.pubDate).toLocaleString('ru-RU')}</span>` : ''}
@@ -6824,7 +6837,7 @@ async function renderAgentCenter() {
         const runs = await api('/api/agent-runs');
         drawAgentRuns(runs);
     } catch (e) {
-        runsEl.innerHTML = `<div class="info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить историю запусков: ${escapeHtml(e.message)}</div>`;
+        runsEl.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--accent-red);">Не удалось загрузить историю запусков: ${escapeHtml(e.message)}</div>`;
     }
 
     try {
@@ -6849,7 +6862,7 @@ function drawAgentRuns(runs) {
     if (!container) return;
 
     if (!runs || runs.length === 0) {
-        container.innerHTML = `<div class="info-box" style="text-align:center; color:var(--text-secondary);">Запусков агентов пока нет.</div>`;
+        container.innerHTML = `<div class="ui-card info-box" style="text-align:center; color:var(--text-secondary);">Запусков агентов пока нет.</div>`;
         return;
     }
 
@@ -6859,7 +6872,7 @@ function drawAgentRuns(runs) {
         const logFull = r.log || '';
         const logShort = logFull.length > 160 ? logFull.slice(0, 160) + '…' : logFull;
         return `
-        <div class="parser-niche-card">
+        <div class="ui-card ui-card--gradient parser-niche-card">
             <div class="parser-niche-head">
                 <b>${escapeHtml(r.agentName)}</b>
                 <span class="ac-run-status ${escapeHtml(r.status)}">${statusLabels[r.status] || escapeHtml(r.status)}</span>

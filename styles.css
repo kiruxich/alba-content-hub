@@ -240,7 +240,6 @@ body:before {
 .kanban-board { display: flex; gap: 16px; padding: 24px; overflow-x: auto; height: calc(100vh - 120px); }
 .kanban-column { flex: 1; min-width: 250px; background: var(--surface-sunken); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; border: 1px solid var(--border-subtle); }
 .kanban-column-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 15px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 0.5px solid var(--separator); }
-.kanban-count { background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .kanban-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .kanban-card {
     background: var(--surface-raised); border-radius: 12px; padding: 12px;
@@ -254,24 +253,19 @@ body:before {
 
 /* DASHBOARD & ANALYTICS */
 .analytics-container { padding: 24px; max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-.analytics-card { background: var(--surface); border-radius: 16px; padding: 20px; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); }
+.analytics-card { padding: 20px; border-radius: 16px; }
 .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
 .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
-.stat-box { background: var(--surface-sunken); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid var(--border-subtle); }
+.stat-box { padding: 14px; border-radius: 12px; text-align: center; }
 
 /* BADGES & LIMITS */
-.funnel-badge { font-size: 10px; font-weight: 700; padding: 3px 6px; border-radius: 5px; text-transform: uppercase; margin-right: 4px; }
-.limit-badge { font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--accent-green); color: var(--accent-green); display: inline-block; margin-bottom: 12px; }
 .warning-banner { background: rgba(255, 159, 10, 0.15); border: 1px solid var(--accent-orange); color: var(--accent-orange); padding: 12px; border-radius: 12px; font-size: 13px; margin-bottom: 16px; }
 
 .products-grid { padding: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-.product-card { background: var(--surface); border-radius: 16px; padding: 20px; cursor: pointer; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); display: flex; flex-direction: column; justify-content: space-between; transition: transform 200ms var(--ease-out), border-color 200ms var(--ease-out), background-color 200ms var(--ease-out); }
-.product-card:hover { transform: translateY(-2px); border-color: var(--border-strong); background: var(--surface-raised); }
-.product-card:active { transform: translateY(0) scale(0.995); }
+.product-card { padding: 20px; border-radius: 16px; display: flex; flex-direction: column; justify-content: space-between; }
 
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .card-title { font-size: 20px; font-weight: 700; }
-.card-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; text-transform: uppercase; }
 .card-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.45; margin-bottom: 20px; }
 .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--accent-blue); font-weight: 600; border-top: 0.5px solid var(--separator); padding-top: 12px; }
 
@@ -317,11 +311,10 @@ body:before {
 .overlay.active .drawer-content { transform: translateX(0); }
 
 .nav-bar { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(20px); border-bottom: 0.5px solid var(--separator); z-index: 10; }
-.back-btn { color: var(--accent-blue); font-size: 15px; background: none; border: none; cursor: pointer; padding: 0; font-weight: 600; }
 
 .modal-body { padding: 24px; flex: 1; }
 .p-section-title { font-size: 11px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; letter-spacing: 0.5px; margin: 24px 0 10px 4px; }
-.info-box { background: var(--surface); border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.5; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); }
+.info-box { padding: 16px; font-size: 14px; line-height: 1.5; border-radius: 12px; }
 
 .roadmap-list { display: flex; flex-direction: column; gap: 10px; }
 .roadmap-step { background: var(--bg-grouped); border-radius: 12px; padding: 14px; border-left: 3px solid var(--accent-blue); }
@@ -332,10 +325,9 @@ body:before {
 .roadmap-status.in_progress { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
 .roadmap-status.done { background: rgba(48,209,88,0.15); color: var(--accent-green); }
 
-.idea-card { background: var(--surface); border-radius: 14px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border-subtle); box-shadow: var(--hairline-top); position: relative; }
+.idea-card { padding: 16px; margin-bottom: 12px; position: relative; }
 .idea-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
 .idea-title { font-size: 15px; font-weight: 600; flex: 1; padding-right: 8px; }
-.format-tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600; background: rgba(255,255,255,0.08); color: var(--accent-orange); }
 .idea-desc-text { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4; }
 .idea-cta { font-size: 13px; color: var(--accent-blue); font-style: italic; margin-bottom: 12px; }
 
@@ -343,98 +335,158 @@ body:before {
 
 .action-btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
-/* ЕДИНАЯ МЕХАНИКА КНОПОК
-   Раньше каждый класс задавал свои отступы и вес, а варианты различались
-   только цветом заливки: рядом стояли кнопки разной высоты, и ни одна не
-   реагировала на нажатие. Общая часть теперь одна, различаются только три
-   переменные - фон, текст, рамка. Отсюда одинаковая высота в любом ряду,
-   одинаковый отклик и предсказуемое disabled-состояние.
-   Второстепенные кнопки подсвечены волосяной линией по верхнему краю: так
-   читается толщина стеклянного слоя, и это дешевле честной рамки. */
-.schedule-btn, .tg-btn, .edit-btn, .delete-btn, .submit-btn,
-.cc-primary, .cc-secondary {
+/* ==========================================================================
+   ПРИМИТИВ: БЕЙДЖ (.ui-badge)
+   Восемь классов делали одно и то же - пилюля с текстом: cc-pill,
+   format-tag, funnel-badge, card-badge, limit-badge, kanban-count,
+   crm-obj-count, parser-niche-status. Отличались только оттенком и парой
+   пикселей отступа. Форма теперь одна, цвет задаётся тоном.
+   ========================================================================== */
+.ui-badge {
+    --badge-bg: rgba(255, 255, 255, 0.08);
+    --badge-fg: var(--text-secondary);
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 7px;
+    background: var(--badge-bg); color: var(--badge-fg);
+    font-size: 11px; font-weight: 600; line-height: 1.45; white-space: nowrap;
+}
+.ui-badge--blue   { --badge-bg: rgba(10, 132, 255, 0.15);  --badge-fg: var(--accent-blue); }
+.ui-badge--green  { --badge-bg: rgba(48, 209, 88, 0.15);   --badge-fg: var(--accent-green); }
+.ui-badge--orange { --badge-bg: rgba(255, 159, 10, 0.15);  --badge-fg: var(--accent-orange); }
+.ui-badge--red    { --badge-bg: rgba(255, 69, 58, 0.15);   --badge-fg: var(--accent-red); }
+.ui-badge--purple { --badge-bg: rgba(191, 90, 242, 0.15);  --badge-fg: var(--accent-purple); }
+/* Заглавные - для статусов, где важно опознать состояние с одного взгляда,
+   а не прочитать слово. */
+.ui-badge--caps { text-transform: uppercase; letter-spacing: 0.3px; font-weight: 700; }
+.ui-badge--outline { background: transparent; border: 1px solid currentColor; }
+
+/* ==========================================================================
+   ПРИМИТИВ: ПОВЕРХНОСТЬ (.ui-card)
+   Девять классов повторяли один и тот же материал - стекло, рамка,
+   скругление, волосяная линия: idea-card, cc-card, crm-panel,
+   analytics-card, product-card, info-box, stat-box, parser-niche-card,
+   merged-stat. Примитив даёт только материал; раскладку (отступы, flex,
+   grid) по-прежнему задаёт класс конкретного места - иначе пришлось бы
+   тащить в примитив девять разных раскладок.
+   ========================================================================== */
+.ui-card {
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--hairline-top);
+}
+.ui-card--raised { background: var(--surface-raised); }
+.ui-card--sunken { background: var(--surface-sunken); box-shadow: none; }
+.ui-card--flat { box-shadow: none; }
+/* Градиентная поверхность: свет падает сверху-слева. Для крупных карточек,
+   которые должны читаться как отдельный блок, а не как строка списка. */
+.ui-card--gradient {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015) 65%);
+    border-color: rgba(255, 255, 255, 0.09);
+}
+.ui-card--pad { padding: 16px; }
+.ui-card--pad-lg { padding: 20px; }
+/* Кликабельная карточка: подъём при наведении вместо смены цвета. */
+.ui-card--interactive {
+    cursor: pointer;
+    transition: transform 200ms var(--ease-out), border-color 200ms var(--ease-out),
+                background-color 200ms var(--ease-out);
+}
+.ui-card--interactive:hover { transform: translateY(-2px); border-color: var(--border-strong); background: var(--surface-raised); }
+.ui-card--interactive:active { transform: translateY(0) scale(0.995); }
+
+/* ==========================================================================
+   ПРИМИТИВ: ПУСТОЕ СОСТОЯНИЕ (.ui-empty)
+   ========================================================================== */
+.ui-empty {
+    background: var(--surface);
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 14px; padding: 20px; text-align: center;
+    color: var(--text-secondary); font-size: 13px; line-height: 1.5;
+}
+.ui-empty--hero { padding: 40px 24px; }
+.ui-empty--hero .ui-empty__icon { font-size: 30px; margin-bottom: 10px; }
+.ui-empty--hero b { display: block; font-size: 16px; color: var(--text-primary); margin-bottom: 6px; }
+.ui-empty--hero p { max-width: 440px; margin: 0 auto 18px; }
+/* Строчный вариант - когда «пусто» это подпись внутри блока, а не сам блок. */
+.ui-empty--inline { background: none; border: none; padding: 6px 0; text-align: left; font-size: 12.5px; }
+
+/* ==========================================================================
+   ПРИМИТИВ: КНОПКА (.ui-btn)
+   Один элемент на всё приложение. До этого кнопок было десять классов -
+   schedule-btn, edit-btn, submit-btn, delete-btn, cc-primary, cc-secondary,
+   back-btn и далее, - каждый со своей высотой, шрифтом и поведением; общие
+   правила приходилось склеивать длинными списками селекторов, и любая
+   правка требовала не забыть все десять. Теперь общая механика одна,
+   вариант задаётся модификатором и меняет только три переменные.
+   ========================================================================== */
+.ui-btn {
     --btn-bg: transparent;
     --btn-fg: var(--text-primary);
     --btn-border: transparent;
+
     position: relative;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     min-height: var(--control-h); padding: 0 14px;
     border: 1px solid var(--btn-border); border-radius: 11px;
     background: var(--btn-bg); color: var(--btn-fg);
     font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1;
-    white-space: nowrap; cursor: pointer;
+    white-space: nowrap; cursor: pointer; text-decoration: none;
     transition: transform 140ms var(--ease-out), background-color 140ms var(--ease-out),
-                border-color 140ms var(--ease-out), color 140ms var(--ease-out), opacity 140ms var(--ease-out);
+                border-color 140ms var(--ease-out), color 140ms var(--ease-out),
+                box-shadow 140ms var(--ease-out), filter 140ms var(--ease-out),
+                opacity 140ms var(--ease-out);
 }
-.schedule-btn:not(:disabled):active, .tg-btn:not(:disabled):active,
-.edit-btn:not(:disabled):active, .delete-btn:not(:disabled):active,
-.submit-btn:not(:disabled):active, .cc-primary:not(:disabled):active,
-.cc-secondary:not(:disabled):active { transform: scale(0.97); transition-duration: 100ms; }
-
-.schedule-btn:not(:disabled):active, .tg-btn:not(:disabled):active,
-.submit-btn:not(:disabled):active, .cc-primary:not(:disabled):active {
-    transform: translateY(1px) scale(0.985);
-    filter: brightness(0.94);
-    box-shadow:
-        inset 0 1px 2px rgba(0, 0, 0, 0.18),
-        0 1px 2px rgba(0, 0, 0, 0.4);
+.ui-btn:not(:disabled):active { transform: scale(0.97); transition-duration: 100ms; }
+.ui-btn:disabled, .ui-btn[aria-disabled="true"] { opacity: 0.35; cursor: not-allowed; transform: none; }
+.ui-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg-canvas), 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
-.schedule-btn:disabled, .tg-btn:disabled, .edit-btn:disabled, .delete-btn:disabled,
-.submit-btn:disabled, .cc-primary:disabled, .cc-secondary:disabled, .cc-link:disabled {
-    opacity: 0.35; cursor: not-allowed; transform: none;
-}
-.schedule-btn:focus-visible, .tg-btn:focus-visible, .edit-btn:focus-visible,
-.delete-btn:focus-visible, .submit-btn:focus-visible,
-.cc-primary:focus-visible, .cc-secondary:focus-visible {
-    outline: none; box-shadow: 0 0 0 2px var(--bg-canvas), 0 0 0 4px rgba(255, 255, 255, 0.85);
-}
-
-/* Главное действие - единственная сплошная БЕЛАЯ плоскость в ряду. Цветом
+/* Главное действие - единственная сплошная белая плоскость в ряду. Цветом
    здесь ничего не выделяется: рядом со стеклянными кнопками белая читается
-   мгновенно, а синяя заливка спорила с ними за внимание и тянула на себя
-   больше, чем стоит одно действие. Плюс синий в интерфейсе уже занят -
-   ссылки, выделения, информационные числа; кнопка, покрашенная тем же
-   цветом, переставала быть заметной именно как кнопка. */
-.schedule-btn, .tg-btn, .submit-btn, .cc-primary {
+   мгновенно, а синий в интерфейсе уже занят ссылками и числами.
+   Клавиша собрана из слоёв: едва заметный градиент даёт выпуклость, светлая
+   кромка по верху и тёмная по низу - толщину, широкая мягкая тень со
+   смещением сажает её над поверхностью, узкая держит контакт. */
+.ui-btn--primary {
     --btn-bg: linear-gradient(180deg, #ffffff 0%, #e9e9ee 100%);
     --btn-fg: var(--text-on-accent);
     --btn-border: transparent;
-    /* Четыре слоя, а не одна тень. Изнутри: светлая кромка по верху и
-       тёмная по низу дают клавише толщину - плоская заливка выглядит
-       наклейкой. Снаружи: широкая мягкая тень со смещением сажает её над
-       поверхностью, узкая держит контакт с ней. Градиент едва заметен
-       (белый -> #e9e9ee), но именно он читается как выпуклость. */
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.9),
         inset 0 -1px 0 rgba(0, 0, 0, 0.08),
         0 6px 18px -6px rgba(0, 0, 0, 0.65),
         0 1px 2px rgba(0, 0, 0, 0.45);
     letter-spacing: -0.01em;
-    transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out),
-                filter 140ms var(--ease-out), opacity 140ms var(--ease-out);
 }
-.edit-btn, .cc-secondary {
+.ui-btn--secondary {
     --btn-bg: var(--control); --btn-fg: var(--text-primary); --btn-border: var(--border-subtle);
     box-shadow: var(--hairline-top);
 }
-.delete-btn, .cc-danger {
+.ui-btn--danger {
     --btn-bg: var(--danger-surface); --btn-fg: var(--rose-300); --btn-border: var(--danger-border);
-    box-shadow: none;
 }
-/* Выбранное состояние переключателя (площадка, язык) - поднятая поверхность
-   и белый текст, как у сегментов в CRM и активного пункта меню. Красить его
-   заливкой главной кнопки нельзя: это уравняло бы «я выбрал Telegram» и
-   «отправить пост». */
-.edit-btn.on {
+.ui-btn--ghost { --btn-fg: var(--text-secondary); }
+.ui-btn--link {
+    --btn-fg: var(--accent-blue);
+    min-height: 0; padding: 0; border: none; background: none;
+    font-size: 12px; border-radius: 6px;
+}
+.ui-btn--link:not(:disabled):active { transform: none; }
+
+/* Выбранное состояние переключателя (площадка публикации, язык). Красить
+   выбор заливкой главной кнопки нельзя: это уравняло бы «я выбрал Telegram»
+   и «отправить пост». */
+.ui-btn.on {
     --btn-bg: var(--control-hover); --btn-fg: rgba(255, 255, 255, 0.96); --btn-border: var(--border-strong);
 }
 
 @media (hover: hover) and (pointer: fine) {
-    /* Наведение - подъём: клавиша отрывается от поверхности, тень уходит
-       глубже. Осветлять белое некуда, поэтому работает только глубина. */
-    .schedule-btn:not(:disabled):hover, .tg-btn:not(:disabled):hover,
-    .submit-btn:not(:disabled):hover, .cc-primary:not(:disabled):hover {
+    /* Наведение на главную - подъём: осветлять белое некуда, работает
+       только глубина. */
+    .ui-btn--primary:not(:disabled):hover {
         transform: translateY(-1px);
         box-shadow:
             inset 0 1px 0 rgba(255, 255, 255, 0.95),
@@ -442,13 +494,31 @@ body:before {
             0 10px 26px -8px rgba(0, 0, 0, 0.7),
             0 2px 4px rgba(0, 0, 0, 0.45);
     }
-    .edit-btn:not(:disabled):hover, .cc-secondary:not(:disabled):hover {
+    .ui-btn--secondary:not(:disabled):hover {
         --btn-bg: var(--control-hover); --btn-border: var(--border-strong);
     }
-    .delete-btn:not(:disabled):hover, .cc-danger:not(:disabled):hover {
+    .ui-btn--danger:not(:disabled):hover {
         --btn-bg: rgba(255, 69, 58, 0.22); --btn-border: var(--accent-red);
     }
+    .ui-btn--ghost:not(:disabled):hover { --btn-bg: var(--control); --btn-fg: var(--text-primary); }
+    .ui-btn--link:not(:disabled):hover { --btn-fg: #4aa8ff; }
 }
+
+/* Нажатие главной вдавливает клавишу: тень схлопывается внутрь, свет по
+   верхней кромке гаснет. Одного scale мало - он читается как
+   «уменьшилось», а не «нажалось». */
+.ui-btn--primary:not(:disabled):active {
+    transform: translateY(1px) scale(0.985);
+    filter: brightness(0.94);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Размеры и форма */
+.ui-btn--sm { min-height: 32px; padding: 0 11px; font-size: 12px; border-radius: 9px; }
+.ui-btn--lg { min-height: 46px; padding: 0 18px; font-size: 15px; border-radius: 12px; }
+.ui-btn--block { width: 100%; }
+.ui-btn--icon { width: var(--control-h); padding: 0; flex-shrink: 0; }
+.ui-btn--icon.ui-btn--sm { width: 32px; }
 .ps-tab-btn.active { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); }
 
 .form-label { font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700; margin-top:12px; display:block; }
@@ -469,7 +539,6 @@ body:before {
 .form-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; font-family: inherit; line-height: 16px; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
 
 .date-picker-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--separator); background: var(--bg-grouped); color: var(--text-primary); font-size: 16px; margin-top: 10px; color-scheme: dark; }
-.submit-btn { width: 100%; min-height: 46px; padding: 0 18px; border-radius: 12px; font-size: 15px; margin-top: 12px; }
 
 .toast { position: fixed; bottom: 30px; right: 30px; background: var(--accent-green); color: white; padding: 12px 24px; border-radius: 14px; font-size: 14px; font-weight: 600; z-index: 300; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
 .toast.show { transform: translateY(0); opacity: 1; }
@@ -772,21 +841,9 @@ body:before {
 
 /* --- CUSTOMER PARSER (niche cards) --- */
 .parser-niches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 16px; }
-.parser-niche-card {
-    background: linear-gradient(165deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015) 65%);
-    border-radius: 20px; padding: 18px 20px; border: 1px solid rgba(255,255,255,0.09);
-    display: flex; flex-direction: column; gap: 12px;
-}
+.parser-niche-card { border-radius: 20px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
 .parser-niche-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.parser-niche-status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 7px; text-transform: uppercase; }
-.parser-niche-status.idle { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
-.parser-niche-status.queued { background: rgba(10,132,255,0.08); color: var(--accent-blue); }
-.parser-niche-status.running { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
-.parser-niche-status.captcha { background: rgba(255,159,10,0.15); color: var(--accent-orange); }
-.parser-niche-status.done { background: rgba(48,209,88,0.15); color: var(--accent-green); }
-.parser-niche-status.error { background: rgba(255,69,58,0.15); color: var(--accent-red); }
-.parser-niche-status.cancelled { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
-.parser-niche-status.dedupe_running { background: rgba(191,90,242,0.15); color: var(--accent-purple); }
+
 .parser-niche-card .form-input { margin-top: 0; }
 .parser-niche-console {
     background: #05050a; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
@@ -928,7 +985,7 @@ body:before {
 .cc-flow-arrow { color: var(--text-secondary); opacity: 0.45; font-size: 12px; }
 
 /* КАРТОЧКА ЧЕРНОВИКА */
-.cc-card { background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; margin-bottom: 14px; overflow: hidden; }
+.cc-card { border-radius: 16px; margin-bottom: 14px; overflow: hidden; }
 .cc-card.collapsed { background: rgba(28,28,30,0.6); }
 
 .cc-head { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; }
@@ -939,11 +996,6 @@ body:before {
 .cc-head-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
 .cc-muted { color: var(--text-secondary); font-weight: 400; }
 
-.cc-pill { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 7px; background: rgba(255,255,255,0.07); color: var(--text-secondary); }
-.cc-pill-work { background: rgba(255,159,10,0.15); color: var(--accent-orange); }
-.cc-pill-ready { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
-.cc-pill-done { background: rgba(48,209,88,0.15); color: var(--accent-green); }
-.cc-pill-agent { background: rgba(191,90,242,0.15); color: var(--accent-purple); }
 
 /* Шаги внутри карточки - показывают, где именно ты сейчас в пайплайне. */
 .cc-steps { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -1012,25 +1064,8 @@ body:before {
 /* ДЕЙСТВИЯ */
 .cc-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
 .cc-actions-spacer { flex: 1 1 auto; }
-/* Общая механика (высота, радиус, отклик, disabled) задана выше вместе с
-   остальными кнопками - здесь остаётся только то, чем .cc-primary
-   отличается: это кнопка на всю ширину блока. */
-.cc-primary { width: 100%; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 15px; margin-top: 20px; }
-.cc-primary-inline { width: auto; min-height: var(--control-h); margin-top: 0; padding: 0 16px; font-size: 13px; border-radius: 11px; }
-.cc-link {
-    border: none; background: none; color: var(--accent-blue); font-size: 12px; font-weight: 600;
-    font-family: inherit; cursor: pointer; padding: 0; transition: color 140ms var(--ease-out);
-}
-.cc-link:hover:not(:disabled) { color: #4aa8ff; }
 
 /* ПУСТЫЕ СОСТОЯНИЯ */
-.cc-placeholder { background: var(--bg-grouped); border: 1px dashed rgba(255,255,255,0.12); border-radius: 14px; padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
-.cc-placeholder-hero { padding: 40px 24px; }
-.cc-placeholder-hero .cc-placeholder-icon { font-size: 30px; margin-bottom: 10px; }
-.cc-placeholder-hero b { display: block; font-size: 16px; color: var(--text-primary); margin-bottom: 6px; }
-.cc-placeholder-hero p { max-width: 440px; margin: 0 auto 18px; }
-.cc-empty { font-size: 12.5px; color: var(--text-secondary); }
-.cc-empty-inline { padding: 6px 0; }
 
 /* СЕКЦИЯ "ЧЕРНОВИКИ НА ПРОВЕРКЕ" */
 .cc-section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--separator); }
@@ -1044,13 +1079,13 @@ body:before {
 
 @media (max-width: 767px) {
     .cc-toprow { flex-direction: column; align-items: stretch; }
-    .cc-toprow .cc-primary-inline { width: 100%; padding: 13px; font-size: 15px; }
+    .cc-toprow .ui-btn { width: 100%; }
     .cc-flow { justify-content: center; }
     .cc-suggest { width: 100%; }
     .cc-toolbar { flex-direction: column; align-items: stretch; }
     .cc-segment { justify-content: center; }
     .cc-actions { flex-direction: column; align-items: stretch; }
-    .cc-actions .cc-secondary, .cc-actions .cc-primary-inline { width: 100%; text-align: center; }
+    .cc-actions .ui-btn { width: 100%; }
     .cc-actions-spacer { display: none; }
 }
 
@@ -1070,7 +1105,7 @@ body:before {
 .ie-panel { background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; }
 .ie-panel > .cc-label:first-child { margin-top: 0; }
 .ie-panel-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.ie-panel-actions .cc-secondary { padding: 0 12px; font-size: 12px; }
+.ie-panel-actions .ui-btn { padding: 0 12px; font-size: 12px; }
 .ie-asset-preview { margin-top: 8px; font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
 
 .ie-text-tools { display: flex; align-items: center; gap: 12px; }
@@ -1120,10 +1155,7 @@ body:before {
 .scrape-row-contacts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
 
 .merged-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-.merged-stat {
-    flex: 1 1 140px; padding: 14px 16px; border-radius: 12px;
-    background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.06);
-}
+.merged-stat { flex: 1 1 140px; padding: 14px 16px; border-radius: 12px; }
 .merged-stat b { display: block; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
 .merged-stat b.ok { color: var(--accent-green); }
 .merged-stat span { font-size: 11.5px; color: var(--text-secondary); }
@@ -1139,7 +1171,6 @@ body:before {
 .merged-table a { color: var(--accent-blue); text-decoration: none; }
 .merged-table a:hover { text-decoration: underline; }
 
-.parser-niche-status.searching { background: rgba(191,90,242,0.15); color: var(--accent-purple); }
 
 @media (max-width: 767px) {
     .cust-tabs { width: 100%; justify-content: center; }
@@ -1216,8 +1247,8 @@ body:before {
        вторичные действия ставим по две в ряд, полную ширину оставляем
        только «Опубликовать». */
     .idea-actions { flex-direction: row; }
-    .idea-actions .cc-secondary { flex: 1 1 calc(50% - 4px); width: auto; }
-    .idea-actions .cc-primary-inline { flex: 1 1 100%; }
+    .idea-actions .ui-btn--secondary, .idea-actions .ui-btn--danger { flex: 1 1 calc(50% - 4px); width: auto; }
+    .idea-actions .ui-btn--primary { flex: 1 1 100%; }
 
     .pn-grid { grid-template-columns: minmax(0, 1fr); }
     .pn-actions, .pn-actions-group { flex-direction: column; align-items: stretch; }
@@ -1250,11 +1281,10 @@ body:before {
 }
 .crm-obj:hover { color: var(--text-primary); }
 .crm-obj.on { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
-.crm-obj-count {
-    display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 6px;
-    background: rgba(255,255,255,0.08); color: var(--text-secondary); font-size: 11px;
-}
-.crm-obj.on .crm-obj-count { background: rgba(10,132,255,0.18); color: var(--accent-blue); }
+/* Счётчик в переключателе объектов - тот же .ui-badge, здесь только отступ
+   и подсветка внутри активной вкладки. */
+.crm-obj .ui-badge { margin-left: 5px; padding: 1px 6px; }
+.crm-obj.on .ui-badge { --badge-bg: rgba(10, 132, 255, 0.18); --badge-fg: var(--accent-blue); }
 
 .crm-body { padding: 20px 24px 40px; max-width: 1600px; }
 .crm-body .kanban-board { padding: 0; height: auto; min-height: 60vh; }
@@ -1262,7 +1292,7 @@ body:before {
 .merged-stat b.bad { color: var(--accent-red); }
 
 .crm-overview-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-.crm-panel { background: var(--bg-grouped); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; }
+.crm-panel { padding: 16px; }
 .crm-panel-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
@@ -1350,7 +1380,7 @@ select.crm-cell { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .crm-script > summary { cursor: pointer; padding: 12px 14px; background: rgba(255,255,255,0.04); font-size: 13px; font-weight: 600; list-style: none; }
 .crm-script > summary::-webkit-details-marker { display: none; }
 .crm-script-body { padding: 12px 14px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: var(--text-secondary); }
-.crm-script .cc-secondary { margin: 0 14px 14px; }
+.crm-script .ui-btn { margin: 0 14px 14px; }
 
 .crm-related { margin-top: 24px; }
 .crm-related-row {
