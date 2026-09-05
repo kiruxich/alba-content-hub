@@ -1,0 +1,36 @@
+<task-notification>
+<task-id>ad3d2fe075b4189e9</task-id>
+<tool-use-id>toolu_01QJum9o8THSFZfgBFubz9UY</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kiruxa-Desktop-alba-content-hub/fc8affdb-d400-4f39-8fa9-83519e7ff8ce/tasks/ad3d2fe075b4189e9.output</output-file>
+<status>completed</status>
+<summary>Agent "Review frontend code from this session" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Code Review: URL Checker, Parser Niches, Idea EN Translation
+
+**1. Проверка сайта (URL checker)** — No real bugs found.
+- `runUrlCheck` handles network/API failure correctly (try/catch, button re-enabled in `finally`).
+- `escapeHtml` is applied consistently everywhere scanned-site-controlled data lands in the template (`f.message`, `f.ruleId`, `f.fix`, `f.severity`, `health.error`) — no HTML-injection path from `findings`.
+- `generateUrlCheckPdf` blob cleanup (`URL.revokeObjectURL` after `a.click()`) is the standard safe pattern.
+- Minor/low-risk: `missingHeaders.join(', ')` and `health.status` are interpolated unescaped, but both are backend-derived (header key names, HTTP status code), not raw scanned HTML — not exploitable in practice.
+
+**2. Заказчики (parser niches)** — several real issues:
+
+- **`drawParserNiches` (app.js ~1717) — data loss during active polling.** Every 4s while *any* niche is `queued/running/captcha/dedupe_running`, `startParserPolling`'s interval calls `drawParserNiches()`, which does a full `innerHTML` replace of the *entire* grid, not just the active card. Failure scenario: user has one niche running, and is mid-typing (not yet blurred) into the category/description field of a *different, idle* niche card — within 4 seconds their unsaved keystrokes and focus are wiped out because the whole grid's inputs are recreated from the stale in-memory `parserNiches` array.
+
+- **`saveParserNicheField` (app.js ~1780) — no rollback on failed save.** `niche[field] = value` is set optimistically before the `await api(...)`. On failure it only shows a toast; the local array keeps the "new" value, so the UI still displays the edited text as if saved. Failure scenario: PUT fails (network blip), user sees toast but input still shows the edited value; next reload/poll silently reverts it with no further indication the edit was lost.
+
+- **`runParserNiche` (app.js ~1791) — no click-time guard.** The "▶ Обновить парсер" button is only disabled after the async `/run` response updates `n.status`; there's no immediate disable/debounce on click. Failure scenario: user double-clicks quickly, firing two concurrent `POST /run` requests before the first resolves.
+
+- **Background polling persists across tab switches** — not a leak (`parserPollTimers[id]` guard in `startParserPolling` prevents duplicate timers even if `renderParserNiches` re-runs), but polling keeps firing every 4s while the user is on a different tab, until the niche finishes.
+
+- **`removeParserNiche`** correctly clears its timer before deletion — no leak there.
+
+- **CSS gap (styles.css ~486-493):** `statusLabels` in JS includes `queued`, but `.parser-niche-status.queued` has no CSS rule (only `idle/running/captcha/done/error/cancelled/dedupe_running` are styled) — a queued niche's status pill renders unstyled/default color instead of a distinct color.
+
+**3. Idea EN translation** — EN-section show/hide (`openEditIdeaModal` → `display:block`, `openNewIdeaModal` → `display:none`) and the persist-only-when-editing logic in `saveIdeaChanges` (EN fields only read/sent inside the `if (id)` branch) are both correct; no bugs there.
+
+- **`translateIdeaToEnglish` (app.js line 629) — unguarded global `event` use.** `const btn = event.target;` executes *before* the try/catch. It only works because the button uses an inline `onclick` handler, where browsers implicitly populate `window.event`. If this function is ever invoked without a live synchronous click (keyboard-triggered form submit, programmatic call, future refactor to `addEventListener`), `event` is `undefined` → `ReferenceError` thrown outside the try/catch, silently breaking translation with an uncaught exception and no user-facing error message.
+
+result: Reviewed all three features (URL checker, parser niches, idea EN translation) across index.html/app.js/styles.css. URL checker tab has no real issues. Parser niches tab has the most impactful bug: `drawParserNiches()` replaces the entire grid's innerHTML on every 4s poll tick, wiping unsaved/unblurred input text and focus in any card while any niche is active — plus no-rollback optimistic saves in `saveParserNicheField`, a double-click race in `runParserNiche`, and a missing `.parser-niche-status.queued` CSS rule. Idea EN translation logic (show/hide, persist-only-on-edit) is correct, but `translateIdeaToEnglish` reads the global `event` object before its try/catch, which throws an uncaught ReferenceError if ever called without a live inline-click event.</result>
+<usage><subagent_tokens>80915</subagent_tokens><tool_uses>13</tool_uses><duration_ms>152260</duration_ms></usage>
+</task-notification>
