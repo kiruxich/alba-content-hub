@@ -1,0 +1,6 @@
+<task-notification>
+<task-id>ad3632a8f1fd293a2</task-id>
+<task-id>a499991704528fd10</task-id>
+<status>stopped</status>
+<summary>No completion record was found for 2 background agents from the previous session: "Merge Agent Settings into Agent Center" (ad3632a8f1fd293a2), "YouTube OAuth registration script" (a499991704528fd10). They may have been stopped, or they may have been running when the previous Claude Code process exited — either way their transcripts are saved, so their progress is not lost. Resume any of them by sending a message to its id with SendMessage, or check its worktree/output for partial work before assuming the task landed.</summary>
+</task-notification>
