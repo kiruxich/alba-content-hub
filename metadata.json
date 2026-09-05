@@ -3,7 +3,7 @@
   "checkpoint_id": "01M1RP0FJ6GQQF1T2D7PA851VE",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "infra/ansible/site.yml",
     "infra/ansible/tasks/print_env_summary.yml"
@@ -22,13 +22,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 950,
-    "cache_creation_tokens": 2931826,
-    "cache_read_tokens": 172451369,
-    "output_tokens": 364133,
-    "api_call_count": 479
+    "input_tokens": 976,
+    "cache_creation_tokens": 2949586,
+    "cache_read_tokens": 177451754,
+    "output_tokens": 374679,
+    "api_call_count": 492
   }
 }

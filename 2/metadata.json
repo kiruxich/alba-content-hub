@@ -1,0 +1,94 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "01M1RP0FJ6GQQF1T2D7PA851VE",
+  "session_id": "ce2c234a-a392-4523-81ee-12b7539fd8ba",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-05T11:42:14.099146Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "infra/ansible/site.yml",
+    "infra/ansible/tasks/print_env_summary.yml"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "13a9fa2a9d16",
+  "checkpoint_transcript_start": 1408,
+  "transcript_lines_at_start": 1408,
+  "compact_transcript_start": 257,
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 17760,
+    "cache_read_tokens": 5000385,
+    "output_tokens": 10546,
+    "api_call_count": 13
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01S8hSQqt9H2m3nUpWghCcib",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "graphify"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "feaf50c0d655",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 277,
+        "end": 278,
+        "entry_ids": [
+          "9734e564-6a52-499f-86f1-24f597590ded"
+        ],
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01S8hSQqt9H2m3nUpWghCcib"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: graphify",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-05T11:42:13.973751Z",
+    "agent_lines": 41,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 41,
+    "total_lines_changed": 41,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 251,
+      "user_lines_removed": 229,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "index.html": 91,
+        "public/js/app.js": 83,
+        "styles.css": 77
+      },
+      "user_removed_per_file": {
+        "index.html": 91,
+        "public/js/app.js": 83,
+        "styles.css": 55
+      }
+    }
+  ]
+}
